@@ -71,7 +71,14 @@
 <body>
 
 <header>
-  <h1>SkulPlus</h1>
+  <h1 style="display:flex;align-items:center;gap:10px">
+    {% if SITE_LOGO_URL %}
+      <img src="{{ SITE_LOGO_URL }}" alt="SkulPlus" style="height:40px;width:auto;border-radius:6px;background:#fff;padding:3px">
+    {% else %}
+      <img src="{% static 'images/skulplus_logo.png' %}" alt="SkulPlus" style="height:40px;width:auto;border-radius:6px;background:#fff;padding:3px">
+    {% endif %}
+    <span>SkulPlus</span>
+  </h1>
     <div class="nav-buttons">
     <a href="{% url 'login' %}" class="login-btn">Login</a>
     <a href="{% url 'signup' %}" class="signup-btn">Get Started</a>
