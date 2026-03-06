@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+:root {
+  --blue:#0f3057;
+  --green:#16a34a;
+  --orange:#f59e0b;
+  --light:#f4f7fb;
+  --card:#ffffff;
+  --border:#e6ecf2;
+}
+
+body { background:var(--light); font-family:'Poppins',sans-serif; }
+
+.page-header {
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;
+}
+
+.card {
+  background:#fff; border-radius:14px; padding:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.05);
+}
+
+.select-row {
+  display:flex; gap:20px; margin-bottom:20px;
+}
+.select-row select {
+  flex:1;
+  padding:10px 12px;
+  border-radius:8px;
+  border:1px solid var(--border);
+}
+
+table { width:100%; border-collapse:collapse; margin-top:15px; }
+th, td { padding:12px 10px; border-bottom:1px solid var(--border); }
+th { text-align:left; color:#666; font-size:13px; }
+
+.btn-save {
+  background:linear-gradient(135deg,var(--blue),#1a73e8);
+  color:#fff; border:none; padding:10px 18px;
+  border-radius:8px; font-weight:600;
+  margin-top:15px;
+}
+
+.badge {
+  padding:5px 10px; border-radius:20px;
+  background:rgba(34,197,94,0.15); color:var(--green);
+  font-size:12px;
+}
+</style>
+
+<div class="page-header">
+  <h1><i class="fas fa-layer-group"></i> Subject Allocation</h1>
+</div>
+
+<div class="card">
+
+  <div class="select-row">
+    <select id="classSelect">
+      <option value="">Select Class</option>
+      {% for c in classes %}
+        <option value="{{ c.id }}" data-level="{% if c.resolved_level_name %}{{ c.resolved_level_name }}{% else %}{{ c.level.name|default:'' }}{% endif %}">{{ c.name }} - {{ c.section }}</option>
+      {% endfor %}
+    </select>
+
+    <select id="streamSelect" style="display:none">
+      <option value="">Select Stream (optional)</option>
+    </select>
+
+    <select id="pathwaySelect" style="display:none">
+      <option value="">Select Pathway</option>
+      {% for p in pathways %}
+        <option value="{{ p.id }}">{{ p.code }} - {{ p.name }}</option>
+      {% endfor %}
+    </select>
+
+    <select id="subjectSelect">
+      <option value="">Select Subject</option>
+      {% if school.system_type == 'CBE' and allow_pathways %}
+        {% for p in pathways %}
+          <optgroup label="{{ p.code }} - {{ p.name }}">
+            {% for s in subjects %}
+              {% if s.pathway_id == p.id %}
+                <option value="{{ s.id }}"
+                        data-pathway="{{ s.pathway.id|default:'' }}"
+                        data-pathway-code="{{ s.pathway.code|default:'' }}"
+                        data-level="{{ s.education_level.name|default:'' }}">
+                  [{{ s.pathway.code }}] {{ s.name }}
+                </option>
+              {% endif %}
+            {% endfor %}
+          </optgroup>
+        {% endfor %}
+        <optgroup label="Unassigned">
+          {% for s in subjects %}
+            {% if not s.pathway_id %}
+              <option value="{{ s.id }}"
+                      data-pathway=""
+                      data-pathway-code=""
+                      data-level="{{ s.education_level.name|default:'' }}">
+                {{ s.name }}
+              </option>
+            {% endif %}
+          {% endfor %}
+        </optgroup>
+      {% else %}
+        {% for s in subjects %}
+          <option value="{{ s.id }}"
+                  data-pathway="{{ s.pathway.id|default:'' }}"
+                  data-pathway-code="{{ s.pathway.code|default:'' }}"
+                  data-level="{{ s.education_level.name|default:'' }}">
+            {{ s.name }}
+          </option>
+        {% endfor %}
+      {% endif %}
+    </select>
+  </div>
+
+  <div id="selectedSubjectBadge" style="margin:10px 0; display:none"></div>
+
+  <div id="studentsArea" style="display:none">
+    <label style="font-weight:600; margin-right:20px; display:inline-block">
+      <input type="checkbox" id="allocateAll"> Allocate All Students in Class
+    </label>
+
+    <label style="font-weight:600; display:inline-block">
+      <input type="checkbox" id="selectAll"> Select All Students
+    </label>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Student Name</th>
+          <th>Admission No</th>
+          <th style="text-align:right">Taking Subject</th>
+        </tr>
+      </thead>
+      <tbody id="studentsTable"></tbody>
+    </table>
+
+    <button id="saveAllocBtn" class="btn-save" onclick="saveAllocations()">
+      <i class="fas fa-save"></i> Save Allocations
+    </button>
+  </div>
+
+</div>
+
+
+<script>
+const classSelect = document.getElementById("classSelect");
+const streamSelect = document.getElementById("streamSelect");
+const subjectSelect = document.getElementById("subjectSelect");
+const pathwaySelect = document.getElementById("pathwaySelect");
+const studentsArea = document.getElementById("studentsArea");
+const studentsTable = document.getElementById("studentsTable");
+const selectAll = document.getElementById("selectAll");
+const allocateAll = document.getElementById("allocateAll");
+const selectedSubjectBadge = document.getElementById("selectedSubjectBadge");
+const schoolSystemType = "{{ school.system_type }}";
+const allowPathways = "{{ allow_pathways|yesno:'true,false' }}" === "true";
+
+function filterSubjects(){
+  const classOption = classSelect.options[classSelect.selectedIndex];
+  const level = classOption ? (classOption.dataset.level || '') : '';
+  const pathwayId = pathwaySelect.value;
+
+  Array.from(subjectSelect.options).forEach(opt => {
+    if (!opt.value) return;
+    const subjectLevel = opt.dataset.level || '';
+    const subjectPathway = opt.dataset.pathway || '';
+
+    let visible = true;
+    if (schoolSystemType === 'CBE' && level) {
+      if (subjectLevel !== level) {
+        visible = false;
+      }
+
+      if (level === 'Senior') {
+        if (!allowPathways) {
+          visible = false;
+        } else if (!pathwayId) {
+          visible = false;
+        } else if (!subjectPathway || subjectPathway !== pathwayId) {
+          visible = false;
+        }
+      }
+    }
+
+    opt.hidden = !visible;
+  });
+
+  if (subjectSelect.selectedOptions.length && subjectSelect.selectedOptions[0].hidden) {
+    subjectSelect.value = '';
+  }
+}
+
+classSelect.addEventListener("change", function(){
+  // Load streams for selected class
+  const classId = this.value;
+  const classOption = classSelect.options[classSelect.selectedIndex];
+  const level = classOption ? (classOption.dataset.level || '') : '';
+
+  if (schoolSystemType === 'CBE' && level === 'Senior' && allowPathways) {
+    pathwaySelect.style.display = 'block';
+  } else {
+    pathwaySelect.style.display = 'none';
+    pathwaySelect.value = '';
+  }
+
+  filterSubjects();
+  if (!classId) {
+    streamSelect.innerHTML = '<option value="">Select Stream (optional)</option>';
+    streamSelect.style.display = 'none';
+    loadStudents();
+    return;
+  }
+
+  fetch(`/school/load-streams-for-class/?class_id=${classId}`, {
+    method: 'GET',
+    headers: {'X-Requested-With': 'XMLHttpRequest'}
+  })
+  .then(res => res.json())
+  .then(data => {
+    streamSelect.innerHTML = '<option value="">All Streams</option>';
+    if (data.streams && data.streams.length > 0) {
+      data.streams.forEach(stream => {
+        const option = document.createElement('option');
+        option.value = stream.id;
+        option.text = stream.name;
+        streamSelect.appendChild(option);
+      });
+      streamSelect.style.display = 'block';
+    } else {
+      streamSelect.style.display = 'none';
+    }
+    loadStudents();
+  })
+  .catch(err => {
+    console.error('Error loading streams:', err);
+    streamSelect.style.display = 'none';
+    loadStudents();
+  });
+});
+
+streamSelect.addEventListener("change", loadStudents);
+subjectSelect.addEventListener("change", loadStudents);
+pathwaySelect.addEventListener("change", function(){
+  filterSubjects();
+  loadStudents();
+});
+
+function loadStudents(){
+  let classId = classSelect.value;
+  let subjectId = subjectSelect.value;
+  let streamId = streamSelect.value;
+
+  if(!classId || !subjectId){
+    studentsArea.style.display = "none";
+    selectedSubjectBadge.style.display = "none";
+    return;
+  }
+
+  const selectedOption = subjectSelect.options[subjectSelect.selectedIndex];
+  const classOption = classSelect.options[classSelect.selectedIndex];
+  const level = classOption ? (classOption.dataset.level || '') : '';
+  if (selectedOption && schoolSystemType === 'CBE' && level === 'Senior' && allowPathways) {
+    const code = selectedOption.dataset.pathwayCode || '';
+    const label = code || 'CORE';
+    let badgeClass = 'badge-core';
+    if (code) badgeClass = `badge-${code.toLowerCase()}`;
+    selectedSubjectBadge.innerHTML = `<span class="badge ${badgeClass}">${label}</span> ${selectedOption.text.replace(/\[[^\]]+\]\s*/,'')}`;
+    selectedSubjectBadge.style.display = 'block';
+  } else {
+    selectedSubjectBadge.style.display = 'none';
+  }
+
+  // reset top controls when loading new student list
+  allocateAll.checked = false;
+  allocateAll.disabled = false;
+  selectAll.checked = false;
+  selectAll.disabled = false;
+
+  let url = `{% url "load_students_for_subject" %}?class_id=${classId}&subject_id=${subjectId}`;
+  if (streamId) {
+    url += `&stream_id=${streamId}`;
+  }
+
+  fetch(url, { credentials: 'same-origin' })
+    .then(res=>res.json())
+    .then(data=>{
+      studentsTable.innerHTML = "";
+      data.students.forEach(s=>{
+        studentsTable.innerHTML += `
+          <tr>
+            <td><span class="badge">${s.name}</span></td>
+            <td>${s.admission_number || s.admission || ''}</td>
+            <td style="text-align:right">
+              <input type="checkbox" class="student-check" value="${s.id}" ${s.allocated ? "checked":""}>
+            </td>
+          </tr>`;
+      });
+      studentsArea.style.display = "block";
+      updateSelectAllState();
+    });
+}
+
+selectAll.addEventListener("change", function(){
+  if(allocateAll.checked) return; // ignore when allocate-all is active
+  document.querySelectorAll(".student-check").forEach(cb=>{
+    cb.checked = selectAll.checked;
+  });
+});
+
+allocateAll.addEventListener('change', function(){
+  const active = allocateAll.checked;
+  // when allocate-all is checked, disable individual checkboxes and mark them checked
+  document.querySelectorAll('.student-check').forEach(cb=>{
+    cb.checked = active;
+    cb.disabled = active;
+  });
+  // disable the selectAll control while allocate-all is active
+  selectAll.checked = active;
+  selectAll.disabled = active;
+});
+
+function updateSelectAllState(){
+  let all = document.querySelectorAll(".student-check");
+  let checked = document.querySelectorAll(".student-check:checked");
+  selectAll.checked = all.length === checked.length;
+}
+
+function saveAllocations(){
+  let classId = classSelect.value;
+  let subjectId = subjectSelect.value;
+  let streamId = streamSelect.value;
+
+  let selected = [];
+  document.querySelectorAll(".student-check:checked").forEach(cb=>{
+    selected.push(cb.value);
+  });
+
+  const allocate_all = allocateAll.checked;
+
+  function getCookie(name){const v='; '+document.cookie;const parts=v.split('; '+name+'=');if(parts.length===2)return parts.pop().split(';').shift()}
+
+  const saveBtn = document.getElementById('saveAllocBtn');
+  saveBtn.disabled = true;
+  fetch('{% url "save_subject_allocations" %}', {
+    method: "POST",
+    credentials: 'same-origin',
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": getCookie('csrftoken'),
+      "X-Requested-With": 'XMLHttpRequest'
+    },
+    body: JSON.stringify({
+      class_id: classId,
+      subject_id: subjectId,
+      stream_id: streamId,
+      students: selected,
+      allocate_all: allocate_all
+    })
+  }).then(res => {
+    if (!res.ok) return res.json().then(err => Promise.reject(err));
+    return res.json();
+  }).then(data => {
+    alert('Allocations saved successfully!');
+    // refresh the students list so UI reflects the new allocations
+    loadStudents();
+  }).catch(err => {
+    console.error(err);
+    alert(err.error || err.message || 'Error saving allocations');
+  }).finally(() => { saveBtn.disabled = false; });
+}
+</script>
+
+{% endblock %}

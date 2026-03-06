@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+
+{% block title %}Fee Receipt{% endblock %}
+
+{% block header %}
+<h2 style="margin:0">Fee Receipt #{{ payment.id }}</h2>
+{% endblock %}
+
+{% block content %}
+<style>
+  .receipt-wrap { max-width: 860px; margin: 0 auto; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:18px; }
+  .receipt-top { display:flex; justify-content:space-between; gap:12px; border-bottom:2px solid #0f3057; padding-bottom:10px; margin-bottom:12px; align-items:flex-start; }
+  .header-left { display:flex; gap:10px; align-items:flex-start; }
+  .school-logo { width:72px; height:72px; object-fit:contain; border:1px solid #e5e7eb; border-radius:6px; padding:4px; background:#fff; }
+  .muted { color:#6b7280; font-size:12px; }
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+  .info-box { border:1px solid #e5e7eb; border-radius:8px; padding:10px; }
+  .kv { display:flex; justify-content:space-between; margin:4px 0; }
+  .split-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+  .split-table th, .split-table td { border:1px solid #e5e7eb; padding:8px; }
+  .split-table th { background:#f9fafb; text-align:left; }
+  .right { text-align:right; }
+  .stamp-wrap { display:flex; align-items:center; justify-content:flex-end; gap:12px; }
+  .school-stamp { width:110px; height:110px; object-fit:contain; background:transparent !important; border:none !important; padding:0 !important; box-shadow:none !important; }
+  .actions { display:flex; gap:8px; margin-bottom:10px; }
+  .btn { text-decoration:none; border:none; padding:9px 12px; border-radius:6px; cursor:pointer; }
+  .btn-primary { background:#0f3057; color:#fff; }
+  .btn-soft { background:#fff; color:#111827; border:1px solid #d1d5db; }
+  @media print {
+    .no-print { display:none !important; }
+    .main { margin-left:0 !important; padding:0 !important; }
+    body { background:#fff !important; }
+    .receipt-wrap { max-width:none; margin:0; border:none; border-radius:0; padding:6mm; }
+  }
+</style>
+
+<div class="actions no-print">
+  <button class="btn btn-primary" onclick="printReceipt()">Print Receipt</button>
+  <a class="btn btn-soft" href="{% url 'fee_receipt' payment.id %}?format=pdf">Download PDF</a>
+  <a class="btn btn-soft" href="{% url 'add_payment' %}">Back To Fee Payment</a>
+</div>
+
+<section class="receipt-wrap" id="receipt-print-root">
+  <div class="receipt-top">
+    <div class="header-left">
+      {% if student.school.logo %}
+        <img src="{{ student.school.logo.url }}" alt="{{ student.school.name }} logo" class="school-logo" />
+      {% endif %}
+      <div>
+        <h3 style="margin:0;color:#0f3057;">{{ student.school.name }}</h3>
+        <div class="muted">Official Fee Receipt</div>
+        <div class="muted">
+          {% if student.school.address %}{{ student.school.address }}{% endif %}
+          {% if student.school.phone %}{% if student.school.address %} | {% endif %}{{ student.school.phone }}{% endif %}
+          {% if student.school.email %} | {{ student.school.email }}{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="right">
+      <div><strong>Receipt No:</strong> {{ payment.id }}</div>
+      <div><strong>Date:</strong> {{ payment.date_paid }}</div>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-box">
+      <div class="kv"><span>Student</span><strong>{{ student.first_name }} {{ student.last_name }}</strong></div>
+      <div class="kv"><span>Admission No</span><strong>{{ student.admission_number }}</strong></div>
+      <div class="kv"><span>Class</span><strong>{% if student.classroom %}{{ student.classroom.name }}{% else %}-{% endif %}</strong></div>
+    </div>
+    <div class="info-box">
+      <div class="kv"><span>Term</span><strong>{{ payment.term }}</strong></div>
+      <div class="kv"><span>Year</span><strong>{{ payment.year }}</strong></div>
+      <div class="kv"><span>Payment Method</span><strong>{{ payment.payment_method }}</strong></div>
+      <div class="kv"><span>Total Paid</span><strong>{{ payment.amount_paid }}</strong></div>
+    </div>
+  </div>
+
+  <table class="split-table">
+    <thead>
+      <tr>
+        <th>Year</th>
+        <th>Term</th>
+        <th>Vote Head</th>
+        <th class="right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in allocations %}
+      <tr>
+        <td>{{ row.allocation_year }}</td>
+        <td>{{ row.allocation_term }}</td>
+        <td>{{ row.vote_head }}</td>
+        <td class="right">{{ row.amount }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4">No split rows available.</td></tr>
+      {% endfor %}
+      <tr>
+        <td colspan="3" class="right"><strong>Total</strong></td>
+        <td class="right"><strong>{{ payment.amount_paid }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-grid" style="margin-top:12px;">
+    <div class="info-box">
+      <div class="kv"><span>Balance Before Payment</span><strong>{{ balance_before }}</strong></div>
+      <div class="kv"><span>Balance After Payment</span><strong>{{ balance_after }}</strong></div>
+    </div>
+    <div class="info-box">
+      <div class="stamp-wrap">
+        <div>
+          <div class="muted">Prepared by {{ request.user.get_full_name|default:request.user.username }}</div>
+          <div class="muted">Accounts Office</div>
+        </div>
+        {% if student.school.stamp %}
+          <img src="{{ student.school.stamp.url }}" alt="{{ student.school.name }} stamp" class="school-stamp" />
+        {% endif %}
+      </div>
+      <div class="muted">Thank you.</div>
+    </div>
+  </div>
+</section>
+
+<script>
+  function printReceipt() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('format', 'pdf');
+    url.searchParams.set('print_pdf', '1');
+    if (window.SkulPlusPrint && window.SkulPlusPrint.printUrl) {
+      window.SkulPlusPrint.printUrl(url.toString());
+    } else {
+      window.open(url.toString(), '_blank');
+    }
+  }
+</script>
+{% endblock %}

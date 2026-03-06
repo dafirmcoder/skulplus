@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<div class="page-header">
+  <h1><i class="fas fa-user-plus"></i> Admit New Student</h1>
+  <a href="{% url 'admit_student' %}" class="btn-cancel">Back to list</a>
+</div>
+
+<div class="card">
+  <form method="post" enctype="multipart/form-data" id="admit-student-form-full">
+    {% csrf_token %}
+    <div id="admit-form-errors" style="margin-bottom:8px"></div>
+
+    <div class="form-grid">
+      <div class="form-group photo-group">
+        <label>Student Photo</label>
+        <div class="photo-upload">
+          <img id="photoPreview" src="https://via.placeholder.com/120x120?text=Photo" class="photo-preview">
+          <label class="upload-btn">
+            <i class="fas fa-camera"></i> Upload Photo
+            <input type="file" name="photo" accept="image/*" onchange="previewPhoto(event)" hidden>
+          </label>
+        </div>
+      </div>
+
+      {% for field in form %}
+      <div class="form-group">
+        <label>{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}
+          <small class="error">{{ field.errors|join:", " }}</small>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+    </div>
+
+    <div class="modal-actions">
+      <button type="submit" class="btn-save">Save</button>
+    </div>
+  </form>
+</div>
+
+<style>
+/* reuse small set of styles from classes/admit templates */
+.page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.05); }
+.form-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:20px; }
+.form-group label{ font-size:13px; font-weight:600; margin-bottom:6px; color:#374151; }
+.photo-preview{ width:120px; height:120px; object-fit:cover; border-radius:14px; border:2px dashed #2563eb; padding:6px; background:#eef2ff; }
+.upload-btn{ font-size:13px; background:#22c55e; color:#fff; padding:7px 14px; border-radius:6px; cursor:pointer; }
+.modal-actions{ text-align:right; margin-top:12px; }
+.btn-save{ background:linear-gradient(135deg,#0f3057,#1a73e8); color:#fff; border:none; padding:8px 14px; border-radius:6px; }
+.btn-cancel{ background:#eee; padding:8px 12px; border-radius:6px; text-decoration:none; color:#000 }
+.error{ color:#dc2626; font-size:12px; margin-top:4px; }
+</style>
+
+<script>
+function previewPhoto(e){ var img = document.getElementById('photoPreview'); var file = e.target.files && e.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function(ev){ img.src = ev.target.result; }; reader.readAsDataURL(file); }
+
+// Dynamic stream loading when classroom changes
+document.addEventListener('DOMContentLoaded', function(){
+  const classroomSelect = document.querySelector('select[name="classroom"]');
+  const streamSelect = document.querySelector('select[name="stream"]');
+  
+  if (classroomSelect && streamSelect) {
+    classroomSelect.addEventListener('change', function(){
+      const classId = this.value;
+      if (!classId) {
+        streamSelect.innerHTML = '<option value="">---------</option>';
+        return;
+      }
+      
+      fetch(`/load-streams-for-class/?class_id=${classId}`, {
+        method: 'GET',
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+      })
+      .then(res => res.json())
+      .then(data => {
+        streamSelect.innerHTML = '<option value="">---------</option>';
+        if (data.streams && data.streams.length > 0) {
+          data.streams.forEach(stream => {
+            const option = document.createElement('option');
+            option.value = stream.id;
+            option.text = stream.name;
+            streamSelect.appendChild(option);
+          });
+        }
+      })
+      .catch(err => console.error('Error loading streams:', err));
+    });
+  }
+
+  // Submit via AJAX optionally — reuse same logic as list page
+  const form = document.getElementById('admit-student-form-full');
+  if (!form) return;
+  form.addEventListener('submit', function(ev){
+    // allow normal POST when JS disabled; with JS we'll use fetch and redirect back on success
+    ev.preventDefault();
+    const fd = new FormData(form);
+    const csrftoken = document.cookie.split('csrftoken=')[1] || '';
+    fetch(form.action || window.location.href, { method:'POST', body:fd, credentials:'same-origin', headers:{ 'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': csrftoken } }).then(async res=>{
+      if (res.ok){
+        const ct = res.headers.get('content-type')||'';
+        if (ct.includes('application/json')){
+          const data = await res.json();
+          if (data.success){ window.location.href = '{% url "admit_student" %}'; }
+        } else { window.location.href = '{% url "admit_student" %}'; }
+      } else {
+        try{ const d = await res.json(); if (d && d.errors) { displayFormErrors(d.errors); return; } } catch(e){}
+        const txt = await res.text(); displayFormErrors({'__all__':[txt.slice(0,500)]});
+      }
+    }).catch(err=>{ displayFormErrors({'__all__':['Network error: '+err.message]}); });
+  });
+});
+
+function displayFormErrors(errors){ const gen=document.getElementById('admit-form-errors'); gen.innerHTML=''; for(const k in errors){ const msgs=errors[k]; const div=document.createElement('div'); div.className='error'; div.textContent = Array.isArray(msgs)?msgs.join('; '):msgs; gen.appendChild(div); } }
+</script>
+
+{% endblock %}

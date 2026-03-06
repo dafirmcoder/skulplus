@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<div class="page-wrapper">
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <h1><i class="fas fa-user-edit"></i> Edit Students</h1>
+    <p>Search, view and update student records</p>
+  </div>
+
+  <!-- SEARCH BAR -->
+  <div class="search-bar">
+    <input type="text" id="studentSearch" placeholder="Search by name, admission number or class...">
+    <i class="fas fa-search"></i>
+  </div>
+
+  <!-- STUDENT TABLE -->
+  <div class="table-card">
+    <table class="student-table">
+      <thead>
+        <tr>
+          <th>Photo</th>
+          <th>Admission No.</th>
+          <th>Name</th>
+          {% if allow_pathways %}
+          <th>Pathway</th>
+          {% endif %}
+          <th>Class</th>
+          <th>Gender</th>
+          <th>Parent Phone</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="studentTable">
+        {% for student in students %}
+        <tr data-student-id="{{ student.id }}">
+          <td>
+            {% if student.photo %}
+              <img src="{{ student.photo.url }}" class="student-pic">
+            {% else %}
+              <img src="https://via.placeholder.com/40" class="student-pic">
+            {% endif %}
+          </td>
+          <td>{{ student.admission_number }}</td>
+          <td>{{ student.first_name }} {{ student.last_name }}</td>
+          {% if allow_pathways %}
+          <td>
+            {% if student.classroom.level and student.classroom.level.name == 'Senior' %}
+              {% if student.studentpathway %}
+                <span class="badge badge-{{ student.studentpathway.pathway.code|lower }}">{{ student.studentpathway.pathway.code }}</span>
+              {% else %}
+                <span class="badge badge-warning">Not Selected</span>
+              {% endif %}
+            {% else %}
+              <span style="color:#9ca3af">—</span>
+            {% endif %}
+          </td>
+          {% endif %}
+          <td>{{ student.classroom }}</td>
+          <td>{{ student.gender }}</td>
+          <td>{{ student.parent_phone }}</td>
+          <td>
+            <a href="#" onclick="openEditModal({{ student.id }});return false;" class="btn-action edit" title="Edit">
+              <i class="fas fa-pen"></i>
+            </a>
+            <a href="#" onclick="openViewModal({{ student.id }});return false;" class="btn-action view" title="View">
+              <i class="fas fa-eye"></i>
+            </a>
+            <a href="#" onclick="openDeleteModal({{ student.id }});return false;" class="btn-action" style="background:#ef4444" title="Delete">
+              <i class="fas fa-trash"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="{% if allow_pathways %}8{% else %}7{% endif %}" style="text-align:center;padding:20px;color:#888;">
+            No students found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+:root{
+  --skul-blue:#1e3a8a;
+  --skul-blue-light:#2563eb;
+  --skul-green:#22c55e;
+  --skul-orange:#f59e0b;
+  --bg:#f4f7fb;
+}
+
+.page-wrapper{
+  padding:30px;
+  font-family:'Poppins',sans-serif;
+  background:var(--bg);
+  min-height:100vh;
+}
+
+.page-header h1{
+  margin:0;
+  color:var(--skul-blue);
+  font-size:24px;
+}
+.page-header p{
+  margin:6px 0 20px;
+  color:#6b7280;
+  font-size:14px;
+}
+
+/* SEARCH */
+.search-bar{
+  position:relative;
+  max-width:400px;
+  margin-bottom:20px;
+}
+.search-bar input{
+  width:100%;
+  padding:11px 40px 11px 14px;
+  border-radius:8px;
+  border:1px solid #e5e7eb;
+  background:#fff;
+}
+.search-bar i{
+  position:absolute;
+  right:12px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#888;
+}
+
+/* TABLE CARD */
+.table-card{
+  background:#fff;
+  border-radius:14px;
+  padding:18px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.05);
+  overflow-x:auto;
+}
+
+.student-table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+.student-table thead{
+  background:#eef2ff;
+}
+
+.student-table th{
+  text-align:left;
+  padding:12px;
+  font-size:13px;
+  color:#374151;
+}
+
+.student-table td{
+  padding:12px;
+  border-top:1px solid #f1f5f9;
+  font-size:14px;
+}
+
+.student-table tr:hover{
+  background:#f9fafb;
+}
+
+.student-pic{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  object-fit:cover;
+  border:2px solid #e0e7ff;
+}
+
+/* ACTION BUTTONS */
+.btn-action{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:34px;
+  height:34px;
+  border-radius:8px;
+  margin-right:6px;
+  text-decoration:none;
+  color:#fff;
+  font-size:14px;
+  transition:0.2s;
+}
+
+.btn-action.edit{ background:var(--skul-blue-light); }
+.btn-action.view{ background:var(--skul-green); }
+
+.btn-action:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 15px rgba(0,0,0,0.15);
+}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .student-table th:nth-child(5),
+  .student-table td:nth-child(5),
+  .student-table th:nth-child(6),
+  .student-table td:nth-child(6){
+    display:none;
+  }
+}
+
+/* Modal styles (match students_page/admit_student) */
+.modal-bg{
+  position:fixed;inset:0;background:rgba(0,0,0,0.45);
+  display:none;align-items:center;justify-content:center;z-index:1000;
+}
+.modal{
+  background:#fff;width:95%;max-width:700px;border-radius:14px;padding:25px;
+}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+.form-group label{font-size:13px;font-weight:600;margin-bottom:6px;display:block}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #e6ecf2}
+.modal-actions{text-align:right;margin-top:12px}
+.btn-save{background:linear-gradient(135deg,var(--skul-blue-light),#2563eb);color:#fff;border:none;padding:8px 14px;border-radius:6px}
+.btn-cancel{background:#eee;border:none;padding:8px 12px;border-radius:6px;margin-right:6px}
+.error{color:#dc2626;font-size:12px}
+</style>
+
+<script>
+document.getElementById("studentSearch").addEventListener("keyup", function() {
+  let filter = this.value.toLowerCase();
+  let rows = document.querySelectorAll("#studentTable tr");
+
+  rows.forEach(row => {
+    let text = row.innerText.toLowerCase();
+    row.style.display = text.includes(filter) ? "" : "none";
+  });
+});
+</script>
+
+<!-- EDIT MODAL (AJAX) -->
+<div class="modal-bg" id="editModal">
+  <div class="modal" id="editModalContent"></div>
+</div>
+
+<!-- GENERIC MODAL FOR VIEW/DELETE -->
+<div class="modal-bg" id="genericModal">
+  <div class="modal" id="genericModalContent"></div>
+</div>
+
+<script>
+function getCookie(name){
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== ''){
+    const cookies = document.cookie.split(';');
+    for (let i=0;i<cookies.length;i++){ const c = cookies[i].trim(); if (c.startsWith(name+'=')){ cookieValue = decodeURIComponent(c.substring(name.length+1)); break; } }
+  }
+  return cookieValue;
+}
+function openEditModal(studentId){
+  const url = `/school/students/${studentId}/edit/`;
+  fetch(url, { method: 'GET', credentials: 'same-origin', headers: {'X-Requested-With':'XMLHttpRequest'} })
+    .then(async res => {
+      const html = await res.text();
+      if (!res.ok) { alert('Failed to load form (status '+res.status+'):\n'+html.slice(0,1000)); throw new Error('Failed to load form'); }
+      document.getElementById('editModalContent').innerHTML = html;
+      document.getElementById('editModal').style.display = 'flex';
+      attachEditFormHandler();
+    }).catch(err => { alert('Could not load edit form: '+err.message); });
+}
+function closeEditModal(){ document.getElementById('editModal').style.display = 'none'; }
+
+function attachEditFormHandler(){
+  const form = document.getElementById('edit-student-form');
+  if (!form) return;
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    const fd = new FormData(form);
+    const csrftoken = getCookie('csrftoken') || (form.querySelector('[name="csrfmiddlewaretoken"]') && form.querySelector('[name="csrfmiddlewaretoken"]').value);
+
+    fetch(form.action, {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+      headers: {'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': csrftoken || ''}
+    }).then(async res => {
+      if (!res.ok){ try{ const data = await res.json(); if (data && data.errors){ showEditErrors(data.errors); return; } }catch(e){} const txt = await res.text(); showEditErrors({'__all__':[txt.slice(0,300)]}); return; }
+      const data = await res.json();
+      if (data.success){
+        const s = data.student;
+        const row = document.querySelector(`tr[data-student-id="${s.id}"]`);
+        if (row){
+          row.children[0].querySelector('img').src = s.photo_url || 'https://via.placeholder.com/40';
+          row.children[1].textContent = s.admission_number || '';
+          row.children[2].textContent = (s.first_name||'') + ' ' + (s.last_name||'');
+          row.children[3].textContent = s.classroom || '';
+          row.children[4].textContent = s.gender || '';
+          row.children[5].textContent = s.parent_phone || '';
+        }
+        closeEditModal();
+      } else if (data.errors){ showEditErrors(data.errors); }
+    }).catch(err=> showEditErrors({'__all__':['Network error: '+err.message]}));
+  });
+
+  function showEditErrors(errors){
+    const errDiv = document.getElementById('edit-form-errors'); if (!errDiv) return; errDiv.innerHTML='';
+    for (const k in errors){ const msgs = errors[k]; const d = document.createElement('div'); d.className='error'; d.textContent = Array.isArray(msgs)? msgs.join('; '): msgs; errDiv.appendChild(d); }
+  }
+}
+</script>
+
+{% include 'schools/_modals_js.html' %}
+
+{% endblock %}

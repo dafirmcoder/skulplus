@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+:root {
+  --blue:#0f3057;
+  --green:#16a34a;
+  --orange:#f59e0b;
+  --light:#f4f7fb;
+  --card:#ffffff;
+  --border:#e6ecf2;
+}
+
+body { background:var(--light); font-family:'Poppins',sans-serif; }
+
+.page-header {
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;
+}
+
+.btn-add {
+  background:linear-gradient(135deg,var(--green),#22c55e);
+  color:#fff; padding:10px 16px; border-radius:8px; border:none; font-weight:600;
+}
+
+.card {
+  background:#fff; border-radius:14px; padding:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.05);
+}
+
+table { width:100%; border-collapse:collapse; }
+th, td { padding:12px 10px; border-bottom:1px solid var(--border); }
+th { color:#777; font-size:13px; }
+
+.actions i { margin-right:10px; cursor:pointer; }
+.edit{color:var(--blue)} .delete{color:#dc2626} .view{color:var(--green)}
+
+.badge {
+  padding:5px 10px; border-radius:20px;
+  background:rgba(245,158,11,0.15); color:var(--orange); font-size:12px;
+}
+
+/* MODAL */
+.modal-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,0.45);
+  display:none; align-items:center; justify-content:center; z-index:1000;
+}
+.modal {
+  background:#fff; width:95%; max-width:500px; border-radius:14px; padding:25px;
+}
+.form-group { margin-bottom:14px; }
+.form-control { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border); }
+.modal-actions { text-align:right; margin-top:12px; }
+.btn-save { background:linear-gradient(135deg,var(--blue),#1a73e8); color:#fff; border:none; padding:8px 14px; border-radius:6px; }
+.btn-cancel { background:#eee; border:none; padding:8px 12px; border-radius:6px; margin-right:6px; }
+</style>
+
+
+<div class="page-header">
+  <h1><i class="fas fa-school"></i> Classes Management</h1>
+  <div style="display:flex;gap:12px;align-items:center">
+    <a href="{% url 'export_classes_excel' %}" class="btn-add"><i class="fas fa-file-excel"></i> Excel</a>
+    <a href="{% url 'export_classes_pdf' %}" class="btn-add" style="background:var(--orange)"><i class="fas fa-file-pdf"></i> PDF</a>
+    <button onclick="printTable()" class="btn-add" style="background:var(--blue)"><i class="fas fa-print"></i> Print</button>
+    <button class="btn-add" onclick="openModal()"><i class="fas fa-plus"></i> New Class</button>
+  </div>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th><th>Stream</th><th>Teacher</th><th>Students</th><th>Streams</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cls in classes %}
+        <tr>
+          <td><strong>{{ cls.name }}</strong></td>
+          <td><span class="badge">{{ cls.section }}</span></td>
+          <td>{{ cls.class_teacher }}</td>
+          <td>{{ cls.students_count }}</td>
+          <td>
+            <span class="badge" style="background:rgba(15,48,87,0.15);color:#0f3057">{{ cls.streams_count }} Stream{{ cls.streams_count|pluralize }}</span>
+          </td>
+          <td class="actions">
+            <i class="fas fa-stream view stream-mgmt-btn" onclick="openStreamModal({{ cls.id }}, '{{ cls.name }}')" title="Manage Streams"></i>
+            <i class="fas fa-eye view" onclick="openClassList({{ cls.id }})" title="View Class List"></i>
+            <i class="fas fa-trash delete delete-btn" data-url="{% url 'delete_class_headteacher' cls.id %}"></i>
+          </td>
+        </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center;color:#888">No classes yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+
+<!-- MODAL FOR CREATING CLASS -->
+<div class="modal-bg" id="classModal">
+  <div class="modal">
+    <h2>Create Class</h2>
+    <form id="createClassForm" method="post">
+      {% csrf_token %}
+      <div class="form-group">{{ form.name.label_tag }} {{ form.name }}</div>
+      <div class="form-group">{{ form.section.label_tag }} {{ form.section }}</div>
+      <div class="form-group">{{ form.level.label_tag }} {{ form.level }}</div>
+      <div class="form-group">{{ form.class_teacher.label_tag }} {{ form.class_teacher }}</div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-save">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL FOR MANAGING STREAMS -->
+<div class="modal-bg" id="streamModal">
+  <div class="modal" style="max-width:600px">
+    <h2 id="streamModalTitle">Manage Streams</h2>
+    <input type="hidden" id="currentClassId" value="">
+    
+    <div style="margin:20px 0">
+      <h3 style="font-size:14px;margin-bottom:10px">Add New Stream</h3>
+      <div style="display:flex;gap:10px;margin-bottom:20px">
+        <input type="text" id="streamName" placeholder="Stream name (e.g., A, B, Science)" class="form-control" style="flex:1">
+        <input type="text" id="streamCode" placeholder="Code (optional)" class="form-control" style="flex:1">
+        <button onclick="createStream()" class="btn-save" style="padding:10px 16px">Add</button>
+      </div>
+    </div>
+
+    <div>
+      <h3 style="font-size:14px;margin-bottom:10px">Existing Streams</h3>
+      <div id="streamsList" style="max-height:300px;overflow-y:auto">
+        <p style="color:#888">Loading streams...</p>
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:20px">
+      <button type="button" class="btn-cancel" onclick="closeStreamModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openModal(){ document.getElementById("classModal").style.display="flex"; }
+function closeModal(){ document.getElementById("classModal").style.display="none"; }
+function openStreamModal(classId, className){
+  document.getElementById("currentClassId").value = classId;
+  document.getElementById("streamModalTitle").textContent = `Manage Streams - ${className}`;
+  document.getElementById("streamModal").style.display="flex";
+  loadStreams(classId);
+}
+function closeStreamModal(){
+  document.getElementById("streamModal").style.display="none";
+  document.getElementById("streamName").value = "";
+  document.getElementById("streamCode").value = "";
+}
+
+function openClassList(classId){
+  const url = `{% url 'class_lists' %}?class_id=${classId}`;
+  window.location.href = url;
+}
+
+// helper to read cookie values
+function getCookie(name){
+  const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+
+// Load streams for a class via AJAX
+function loadStreams(classId){
+  fetch(`{% url 'load_streams_for_class' %}?class_id=${classId}`)
+    .then(r => r.json())
+    .then(data => {
+      const list = document.getElementById("streamsList");
+      if(data.streams.length === 0){
+        list.innerHTML = '<p style="color:#888;text-align:center;padding:20px">No streams yet. Create one above.</p>';
+      } else {
+        list.innerHTML = data.streams.map(s => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid #e6ecf2;border-radius:6px;margin-bottom:8px;background:#f9fafb">
+            <div>
+              <strong>${s.name}</strong>
+              <span style="color:#888;font-size:12px;margin-left:8px">(${s.code})</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button onclick="editStreamPrompt(${s.id}, '${s.name}', '${s.code}')" class="btn-save" style="padding:5px 10px;font-size:12px">Edit</button>
+              <button onclick="deleteStream(${s.id})" class="btn-save" style="padding:5px 10px;font-size:12px;background:#dc2626">Delete</button>
+            </div>
+          </div>
+        `).join('');
+      }
+    })
+    .catch(err => { console.error(err); alert('Failed to load streams'); });
+}
+
+// Create a new stream
+function createStream(){
+  const classId = document.getElementById("currentClassId").value;
+  const streamName = document.getElementById("streamName").value.trim();
+  const streamCode = document.getElementById("streamCode").value.trim();
+
+  if(!streamName){
+    alert("Please enter a stream name");
+    return;
+  }
+
+  const csrftoken = getCookie('csrftoken');
+  fetch('{% url "classes_management" %}', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrftoken,
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({
+      action: 'create_stream',
+      class_id: classId,
+      stream_name: streamName,
+      stream_code: streamCode || `STR_${streamName}`
+    })
+  }).then(r => r.json()).then(d => {
+    if(d.success){
+      document.getElementById("streamName").value = "";
+      document.getElementById("streamCode").value = "";
+      loadStreams(classId);
+      alert(d.message || 'Stream created');
+    } else {
+      alert(d.error || 'Failed to create stream');
+    }
+  }).catch(err => { console.error(err); alert('Network error'); });
+}
+
+// Delete a stream
+function deleteStream(streamId){
+  if(!confirm('Delete this stream? Students in this stream will have their stream assignment removed.')) return;
+
+  const csrftoken = getCookie('csrftoken');
+  fetch('{% url "classes_management" %}', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrftoken,
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({
+      action: 'delete_stream',
+      stream_id: streamId
+    })
+  }).then(r => r.json()).then(d => {
+    if(d.success){
+      const classId = document.getElementById("currentClassId").value;
+      loadStreams(classId);
+      alert(d.message || 'Stream deleted');
+    } else {
+      alert(d.error || 'Failed to delete stream');
+    }
+  }).catch(err => { console.error(err); alert('Network error'); });
+}
+
+// Edit a stream
+function editStreamPrompt(streamId, currentName, currentCode){
+  const newName = prompt("Edit stream name:", currentName);
+  if(newName === null) return;
+
+  const newCode = prompt("Edit stream code:", currentCode);
+  if(newCode === null) return;
+
+  const csrftoken = getCookie('csrftoken');
+  fetch('{% url "classes_management" %}', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrftoken,
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({
+      action: 'edit_stream',
+      stream_id: streamId,
+      stream_name: newName,
+      stream_code: newCode
+    })
+  }).then(r => r.json()).then(d => {
+    if(d.success){
+      const classId = document.getElementById("currentClassId").value;
+      loadStreams(classId);
+      alert(d.message || 'Stream updated');
+    } else {
+      alert(d.error || 'Failed to update stream');
+    }
+  }).catch(err => { console.error(err); alert('Network error'); });
+}
+
+// AJAX form submit for creating class (progressive enhancement)
+const createForm = document.getElementById('createClassForm');
+if(createForm){
+  createForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    const fd = new FormData(this);
+    const obj = Object.fromEntries(fd.entries());
+    const csrftoken = getCookie('csrftoken');
+    fetch('{% url "classes_management" %}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken,
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify({...obj, action: 'create_class'})
+    }).then(r=>r.json()).then(d=>{
+      if(d.success){
+        location.reload();
+      } else {
+        alert(d.error || 'Failed to create class');
+      }
+    }).catch(err=>{console.error(err); alert('Network error')});
+  });
+}
+
+// Delete buttons: attach handlers that use CSRF cookie
+document.querySelectorAll('.delete-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    if(!confirm('Delete this class?')) return;
+    const url = this.dataset.url;
+    fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    }).then(resp => {
+      if(resp.ok) return resp.json().catch(()=>({success:true}));
+      throw new Error('Delete failed');
+    }).then(data => {
+      // if server returns JSON with success flag, respect it
+      if(data && data.success === false){ alert(data.error || 'Delete failed'); return; }
+      location.reload();
+    }).catch(err => { console.error(err); alert('Could not delete class'); });
+  });
+});
+
+function printTable(){
+    var tableContent = document.querySelector("table").outerHTML;
+    var html = `
+        <html>
+        <head>
+            <title>Classes List</title>
+            <style>
+                body{font-family:Poppins,sans-serif;padding:20px}
+                table{width:100%;border-collapse:collapse}
+                th,td{border:1px solid #ccc;padding:8px;text-align:left}
+            </style>
+        </head>
+        <body>
+            <h2>Classes List</h2>
+            ${tableContent}
+        </body>
+        </html>
+    `;
+    if (window.SkulPlusPrint && window.SkulPlusPrint.printHtml) {
+      window.SkulPlusPrint.printHtml(html);
+    } else {
+      window.print();
+    }
+}
+</script>
+
+{% endblock %}

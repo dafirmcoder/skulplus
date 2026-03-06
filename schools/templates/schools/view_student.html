@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div style="padding:24px;max-width:900px;margin:0 auto;background:#fff;border-radius:8px">
+  <h2>Student: {{ student.first_name }} {{ student.last_name }}</h2>
+  <p><strong>Admission No:</strong> {{ student.admission_number }}</p>
+  <p><strong>Class:</strong> {{ student.classroom }}</p>
+  {% if allow_pathways and student_pathway %}
+  <p><strong>Pathway:</strong> {{ student_pathway.pathway.code }} - {{ student_pathway.pathway.name }}</p>
+  {% endif %}
+  <p><strong>Parent:</strong> {{ student.parent_name }} ({{ student.parent_phone }})</p>
+  <p><strong>DOB:</strong> {{ student.date_of_birth }}</p>
+  <a href="{% url 'edit_students' %}" style="display:inline-block;margin-top:12px;padding:8px 12px;border-radius:6px;border:1px solid #ccc;background:#fff;text-decoration:none;color:#333">Back</a>
+</div>
+{% endblock %}

@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+:root {
+  --blue:#0f3057;
+  --green:#16a34a;
+  --orange:#f59e0b;
+  --light:#f4f7fb;
+  --card:#ffffff;
+  --border:#e6ecf2;
+}
+
+body { background:var(--light); font-family:'Poppins',sans-serif; }
+
+.page-header {
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;
+}
+
+.btn-add {
+  background:linear-gradient(135deg,var(--green),#22c55e);
+  color:#fff; padding:10px 16px; border-radius:8px; border:none;
+  font-weight:600; cursor:pointer;
+}
+
+.card {
+  background:#fff; border-radius:14px; padding:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.05);
+}
+
+table { width:100%; border-collapse:collapse; }
+th, td { padding:12px 10px; border-bottom:1px solid var(--border); }
+th { color:#777; font-size:13px; text-align:left; }
+
+.actions i { margin-right:12px; cursor:pointer; }
+.edit{color:var(--blue)} .delete{color:#dc2626} .view{color:var(--green)}
+
+.badge {
+  padding:5px 10px; border-radius:20px;
+  background:rgba(245,158,11,0.15); color:var(--orange); font-size:12px;
+}
+
+/* MODAL */
+.modal-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,0.45);
+  display:none; align-items:center; justify-content:center; z-index:1000;
+}
+.modal {
+  background:#fff; width:95%; max-width:520px; border-radius:14px; padding:25px;
+}
+.form-group { margin-bottom:14px; }
+.form-group label { font-weight:600; font-size:13px; margin-bottom:6px; display:block; }
+.form-group input, .form-group select {
+  width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border);
+}
+.modal-actions { text-align:right; margin-top:12px; }
+.btn-save { background:linear-gradient(135deg,var(--blue),#1a73e8); color:#fff; border:none; padding:8px 14px; border-radius:6px; }
+.btn-cancel { background:#eee; border:none; padding:8px 12px; border-radius:6px; margin-right:6px; }
+.error { color:#dc2626; font-size:12px; }
+</style>
+
+
+<div class="page-header">
+  <h1><i class="fas fa-book"></i> Subjects Management</h1>
+  <button class="btn-add" onclick="openModal()"><i class="fas fa-plus"></i> Add Subject</button>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Name</th>
+        <th>Short Name</th>
+        <th>Category</th>
+        {% if allow_pathways %}
+        <th>Pathway</th>
+        {% endif %}
+        <th>Classes Using</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for subject in subjects %}
+      <tr data-subject-id="{{ subject.id }}" data-subject-code="{{ subject.code }}" data-subject-name="{{ subject.name }}" data-subject-short="{{ subject.short_name }}" data-subject-category="{{ subject.subject_category }}">
+        <td><span class="badge">{{ subject.code }}</span></td>
+        <td><strong>{{ subject.name }}</strong></td>
+        <td>{{ subject.short_name }}</td>
+        <td>
+          {% if subject.subject_category %}
+            {{ subject.get_subject_category_display }}
+          {% else %}
+            <span style="color:#9ca3af">—</span>
+          {% endif %}
+        </td>
+        {% if allow_pathways %}
+          <td>
+            {% if subject.education_level and subject.education_level.name == 'Senior' %}
+              {% if subject.pathway %}
+                <span class="badge badge-{{ subject.pathway.code|lower }}">{{ subject.pathway.code }}</span>
+              {% else %}
+                <span class="badge badge-core">CORE</span>
+              {% endif %}
+            {% else %}
+              <span style="color:#9ca3af">—</span>
+            {% endif %}
+          </td>
+        {% endif %}
+        <td>{{ subject.class_count }}</td>
+        <td class="actions">
+          <i class="fas fa-eye view" title="View"></i>
+          <i class="fas fa-edit edit" title="Edit" onclick="openEdit({{ subject.id }})"></i>
+          <i class="fas fa-trash delete" title="Delete" onclick="confirmDelete({{ subject.id }})"></i>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="{% if allow_pathways %}7{% else %}6{% endif %}" style="text-align:center;color:#888">No subjects added yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+
+<!-- MODAL -->
+<div class="modal-bg" id="subjectModal">
+  <div class="modal">
+    <h2><i class="fas fa-book-medical"></i> Add Subject</h2>
+
+    <form method="post" id="subject-form">
+      {% csrf_token %}
+      <div id="form-errors"></div>
+
+      <div class="form-group">
+        {{ form.code.label_tag }}
+        {{ form.code }}
+      </div>
+
+      <div class="form-group">
+        {{ form.name.label_tag }}
+        {{ form.name }}
+      </div>
+
+      <div class="form-group">
+        {{ form.short_name.label_tag }}
+        {{ form.short_name }}
+      </div>
+
+      <div class="form-group">
+        {{ form.subject_category.label_tag }}
+        {{ form.subject_category }}
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-save" id="subject-submit-btn">Save Subject</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModal(){
+  document.getElementById("subjectModal").style.display="flex";
+  const form = document.getElementById('subject-form');
+  form.reset();
+  delete form.dataset.editUrl;
+  document.querySelector('#subjectModal h2').textContent = 'Add Subject';
+  document.getElementById('subject-submit-btn').textContent = 'Save Subject';
+  document.getElementById('form-errors').innerHTML = '';
+}
+function closeModal(){ document.getElementById("subjectModal").style.display="none"; }
+
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+document.getElementById("subject-form").addEventListener("submit", function(e){
+  e.preventDefault();
+  let form = this;
+  let data = new FormData(form);
+
+  // if editing, submit to edit URL
+  const editUrl = form.dataset.editUrl || '';
+  const url = editUrl || '';
+  const method = editUrl ? 'POST' : 'POST';
+
+  fetch(url || window.location.pathname, {
+    method: method,
+    body: data,
+    credentials: 'same-origin',
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': getCookie('csrftoken') }
+  })
+  .then(res => res.json())
+  .then(resp => {
+    if (resp.success) { location.reload(); }
+    else if (resp.errors) {
+      const errDiv = document.getElementById('form-errors'); errDiv.innerHTML = '';
+      for (const [k, v] of Object.entries(resp.errors)) { errDiv.innerHTML += `<div class="error">${k}: ${v}</div>`; }
+    }
+  })
+  .catch(()=> alert('Request failed'));
+});
+
+function openEdit(id){
+  const row = document.querySelector(`tr[data-subject-id="${id}"]`);
+  if (!row) return;
+  const code = row.dataset.subjectCode || '';
+  const name = row.dataset.subjectName || '';
+  const short = row.dataset.subjectShort || '';
+  const category = row.dataset.subjectCategory || '';
+
+  document.querySelector('#subjectModal h2').textContent = 'Edit Subject';
+  document.getElementById('subject-submit-btn').textContent = 'Update Subject';
+  document.getElementById('id_code').value = code;
+  document.getElementById('id_name').value = name;
+  document.getElementById('id_short_name').value = short;
+  if (document.getElementById('id_subject_category')) {
+    document.getElementById('id_subject_category').value = category;
+  }
+  const form = document.getElementById('subject-form');
+  form.dataset.editUrl = '{% url "edit_subject" 0 %}'.replace('/0/', '/' + id + '/');
+  document.getElementById("subjectModal").style.display = "flex";
+}
+
+function confirmDelete(id){
+  if (!confirm('Delete this subject?')) return;
+  const row = document.querySelector(`tr[data-subject-id="${id}"]`);
+  const csr = getCookie('csrftoken');
+  fetch('{% url "delete_subject" 0 %}'.replace('/0/', '/' + id + '/'), { method:'POST', credentials:'same-origin', headers:{ 'X-CSRFToken': csr, 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(r => r.json())
+    .then(j => {
+      if (!j.success) {
+        alert('Delete failed');
+        return;
+      }
+      if (row) row.remove();
+
+      const tbody = document.querySelector('.card table tbody');
+      if (tbody && tbody.querySelectorAll('tr[data-subject-id]').length === 0) {
+        const colspan = {{ allow_pathways|yesno:"7,6" }};
+        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;color:#888">No subjects added yet</td></tr>`;
+      }
+    })
+    .catch(() => alert('Delete failed'));
+}
+</script>
+
+{% endblock %}

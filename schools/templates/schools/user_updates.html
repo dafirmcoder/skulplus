@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .um-wrap { display:grid; gap:14px; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:14px; }
+  .table-wrap { overflow:auto; }
+  .table { width:100%; border-collapse:collapse; min-width:940px; }
+  .table th,.table td { border-bottom:1px solid #f3f4f6; padding:9px 8px; text-align:left; font-size:13px; }
+  .table th { background:#f9fafb; color:#111827; }
+  .tag { display:inline-block; font-size:11px; border-radius:999px; padding:3px 8px; font-weight:700; }
+  .tag-on { background:#dcfce7; color:#166534; }
+  .tag-off { background:#fee2e2; color:#991b1b; }
+  .btn { border:none; border-radius:7px; padding:8px 10px; font-weight:600; cursor:pointer; }
+  .btn-edit { background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; }
+  .btn-del { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+  .btn-primary { background:#0f3057; color:#fff; }
+  .btn-soft { background:#fff; color:#111827; border:1px solid #d1d5db; }
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:1000; }
+  .modal { background:#fff; width:96%; max-width:640px; border-radius:10px; padding:16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+  .label { display:block; font-size:12px; color:#4b5563; margin-bottom:4px; }
+  .input,.select { width:100%; padding:9px; border:1px solid #d1d5db; border-radius:7px; }
+  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:10px; }
+</style>
+
+<div class="um-wrap">
+  <section class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+      <h2 style="margin:0;color:#0f3057;">User Updates</h2>
+      <div style="color:#6b7280;font-size:13px;">School: {{ school.name }}</div>
+    </div>
+    <div class="table-wrap" style="margin-top:10px;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Teacher</th>
+            <th>Staff</th>
+            <th>Class Teacher</th>
+            <th>Status</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in users_with_meta %}
+          <tr>
+            <td>{{ item.user.get_full_name }}</td>
+            <td>{{ item.user.email }}</td>
+            <td>{{ item.phone|default:'-' }}</td>
+            <td>{% if item.is_teacher %}✓{% else %}-{% endif %}</td>
+            <td>{% if item.is_staff %}✓{% else %}-{% endif %}</td>
+            <td>
+              {% if item.teacher and item.teacher.is_class_teacher %}
+                {{ item.class_teacher_for|default:'-' }}{% if item.class_teacher_stream %} ({{ item.class_teacher_stream }}){% endif %}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% if item.user.is_active %}
+                <span class="tag tag-on">Active</span>
+              {% else %}
+                <span class="tag tag-off">Inactive</span>
+              {% endif %}
+            </td>
+            <td style="text-align:right;">
+              <button
+                class="btn btn-edit open-edit"
+                data-user-id="{{ item.user.id }}"
+                data-first-name="{{ item.user.first_name }}"
+                data-last-name="{{ item.user.last_name }}"
+                data-email="{{ item.user.email }}"
+                data-phone="{{ item.phone|default:'' }}"
+                data-is-active="{% if item.user.is_active %}1{% else %}0{% endif %}"
+                data-role-teacher="{% if item.is_teacher %}1{% else %}0{% endif %}"
+                data-role-staff="{% if item.is_staff %}1{% else %}0{% endif %}"
+                data-is-class="{% if item.teacher and item.teacher.is_class_teacher %}1{% else %}0{% endif %}"
+                data-class-id="{{ item.class_teacher_for_id }}"
+                data-stream-id="{{ item.class_teacher_stream_id }}"
+              >
+                Edit
+              </button>
+              <button class="btn btn-del delete-user" data-user-id="{{ item.user.id }}">Delete</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" style="color:#6b7280;">No users found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div class="modal-bg" id="edit-modal">
+  <div class="modal">
+    <h3 style="margin:0 0 10px;color:#0f3057;">Update User</h3>
+    <form id="edit-form" class="grid">
+      <input type="hidden" name="user_id" id="user-id" />
+      <div>
+        <label class="label">First Name</label>
+        <input class="input" name="first_name" id="first-name" required />
+      </div>
+      <div>
+        <label class="label">Last Name</label>
+        <input class="input" name="last_name" id="last-name" required />
+      </div>
+      <div>
+        <label class="label">Email</label>
+        <input class="input" name="email" id="email" type="email" required />
+      </div>
+      <div>
+        <label class="label">Phone</label>
+        <input class="input" name="phone" id="phone" />
+      </div>
+      <div>
+        <label class="label">New Password (optional)</label>
+        <input class="input" name="password" id="password" type="password" minlength="6" />
+      </div>
+      <div>
+        <label class="label"><input type="checkbox" name="is_active" id="is-active" /> Active User</label>
+      </div>
+      <div>
+        <label class="label"><input type="checkbox" name="is_teacher" id="is-teacher" /> Teacher</label>
+      </div>
+      <div>
+        <label class="label"><input type="checkbox" name="is_staff" id="is-staff" /> Staff</label>
+      </div>
+      <div>
+        <label class="label"><input type="checkbox" name="is_class_teacher" id="is-class-teacher" /> Is Class Teacher</label>
+      </div>
+      <div id="class-wrap" style="display:none;">
+        <label class="label">Class</label>
+        <select class="select" name="class_teacher_for" id="class-select">
+          <option value="">Select class</option>
+          {% for c in classes %}
+            <option value="{{ c.id }}">{{ c.name }} {% if c.section %}{{ c.section }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div id="stream-wrap" style="display:none;">
+        <label class="label">Stream</label>
+        <select class="select" name="class_teacher_stream" id="stream-select">
+          <option value="">All streams</option>
+        </select>
+      </div>
+    </form>
+    <div class="actions">
+      <button class="btn btn-soft" type="button" id="close-modal">Cancel</button>
+      <button class="btn btn-primary" type="button" id="save-btn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
+
+const modal = document.getElementById('edit-modal');
+const form = document.getElementById('edit-form');
+const userIdInput = document.getElementById('user-id');
+const firstNameInput = document.getElementById('first-name');
+const lastNameInput = document.getElementById('last-name');
+const emailInput = document.getElementById('email');
+const phoneInput = document.getElementById('phone');
+const passwordInput = document.getElementById('password');
+const isActive = document.getElementById('is-active');
+const isTeacher = document.getElementById('is-teacher');
+const isStaff = document.getElementById('is-staff');
+const isClassTeacher = document.getElementById('is-class-teacher');
+const classWrap = document.getElementById('class-wrap');
+const streamWrap = document.getElementById('stream-wrap');
+const classSelect = document.getElementById('class-select');
+const streamSelect = document.getElementById('stream-select');
+const closeModalBtn = document.getElementById('close-modal');
+const saveBtn = document.getElementById('save-btn');
+
+function openModal(){ modal.style.display = 'flex'; }
+function closeModal(){
+  modal.style.display = 'none';
+  form.reset();
+  classWrap.style.display = 'none';
+  streamWrap.style.display = 'none';
+  streamSelect.innerHTML = '<option value="">All streams</option>';
+}
+
+function syncTeacherUi(){
+  const on = isTeacher.checked && isClassTeacher.checked;
+  classWrap.style.display = on ? 'block' : 'none';
+  streamWrap.style.display = on ? 'block' : 'none';
+  if (!on) {
+    classSelect.value = '';
+    streamSelect.innerHTML = '<option value="">All streams</option>';
+  }
+}
+
+isTeacher.addEventListener('change', () => {
+  if (!isTeacher.checked) isClassTeacher.checked = false;
+  syncTeacherUi();
+});
+
+isClassTeacher.addEventListener('change', () => {
+  if (!isTeacher.checked) {
+    isClassTeacher.checked = false;
+    return;
+  }
+  syncTeacherUi();
+});
+
+isStaff.addEventListener('change', () => {});
+
+async function loadStreams(classId, selectedStreamId=''){
+  streamSelect.innerHTML = '<option value="">All streams</option>';
+  if (!classId) return;
+  const resp = await fetch(`/school/load-streams-for-class/?class_id=${classId}`, {
+    headers: {'X-Requested-With': 'XMLHttpRequest'}
+  });
+  const data = await resp.json();
+  (data.streams || []).forEach(s => streamSelect.add(new Option(s.name, s.id)));
+  if (selectedStreamId) streamSelect.value = selectedStreamId;
+}
+
+classSelect.addEventListener('change', () => loadStreams(classSelect.value));
+closeModalBtn.addEventListener('click', closeModal);
+
+document.querySelectorAll('.open-edit').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    userIdInput.value = btn.dataset.userId;
+    firstNameInput.value = btn.dataset.firstName || '';
+    lastNameInput.value = btn.dataset.lastName || '';
+    emailInput.value = btn.dataset.email || '';
+    phoneInput.value = btn.dataset.phone || '';
+    isActive.checked = btn.dataset.isActive === '1';
+    isTeacher.checked = btn.dataset.roleTeacher === '1';
+    isStaff.checked = btn.dataset.roleStaff === '1';
+    isClassTeacher.checked = btn.dataset.isClass === '1';
+    syncTeacherUi();
+
+    const classId = btn.dataset.classId || '';
+    const streamId = btn.dataset.streamId || '';
+    classSelect.value = classId;
+    await loadStreams(classId, streamId);
+    openModal();
+  });
+});
+
+saveBtn.addEventListener('click', async () => {
+  const payload = Object.fromEntries(new FormData(form));
+  payload.action = 'update';
+  payload.is_active = !!payload.is_active;
+  payload.is_teacher = !!payload.is_teacher;
+  payload.is_staff = !!payload.is_staff;
+  payload.is_class_teacher = !!payload.is_class_teacher;
+  if (!payload.is_teacher && !payload.is_staff) {
+    alert('Select at least one role: Teacher or Staff.');
+    return;
+  }
+  if (!payload.password) delete payload.password;
+
+  try {
+    const resp = await fetch(window.location.pathname, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || 'Update failed.');
+    window.location.reload();
+  } catch (e) {
+    alert(e.message || 'Network error.');
+  }
+});
+
+document.querySelectorAll('.delete-user').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Delete this user? This action cannot be undone.')) return;
+    try {
+      const resp = await fetch(window.location.pathname, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken'),
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ action: 'delete', user_id: btn.dataset.userId })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Delete failed.');
+      window.location.reload();
+    } catch (e) {
+      alert(e.message || 'Network error.');
+    }
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.page-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+.page-head h1{margin:0;color:#0f3057}
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+table{width:100%;border-collapse:collapse}
+th,td{border-bottom:1px solid #e2e8f0;padding:10px 8px;text-align:left;font-size:13px}
+th{background:#f8fafc;color:#334155}
+.badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.b-lock{background:#fee2e2;color:#991b1b}
+.b-open{background:#dcfce7;color:#166534}
+.btn{border:none;border-radius:8px;padding:7px 10px;font-weight:600;cursor:pointer}
+.btn-lock{background:#b91c1c;color:#fff}
+.btn-unlock{background:#166534;color:#fff}
+</style>
+
+<div class="page-head">
+  <h1><i class="fas fa-lock"></i> Set Exams (Lock / Unlock Marks Entry)</h1>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Term</th>
+        <th>Year</th>
+        <th>Date Range</th>
+        <th>Marks Entry</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ex in exams %}
+      <tr data-exam-id="{{ ex.id }}">
+        <td>{{ ex.title }}</td>
+        <td>{{ ex.term }}</td>
+        <td>{{ ex.year }}</td>
+        <td>{{ ex.start_date }} - {{ ex.end_date }}</td>
+        <td class="lock-state">
+          {% if ex.marks_entry_locked %}
+            <span class="badge b-lock">Locked</span>
+          {% else %}
+            <span class="badge b-open">Open</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if ex.marks_entry_locked %}
+            <button class="btn btn-unlock" onclick="toggleLock({{ ex.id }})">Unlock</button>
+          {% else %}
+            <button class="btn btn-lock" onclick="toggleLock({{ ex.id }})">Lock</button>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center;color:#64748b">No exams found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+function toggleLock(examId){
+  const row = document.querySelector(`tr[data-exam-id="${examId}"]`);
+  if(!row) return;
+
+  fetch(`{% url 'toggle_exam_lock' 0 %}`.replace('/0/', `/${examId}/`), {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if(!data.success){
+      alert(data.error || 'Action failed');
+      return;
+    }
+    const locked = !!data.locked;
+    const stateCell = row.querySelector('.lock-state');
+    const actionCell = row.children[5];
+    stateCell.innerHTML = locked
+      ? '<span class="badge b-lock">Locked</span>'
+      : '<span class="badge b-open">Open</span>';
+    actionCell.innerHTML = locked
+      ? `<button class="btn btn-unlock" onclick="toggleLock(${examId})">Unlock</button>`
+      : `<button class="btn btn-lock" onclick="toggleLock(${examId})">Lock</button>`;
+  })
+  .catch(() => alert('Network error'));
+}
+</script>
+{% endblock %}

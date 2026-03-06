@@ -1,0 +1,108 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('load-subjects-for-class/', views.load_subjects_for_class, name='load_subjects_for_class'),
+    path('headteacher/classes/', views.classes_management, name='classes_management'),
+    path('headteacher/classes/delete/<int:pk>/', views.delete_class_headteacher, name='delete_class_headteacher'),
+    path('headteacher/classes/export/excel/', views.export_classes_excel, name='export_classes_excel'),
+    path('headteacher/classes/export/pdf/', views.export_classes_pdf, name='export_classes_pdf'),
+    path('headteacher/dashboard/', views.headteacher_dashboard, name='headteacher_dashboard'),
+    path('headteacher/teachers/', views.manage_teachers, name='manage_teachers'),
+    path('teachers/dashboard/', views.teacher_dashboard, name='teacher_dashboard'),
+    path('headteacher/teachers/<int:teacher_id>/allocate/', views.allocate_teacher, name='allocate_teacher'),
+    path('headteacher/teachers/assignments/<int:assignment_id>/delete/', views.delete_teacher_assignment, name='delete_teacher_assignment'),
+    path('headteacher/teachers/load-subjects-classes/', views.load_school_subjects_classes, name='load_school_subjects_classes'),
+    path('load-streams-for-class/', views.load_streams_for_class, name='load_streams_for_class'),
+    path('headteacher/admit-student/', views.admit_student, name='admit_student'),
+    path('headteacher/admit-student/new/', views.admit_student_new, name='admit_student_new'),
+    path('headteacher/post-announcement/', views.post_announcement, name='post_announcement'),
+    # Student registration
+    path('students/edit/', views.edit_students, name='edit_students'),
+    path('students/', views.students_page, name='students_page'),
+    path('students/admit/', views.admit_student_ajax, name='admit_student_ajax'),
+    path('students/<int:student_id>/edit/', views.edit_student, name='edit_student'),
+    path('students/<int:student_id>/', views.view_student, name='view_student'),
+    path('students/<int:student_id>/delete/', views.delete_student, name='delete_student'),
+    path('students/class-lists/', views.class_lists, name='class_lists'),
+    path('students/promote/', views.promote_students, name='promote_students'),
+    path('students/promote/move/', views.move_students, name='move_students'),
+    path('students/get-adjacent-class/', views.get_adjacent_class, name='get_adjacent_class'),
+    path('students/promote/next/', views.promote_to_next, name='promote_to_next'),
+    path('students/graduation/', views.graduate_students, name='graduate_students'),
+    path('students/promote/undo/', views.undo_promotion, name='undo_promotion'),
+    path('students/promotion-logs/', views.promotion_logs, name='promotion_logs'),
+
+    # Class list exports (server-side)
+    path('students/class-lists/export/excel/', views.export_class_list_excel, name='export_class_list_excel'),
+    path('students/class-lists/export/pdf/', views.export_class_list_pdf, name='export_class_list_pdf'),
+    path('students/class-lists/print/', views.print_class_list, name='print_class_list'),
+    # Marks
+    path('marks/enter/', views.enter_marks, name='enter_marks'),
+
+    # School settings
+    path('settings/school-details/', views.school_details, name='school_details'),
+    path('settings/teachers/', views.manage_teachers, name='manage_teachers'),
+    path('settings/teachers/<int:pk>/edit/', views.edit_teacher, name='edit_teacher'),
+    path('settings/teachers/<int:pk>/delete/', views.delete_teacher, name='delete_teacher'),
+    path('settings/subject-allocation/', views.subject_allocation, name='subject_allocation'),
+    path('load-students-for-subject/', views.load_students_for_subject, name='load_students_for_subject'),
+    path('save-subject-allocations/', views.save_subject_allocations, name='save_subject_allocations'),
+    path('settings/classes/', views.classes_view, name='classes'),
+    path('settings/classes/<int:class_id>/delete/', views.delete_class, name='delete_class'),
+    path('settings/exams/', views.exams, name='exams'),
+    path('settings/grading/', views.grading, name='grading'),
+    path('settings/cbc-comments/', views.cbc_comments_report, name='cbc_comments_report'),
+    path('settings/grading/<int:pk>/edit/', views.edit_grade_scale, name='edit_grade_scale'),
+    path('settings/grading/<int:pk>/delete/', views.delete_grade_scale, name='delete_grade_scale'),
+    path('settings/term-dates/', views.term_dates, name='term_dates'),
+    path('settings/term-dates/create/', views.create_term_date, name='create_term_date'),
+    path('settings/term-dates/<int:pk>/edit/', views.edit_term_date, name='edit_term_date'),
+    path('settings/term-dates/<int:pk>/delete/', views.delete_term_date, name='delete_term_date'),
+    path('settings/subjects/', views.subjects, name='subjects'),
+    path('settings/subjects/<int:subject_id>/edit/', views.edit_subject, name='edit_subject'),
+    path('settings/subjects/<int:subject_id>/delete/', views.delete_subject, name='delete_subject'),
+
+    # Reports
+    path('reports/merit-lists/', views.merit_lists, name='merit_lists'),
+    path('ajax/exams-for-class/', views.exams_with_marks_for_class, name='exams_with_marks_for_class'),
+    path('reports/merit-lists/data/', views.merit_lists_data, name='merit_lists_data'),
+    path('reports/merit-lists/export/pdf/', views.export_merit_list_pdf, name='export_merit_list_pdf'),
+    path('reports/merit-lists/export/excel/', views.export_merit_list_excel, name='export_merit_list_excel'),
+    path('reports/subject-analysis/', views.subject_analysis, name='subject_analysis'),
+    path('reports/full-class-analysis/', views.full_class_analysis, name='full_class_analysis'),
+    path('reports/subject-analysis/data/', views.subject_analysis_data, name='subject_analysis_data'),
+    path('reports/whole-school-analysis/data/', views.whole_school_analysis_data, name='whole_school_analysis_data'),
+    path('reports/whole-school-subject-stream/', views.whole_school_subject_stream_analysis, name='whole_school_subject_stream_analysis'),
+    path('reports/report-cards/', views.report_cards, name='report_cards'),
+    path('reports/report-cards/data/', views.report_cards_data, name='report_cards_data'),
+    path('reports/send-reports/', views.send_reports, name='send_reports'),
+
+    # User management
+    path('users/new/', views.new_user, name='new_user'),
+    path('users/updates/', views.user_updates, name='user_updates'),
+
+    # CLASS LIST EXPORTS - CLIENT SIDE 
+    path("export/class-list/excel/", views.export_class_list_excel, name="export_class_list_excel"),
+    path("export/class-list/pdf/", views.export_class_list_pdf, name="export_class_list_pdf"),
+    path("export/class-list/print/", views.print_class_list, name="print_class_list"),
+
+    # Exams
+    path('exams/', views.exams_management, name='exams_management'),
+    path('exams/<int:pk>/edit/', views.edit_exam, name='edit_exam'),
+    path('exams/<int:pk>/delete/', views.delete_exam, name='delete_exam'),
+
+    # Term dates (use settings/term-dates routes above)
+    path('enter-marks/', views.enter_marks_page, name='enter_marks'),
+path('entered-marks/', views.entered_marks, name='entered_marks'),
+path('set-exams/', views.set_exams, name='set_exams'),
+path('set-exams/<int:exam_id>/toggle-lock/', views.toggle_exam_lock, name='toggle_exam_lock'),
+path('load-marks-students/', views.load_marks_students, name='load_marks_students'),
+path('save-marks/', views.save_marks, name='save_marks'),
+path('suggested-comments/', views.get_suggested_comments, name='get_suggested_comments'),
+path('publish-marks/<int:marksheet_id>/', views.publish_marks, name='publish_marks'),
+path('unpublish-marks/<int:marksheet_id>/', views.unpublish_marks, name='unpublish_marks'),
+]
+
+
+

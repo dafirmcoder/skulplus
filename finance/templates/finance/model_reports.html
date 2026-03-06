@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+
+{% block title %}Model Reports{% endblock %}
+
+{% block content %}
+<style>
+  .report-grid { display:grid; grid-template-columns: 1fr; gap:14px; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:16px; }
+  .section-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .filters { display:grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap:10px; align-items:end; }
+  .label { display:block; font-size:13px; color:#374151; margin-bottom:4px; }
+  .input, .select { width:100%; padding:9px; border:1px solid #d1d5db; border-radius:6px; }
+  .btn { border:none; padding:10px 14px; border-radius:6px; cursor:pointer; font-weight:600; }
+  .btn-primary { background:#0f3057; color:#fff; }
+  .btn-soft { background:#fff; color:#1f2937; border:1px solid #d1d5db; }
+  .btn-print { background:#16a34a; color:#fff; border:1px solid #15803d; }
+  .btn-export { background:#dc2626; color:#fff; border:1px solid #b91c1c; }
+  .table-wrap { overflow:auto; }
+  .table { width:100%; border-collapse:collapse; min-width:0; font-size:13px; }
+  .table th, .table td { border-bottom:1px solid #f3f4f6; padding:8px 10px; text-align:left; }
+  .table th { background:#f9fafb; color:#111827; }
+  .right { text-align:right !important; }
+  .muted { color:#6b7280; }
+  .warn { color:#b45309; font-weight:600; }
+  .summary-grid { display:grid; grid-template-columns:repeat(3,minmax(160px,1fr)); gap:10px; margin:10px 0 14px; }
+  .summary-kpi { border:1px solid #e5e7eb; border-radius:8px; padding:10px; background:#f9fafb; }
+  .summary-kpi .k { font-size:12px; color:#6b7280; }
+  .summary-kpi .v { font-size:18px; font-weight:700; color:#111827; margin-top:4px; }
+  .compare-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .subcard { border:1px solid #e5e7eb; border-radius:8px; padding:10px; }
+  .subcard h4 { margin:0 0 8px; color:#0f3057; font-size:14px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .neg { color:#dc2626; }
+  .pos { color:#16a34a; }
+  .zero { color:#2563eb; }
+  @media (max-width: 1100px) {
+    .filters { grid-template-columns: 1fr 1fr; }
+    .compare-grid { grid-template-columns:1fr; }
+    .summary-grid { grid-template-columns:1fr; }
+  }
+</style>
+
+<div class="report-grid">
+  <section class="card">
+    <h3 style="margin:0 0 10px;color:#0f3057;">Finance Model Reports</h3>
+    <form method="get" class="filters">
+      <div>
+        <label class="label">Term</label>
+        <select name="term" class="select">
+          <option value="Term 1" {% if term == 'Term 1' %}selected{% endif %}>Term 1</option>
+          <option value="Term 2" {% if term == 'Term 2' %}selected{% endif %}>Term 2</option>
+          <option value="Term 3" {% if term == 'Term 3' %}selected{% endif %}>Term 3</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Year</label>
+        <input type="number" name="year" value="{{ year }}" class="input" />
+      </div>
+      <div>
+        <label class="label">Period</label>
+        <select name="period" class="select">
+          <option value="day" {% if period == 'day' %}selected{% endif %}>Day</option>
+          <option value="week" {% if period == 'week' %}selected{% endif %}>Week</option>
+          <option value="month" {% if period == 'month' %}selected{% endif %}>Month</option>
+          <option value="term" {% if period == 'term' %}selected{% endif %}>Term</option>
+          <option value="year" {% if period == 'year' %}selected{% endif %}>Year</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Reference Date</label>
+        <input type="date" name="anchor_date" value="{{ anchor_date }}" class="input" />
+      </div>
+      <button type="submit" class="btn btn-primary">Apply Filter</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="section-head">
+      <h3 style="margin:0;color:#0f3057;">Income vs Expenditure</h3>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn btn-print" id="model-report-print"><i class="fas fa-print"></i>&nbsp;Print</button>
+        <button type="button" class="btn btn-export" id="model-report-export-pdf"><i class="fas fa-file-pdf"></i>&nbsp;Export PDF</button>
+      </div>
+    </div>
+    <div class="muted" style="margin-top:4px;">
+      Period: {{ period_label }} | Range: {{ period_start }} to {{ period_end }}
+    </div>
+    {% if period_warning %}
+      <div class="warn" style="margin-top:6px;">{{ period_warning }}</div>
+    {% endif %}
+
+    <div class="summary-grid">
+      <div class="summary-kpi">
+        <div class="k">Total Income</div>
+        <div class="v mono">{{ income_total|floatformat:2 }}</div>
+      </div>
+      <div class="summary-kpi">
+        <div class="k">Total Expenditure</div>
+        <div class="v mono">{{ expenditure_total|floatformat:2 }}</div>
+      </div>
+      <div class="summary-kpi">
+        <div class="k">Net Cashflow</div>
+        <div class="v mono {% if net_cashflow < 0 %}neg{% elif net_cashflow > 0 %}pos{% else %}zero{% endif %}">{{ net_cashflow|floatformat:2 }}</div>
+      </div>
+    </div>
+
+    <div class="compare-grid">
+      <div class="subcard">
+        <h4>Income by Source</h4>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Source</th><th class="right">Amount</th></tr>
+            </thead>
+            <tbody>
+              {% for row in income_by_source %}
+                <tr>
+                  <td>{{ row.vote_head|default:'-' }}</td>
+                  <td class="right mono">{{ row.total|floatformat:2 }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="muted">No income in this period.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="subcard">
+        <h4>Income by Mode of Payment</h4>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Payment Mode</th><th class="right">Amount</th></tr>
+            </thead>
+            <tbody>
+              {% for row in income_by_mode %}
+                <tr>
+                  <td>{{ row.payment_method|default:'-' }}</td>
+                  <td class="right mono">{{ row.total|floatformat:2 }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="muted">No income in this period.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="subcard">
+        <h4>Expenditure by Purpose</h4>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Purpose (Vote Head)</th><th class="right">Amount</th></tr>
+            </thead>
+            <tbody>
+              {% for row in expenditure_by_purpose %}
+                <tr>
+                  <td>{{ row.vote_head|default:'-' }}</td>
+                  <td class="right mono">{{ row.total|floatformat:2 }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="muted">No expenditure in this period.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="subcard">
+        <h4>Expenditure by Mode of Payment</h4>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Payment Mode</th><th class="right">Amount</th></tr>
+            </thead>
+            <tbody>
+              {% for row in expenditure_by_mode %}
+                <tr>
+                  <td>{{ row.payment_method|default:'-' }}</td>
+                  <td class="right mono">{{ row.total|floatformat:2 }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="muted">No expenditure in this period.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  (function(){
+    function buildUrl(paramName){
+      const url = new URL(window.location.href);
+      url.searchParams.delete('export_pdf');
+      url.searchParams.delete('print_pdf');
+      url.searchParams.set(paramName, '1');
+      return url.toString();
+    }
+
+    const printBtn = document.getElementById('model-report-print');
+    const exportBtn = document.getElementById('model-report-export-pdf');
+
+    printBtn?.addEventListener('click', () => {
+      const url = buildUrl('print_pdf');
+      if (window.SkulPlusPrint && window.SkulPlusPrint.printUrl) {
+        window.SkulPlusPrint.printUrl(url);
+      } else {
+        window.open(url, '_blank');
+      }
+    });
+
+    exportBtn?.addEventListener('click', () => {
+      window.location.href = buildUrl('export_pdf');
+    });
+  })();
+</script>
+{% endblock %}

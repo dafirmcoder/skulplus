@@ -1,0 +1,471 @@
+{% extends 'base.html' %}
+
+{% block title %}Fee Structure{% endblock %}
+
+{% block header %}
+<h2 style="margin:0">Fee Structure - {{ school.name }}</h2>
+{% endblock %}
+
+{% block content %}
+<style>
+  .check-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+  }
+
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .circle-check {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #6b7280;
+    border-radius: 50%;
+    display: inline-block;
+    position: relative;
+    cursor: pointer;
+    background: #fff;
+    margin: 0;
+  }
+
+  .circle-check:checked {
+    border-color: #0f3057;
+    background: #0f3057;
+  }
+
+  .circle-check:checked::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    top: 3px;
+    left: 3px;
+  }
+
+  .small-note {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .print-only { display: none; }
+
+  @media print {
+    .no-print { display: none !important; }
+    .print-only { display: block !important; }
+    body { background: #fff !important; }
+    .main { margin-left: 0 !important; padding: 0 !important; }
+    .print-wrap { padding: 8mm; color: #111; }
+    .print-header { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #0f3057; padding-bottom: 10px; margin-bottom: 12px; }
+    .print-logo { width: 68px; height: 68px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 6px; }
+    .print-title { font-size: 20px; margin: 0; color: #0f3057; }
+    .print-meta { font-size: 12px; color: #374151; margin-top: 3px; }
+    .print-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .print-table th, .print-table td { border: 1px solid #d1d5db; padding: 7px; }
+    .print-table th { background: #f3f4f6; text-align: left; }
+    .right { text-align: right; }
+    .strong-row td { font-weight: 700; background: #f9fafb; }
+    .print-footer { margin-top: 12px; font-size: 12px; color: #374151; border-top: 1px solid #d1d5db; padding-top: 8px; }
+  }
+</style>
+
+<div class="no-print" style="display:grid;grid-template-columns:1.1fr 1fr;gap:14px;align-items:start;">
+  <section style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;">
+    <h3 id="fee-form-title" style="margin-top:0;color:#0f3057;">Add Or Update Vote Head</h3>
+    <form method="post" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      {% csrf_token %}
+      <input type="hidden" name="structure_id" id="structure_id" />
+
+      <div style="grid-column:1 / -1;">
+        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Vote Head</label>
+        <input id="vote_head" list="votehead-options" name="vote_head" required style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" placeholder="Select existing or type new vote head" autocomplete="off" />
+        <div class="small-note" style="margin-top:4px;">Selecting an existing vote head prefills this form. Saving creates a new entry unless an explicit record ID is submitted.</div>
+        <datalist id="votehead-options">
+          {% for head in votehead_options %}
+            <option value="{{ head }}"></option>
+          {% endfor %}
+        </datalist>
+      </div>
+
+      <div>
+        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Amount</label>
+        <input id="amount" type="number" min="0" step="0.01" name="amount" required style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" />
+      </div>
+
+      <div>
+        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Year</label>
+        <input id="year" type="number" name="year" value="{{ default_year }}" required style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" />
+      </div>
+
+      <div style="grid-column:1 / -1;">
+        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Billing Mode</label>
+        <select name="billing_mode" id="billing_mode" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" onchange="toggleBillingMode()">
+          {% for value, label in billing_mode_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="due-term-wrap" style="grid-column:1 / -1;display:none;">
+        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Due Term (Once a year)</label>
+        <select name="due_term" id="due_term" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;">
+          <option value="">Select term</option>
+          {% for value, label in term_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="selected-terms-wrap" style="grid-column:1 / -1;">
+        <label style="display:block;font-size:13px;color:#374151;margin-bottom:6px;">Selected Terms</label>
+        <div class="check-list">
+          {% for value, label in term_choices %}
+            <label class="check-item">
+              <input type="checkbox" class="circle-check term-check" name="applied_terms" value="{{ value }}" />
+              <span>{{ label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div style="grid-column:1 / -1;">
+        <label style="display:block;font-size:13px;color:#374151;margin-bottom:6px;">Applicable Classes</label>
+        <div class="check-list">
+          {% for cls in classes %}
+            <label class="check-item">
+              <input type="checkbox" class="circle-check class-check" name="classrooms" value="{{ cls.id }}" />
+              <span>{{ cls.name }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        <div class="small-note" style="margin-top:4px;">Only classes in {{ school.name }} are listed.</div>
+      </div>
+
+      <div style="grid-column:1 / -1;">
+        <button id="save-btn" type="submit" style="background:#0f3057;color:#fff;border:none;padding:10px 14px;border-radius:6px;cursor:pointer;">Save Vote Head</button> <button type="button" id="cancel-edit" onclick="resetFeeForm()" style="margin-left:8px;background:#fff;color:#374151;border:1px solid #d1d5db;padding:10px 14px;border-radius:6px;cursor:pointer;display:none;">Cancel Edit</button>
+      </div>
+    </form>
+  </section>
+
+  <section style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;">
+    <h3 style="margin-top:0;color:#0f3057;">Filter</h3>
+    <form id="auto-filter-form" method="get" style="display:grid;grid-template-columns:1fr;gap:10px;">
+      <div>
+        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Term</label>
+        <select name="term" data-autofilter style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;">
+          <option value="">All Terms</option>
+          {% for value, label in term_choices %}
+            <option value="{{ value }}" {% if selected_term == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Year</label>
+        <input type="number" name="year" value="{{ selected_year }}" data-autofilter style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" />
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;color:#374151;margin-bottom:6px;">Class / Group Of Classes</label>
+        <div class="check-list">
+          {% for cls in classes %}
+            <label class="check-item">
+              <input type="checkbox" class="circle-check filter-class-check" data-autofilter name="classrooms" value="{{ cls.id }}" {% if cls.id|stringformat:'s' in selected_class_ids %}checked{% endif %} />
+              <span>{{ cls.name }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+      <button type="button" onclick="printFeeStructure()" style="background:#0f3057;color:#fff;border:none;padding:10px 14px;border-radius:6px;cursor:pointer;">Print Fee Structure</button>
+    </form>
+  </section>
+</div>
+
+<div class="no-print" style="margin-top:14px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:auto;">
+  <table style="width:100%;border-collapse:collapse;min-width:980px;">
+    <thead style="background:#f9fafb;">
+      <tr>
+        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Vote Head</th>
+        <th style="text-align:right;padding:12px;border-bottom:1px solid #e5e7eb;">Amount</th>
+        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Year</th>
+        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Billing</th>
+        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Terms</th>
+        <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Classes</th>
+        <th style="text-align:center;padding:12px;border-bottom:1px solid #e5e7eb;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in structures %}
+      <tr>
+        <td style="padding:12px;border-bottom:1px solid #f3f4f6;">{{ item.vote_head }}</td>
+        <td style="padding:12px;border-bottom:1px solid #f3f4f6;text-align:right;">{{ item.amount }}</td>
+        <td style="padding:12px;border-bottom:1px solid #f3f4f6;">{{ item.year }}</td>
+        <td style="padding:12px;border-bottom:1px solid #f3f4f6;">{{ item.get_billing_mode_display }}</td>
+        <td style="padding:12px;border-bottom:1px solid #f3f4f6;">
+          {% if item.billing_mode == 'ONCE_YEAR' %}
+            Paid in {{ item.due_term }}
+          {% else %}
+            {{ item.applied_terms|join:', ' }}
+          {% endif %}
+        </td>
+        <td style="padding:12px;border-bottom:1px solid #f3f4f6;">{% for c in item.applicable_classes.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+        <td style="padding:12px;border-bottom:1px solid #f3f4f6;text-align:center;white-space:nowrap;">
+          <button type="button" onclick="startEdit({{ item.id }})" title="Edit" style="background:none;border:none;color:#0f3057;cursor:pointer;margin-right:10px;">
+            <i class="fas fa-pen-to-square"></i>
+          </button>
+          <form method="post" style="display:inline;" onsubmit="return confirm('Delete this fee structure record?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete" />
+            <input type="hidden" name="structure_id" value="{{ item.id }}" />
+            <button type="submit" title="Delete" style="background:none;border:none;color:#dc2626;cursor:pointer;">
+              <i class="fas fa-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" style="padding:16px;color:#6b7280;">No vote heads found for this school.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="print-only print-wrap">
+  <div class="print-header">
+    {% if school.logo %}
+      <img class="print-logo" src="{{ school.logo.url }}" alt="{{ school.name }} logo" />
+    {% endif %}
+    <div>
+      <h1 class="print-title">{{ school.name }}</h1>
+      <div class="print-meta">{% if school.address %}{{ school.address }}{% endif %}{% if school.phone %} | {{ school.phone }}{% endif %}{% if school.email %} | {{ school.email }}{% endif %}</div>
+      <div class="print-meta"><strong>Fee Structure</strong>{% if selected_year %} - Year {{ selected_year }}{% endif %}{% if print_single_term %} - {{ print_term_label }}{% else %} - All Terms{% endif %}</div>
+    </div>
+  </div>
+
+  <table class="print-table">
+    <thead>
+      <tr>
+        <th>Term</th>
+        <th>Vote Head</th>
+        <th>Applicable Classes</th>
+        <th class="right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for group in print_term_groups %}
+        {% for row in group.rows %}
+        <tr>
+          {% if forloop.first %}<td rowspan="{{ group.term_rowspan }}">{{ group.term }}</td>{% endif %}
+          <td>{{ row.vote_head }}</td>
+          <td>{{ row.classes }}</td>
+          <td class="right">{{ row.amount }}</td>
+        </tr>
+        {% endfor %}
+      {% empty %}
+        <tr>
+          <td colspan="4">No fee structure rows found for this filter.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="height:10px"></div>
+  <table class="print-table">
+    <thead>
+      <tr>
+        <th>Class</th>
+        <th>Term</th>
+        <th>Vote Head</th>
+        <th class="right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for group in print_class_groups %}
+        {% for row in group.rows %}
+          {% if row.row_type == 'detail' %}
+          <tr>
+            {% if row.show_class %}<td rowspan="{{ row.class_rowspan }}">{{ row.class_name }}</td>{% endif %}
+            {% if row.show_term %}<td rowspan="{{ row.term_rowspan }}">{{ row.term }}</td>{% endif %}
+            <td>{{ row.vote_head }}</td>
+            <td class="right">{{ row.amount }}</td>
+          </tr>
+          {% elif row.row_type == 'term_total' %}
+          <tr class="strong-row">
+            <td>{{ row.vote_head }}</td>
+            <td class="right">{{ row.amount }}</td>
+          </tr>
+          {% elif row.row_type == 'class_total' %}
+          <tr class="strong-row">
+            <td colspan="2">Total {{ row.class_name }}</td>
+            <td class="right">{{ row.amount }}</td>
+          </tr>
+          {% endif %}
+        {% endfor %}
+      {% empty %}
+        <tr>
+          <td colspan="4">No class-based rows found for this filter.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="print-footer">
+    <div><strong>Generated:</strong> {{ print_generated_at }}</div>
+    <div><strong>Prepared by:</strong> {{ print_prepared_by }}</div>
+  </div>
+</div>
+{{ votehead_records|json_script:"votehead-records-data" }}
+
+<script>
+
+function printFeeStructure() {
+  window.print();
+}
+function toggleBillingMode() {
+  const mode = document.getElementById('billing_mode').value;
+  const due = document.getElementById('due-term-wrap');
+  const selected = document.getElementById('selected-terms-wrap');
+
+  if (mode === 'ONCE_YEAR') {
+    due.style.display = 'block';
+    selected.style.display = 'none';
+  } else {
+    due.style.display = 'none';
+    selected.style.display = 'block';
+  }
+}
+
+function setCheckedBoxes(selector, values) {
+  const set = new Set((values || []).map(String));
+  document.querySelectorAll(selector).forEach((el) => {
+    el.checked = set.has(String(el.value));
+  });
+}
+
+(function () {
+  const records = JSON.parse(document.getElementById('votehead-records-data').textContent || '[]');
+  const voteHeadInput = document.getElementById('vote_head');
+  const yearInput = document.getElementById('year');
+  const amountInput = document.getElementById('amount');
+  const billingModeInput = document.getElementById('billing_mode');
+  const dueTermInput = document.getElementById('due_term');
+  const structureIdInput = document.getElementById('structure_id');
+
+  function normalized(value) {
+    return (value || '').trim().toLowerCase();
+  }
+
+  function findRecord(voteHead, yearValue) {
+    const key = normalized(voteHead);
+    if (!key) return null;
+
+    const matches = records.filter((r) => normalized(r.vote_head) === key);
+    if (!matches.length) return null;
+
+    const y = parseInt(yearValue, 10);
+    if (!isNaN(y)) {
+      const sameYear = matches.find((r) => parseInt(r.year, 10) === y);
+      if (sameYear) return sameYear;
+    }
+
+    return matches[0];
+  }
+
+  function clearSelections() {
+    structureIdInput.value = '';
+    setCheckedBoxes('.term-check', []);
+    setCheckedBoxes('.class-check', []);
+    dueTermInput.value = '';
+  }
+
+  function applyRecord(record, setId) {
+    if (!record) {
+      clearSelections();
+      return;
+    }
+
+    structureIdInput.value = setId ? String(record.id || "") : "";
+    yearInput.value = record.year;
+    amountInput.value = record.amount;
+    billingModeInput.value = record.billing_mode;
+    dueTermInput.value = record.due_term || '';
+    setCheckedBoxes('.term-check', record.applied_terms || []);
+    setCheckedBoxes('.class-check', record.class_ids || []);
+    toggleBillingMode();
+  }
+
+  function onVoteHeadSelection() {
+    const record = findRecord(voteHeadInput.value, yearInput.value);
+    applyRecord(record);
+  }
+
+  function startEdit(id) {
+    const record = records.find((r) => String(r.id) === String(id));
+    if (!record) return;
+
+    voteHeadInput.value = record.vote_head || '';
+    applyRecord(record, true);
+    document.getElementById('fee-form-title').textContent = 'Edit Vote Head';
+    document.getElementById('save-btn').textContent = 'Update Vote Head';
+    document.getElementById('cancel-edit').style.display = 'inline-block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  window.startEdit = startEdit;
+
+  window.resetFeeForm = function resetFeeForm() {
+    structureIdInput.value = '';
+    voteHeadInput.value = '';
+    yearInput.value = '{{ default_year }}';
+    amountInput.value = '';
+    billingModeInput.value = 'SELECTED_TERMS';
+    dueTermInput.value = '';
+    setCheckedBoxes('.term-check', []);
+    setCheckedBoxes('.class-check', []);
+    toggleBillingMode();
+    document.getElementById('fee-form-title').textContent = 'Add Or Update Vote Head';
+    document.getElementById('save-btn').textContent = 'Save Vote Head';
+    document.getElementById('cancel-edit').style.display = 'none';
+  };
+
+  const filterForm = document.getElementById('auto-filter-form');
+  let filterTimer = null;
+
+  function queueFilterSubmit() {
+    if (!filterForm) return;
+    clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => filterForm.submit(), 220);
+  }
+
+  document.querySelectorAll('[data-autofilter]').forEach((el) => {
+    const evt = (el.tagName === 'INPUT' && el.type === 'number') ? 'change' : 'change';
+    el.addEventListener(evt, queueFilterSubmit);
+  });
+
+  voteHeadInput.addEventListener('change', onVoteHeadSelection);
+  voteHeadInput.addEventListener('blur', onVoteHeadSelection);
+  yearInput.addEventListener('change', onVoteHeadSelection);
+
+  toggleBillingMode();
+})();
+</script>
+{% endblock %}
+
+
+
+
+
+
+
+

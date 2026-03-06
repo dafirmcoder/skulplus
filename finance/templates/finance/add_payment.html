@@ -1,0 +1,427 @@
+{% extends 'base.html' %}
+
+{% block title %}Fee Payment{% endblock %}
+
+{% block header %}
+<h2 style="margin:0">Fee Payment - {{ request.user.headteacher.school.name }}</h2>
+{% endblock %}
+
+{% block content %}
+<style>
+  .pay-grid { display:grid; grid-template-columns: 1.3fr 1fr; gap:14px; align-items:start; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:16px; }
+  .field-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .field-grid .full { grid-column:1 / -1; }
+  .label { display:block; font-size:13px; color:#374151; margin-bottom:4px; }
+  .input, .select { width:100%; padding:9px; border:1px solid #d1d5db; border-radius:6px; }
+  .split-table, .history-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .split-table th, .split-table td, .history-table th, .history-table td { border:1px solid #e5e7eb; padding:8px; vertical-align:top; }
+  .split-table th, .history-table th { background:#f9fafb; text-align:left; }
+  .right { text-align:right; }
+  .muted { color:#6b7280; font-size:12px; }
+  .btn { border:none; padding:10px 14px; border-radius:6px; cursor:pointer; }
+  .btn-primary { background:#0f3057; color:#fff; }
+  .btn-soft { background:#eef2ff; color:#1f2937; border:1px solid #d1d5db; }
+  .kpi { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .kpi-item { border:1px solid #e5e7eb; border-radius:8px; padding:8px; background:#fff; }
+  .kpi-title { font-size:12px; color:#6b7280; }
+  .kpi-value { font-weight:700; color:#111827; }
+  @media (max-width: 980px) {
+    .pay-grid { grid-template-columns: 1fr; }
+    .field-grid { grid-template-columns:1fr; }
+    .kpi { grid-template-columns:1fr; }
+  }
+</style>
+
+<div class="pay-grid">
+  <section class="card">
+    <h3 style="margin-top:0;color:#0f3057;">Record Payment</h3>
+    <form method="post" id="payment-form">
+      {% csrf_token %}
+      <div class="field-grid">
+        <div>
+          <label class="label">Class</label>
+          <select name="classroom" id="classroom" class="select">
+            <option value="">Select class</option>
+            {% for cls in classes %}
+              <option value="{{ cls.id }}" {% if selected_class_id == cls.id|stringformat:'s' %}selected{% endif %}>{{ cls.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="label">Student</label>
+          <select name="student" id="student" class="select" required data-selected="{{ selected_student_id }}">
+            <option value="">Select student</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">Term</label>
+          <select name="term" id="term" class="select" required>
+            {% for value, label in term_choices %}
+              <option value="{{ value }}" {% if selected_term == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="label">Year</label>
+          <input type="number" name="year" id="year" class="input" value="{{ selected_year|default:current_year }}" required />
+        </div>
+        <div>
+          <label class="label">Payment Method</label>
+          <select name="payment_method" id="payment_method" class="select" required>
+            {% for value, label in payment_method_choices %}
+              <option value="{{ value }}" {% if selected_method == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="label">Total Amount Paid</label>
+          <input type="number" min="0" step="0.01" name="amount_paid" id="amount_paid" class="input right" value="{{ entered_total }}" required />
+        </div>
+        <div class="full">
+          <label class="label">Allocation Mode</label>
+          <select name="allocation_mode" id="allocation_mode" class="select">
+            <option value="OLDEST_FIRST" {% if selected_allocation_mode == 'OLDEST_FIRST' %}selected{% endif %}>Oldest-first (Automatic)</option>
+            <option value="MANUAL" {% if selected_allocation_mode == 'MANUAL' %}selected{% endif %}>Manual Selection</option>
+          </select>
+          <div class="muted" style="margin-top:4px;">Oldest-first allocates from oldest arrears first. Manual lets you pick specific year/term/votehead rows.</div>
+        </div>
+        <div class="full">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="label" style="margin:0;">Split Payment Allocation</label>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="btn btn-soft" id="fill-from-balance">Fill From Balance</button>
+              <button type="button" class="btn btn-soft" id="add-split-row">Add Row</button>
+            </div>
+          </div>
+          <table class="split-table" id="split-table">
+            <thead>
+              <tr>
+                <th style="width:52%;">Allocation Target (Year / Term / Vote Head)</th>
+                <th style="width:28%;">Amount</th>
+                <th style="width:20%;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="split-body">
+              <tr>
+                <td>
+                  <select class="select split-target" name="split_target" required>
+                    <option value="">Select allocation target</option>
+                  </select>
+                </td>
+                <td><input class="input right split-amount" type="number" min="0" step="0.01" name="split_amount" /></td>
+                <td><button type="button" class="btn btn-soft remove-row">Remove</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="muted" style="margin-top:6px;">Split total must equal total amount paid.</div>
+        </div>
+        <div class="full" style="display:flex;justify-content:flex-end;">
+          <button type="submit" class="btn btn-primary">Save Payment</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <aside class="card">
+    <h3 style="margin-top:0;color:#0f3057;">Balance Preview</h3>
+    <div class="kpi">
+      <div class="kpi-item">
+        <div class="kpi-title">Total Due</div>
+        <div class="kpi-value" id="kpi-due">0.00</div>
+      </div>
+      <div class="kpi-item">
+        <div class="kpi-title">Already Paid</div>
+        <div class="kpi-value" id="kpi-paid">0.00</div>
+      </div>
+      <div class="kpi-item">
+        <div class="kpi-title">Balance</div>
+        <div class="kpi-value" id="kpi-balance">0.00</div>
+      </div>
+    </div>
+    <h4 style="margin:14px 0 6px;color:#111827;">Due By Vote Head</h4>
+    <table class="split-table">
+      <thead>
+        <tr>
+          <th>Vote Head</th>
+          <th class="right">Due</th>
+          <th class="right">Paid</th>
+          <th class="right">Balance</th>
+        </tr>
+      </thead>
+      <tbody id="due-body">
+        <tr><td colspan="4" class="muted">Select class, student, term and year.</td></tr>
+      </tbody>
+    </table>
+    <h4 style="margin:14px 0 6px;color:#111827;">Outstanding Arrears (Up To Selection)</h4>
+    <table class="split-table">
+      <thead>
+        <tr>
+          <th>Year</th>
+          <th>Term</th>
+          <th>Vote Head</th>
+          <th class="right">Balance</th>
+        </tr>
+      </thead>
+      <tbody id="arrears-body">
+        <tr><td colspan="4" class="muted">No arrears rows loaded.</td></tr>
+      </tbody>
+    </table>
+  </aside>
+</div>
+
+<section class="card" style="margin-top:14px;">
+  <h3 style="margin-top:0;color:#0f3057;">Recent Payment History</h3>
+  <div style="overflow:auto;">
+    <table class="history-table" style="min-width:980px;">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Student</th>
+          <th>Class</th>
+          <th>Term</th>
+          <th>Year</th>
+          <th class="right">Amount</th>
+          <th>Method</th>
+          <th>Split</th>
+          <th>Receipt</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in history_rows %}
+        <tr>
+          <td>{{ row.date_paid }}</td>
+          <td>{{ row.student_name }}</td>
+          <td>{{ row.class_name }}</td>
+          <td>{{ row.term }}</td>
+          <td>{{ row.year }}</td>
+          <td class="right">{{ row.amount_paid }}</td>
+          <td>{{ row.payment_method }}</td>
+          <td>{{ row.allocations }}</td>
+          <td><a href="{% url 'fee_receipt' row.id %}" style="color:#0f3057;text-decoration:none;">View</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="muted">No payments recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  const classSelect = document.getElementById('classroom');
+  const studentSelect = document.getElementById('student');
+  const termSelect = document.getElementById('term');
+  const yearInput = document.getElementById('year');
+  const allocationMode = document.getElementById('allocation_mode');
+  const splitBody = document.getElementById('split-body');
+  const dueBody = document.getElementById('due-body');
+  const arrearsBody = document.getElementById('arrears-body');
+  const amountPaid = document.getElementById('amount_paid');
+  const kpiDue = document.getElementById('kpi-due');
+  const kpiPaid = document.getElementById('kpi-paid');
+  const kpiBalance = document.getElementById('kpi-balance');
+  const initialStudentId = studentSelect.dataset.selected || '';
+  let lastMeta = { votehead_rows: [], target_options: [], outstanding_rows: [] };
+
+  function buildTargetOptions(selected = '') {
+    const targets = lastMeta.target_options || [];
+    const opts = ['<option value="">Select allocation target</option>'];
+    targets.forEach(item => {
+      const sel = item.key === selected ? 'selected' : '';
+      opts.push(`<option value="${item.key}" ${sel}>${item.label}</option>`);
+    });
+    return opts.join('');
+  }
+
+  function rowHtml(targetKey = '', amount = '') {
+    const disabled = allocationMode.value === 'OLDEST_FIRST' ? 'disabled' : '';
+    return `
+      <tr>
+        <td>
+          <select class="select split-target" name="split_target" required ${disabled}>
+            ${buildTargetOptions(targetKey)}
+          </select>
+        </td>
+        <td><input class="input right split-amount" type="number" min="0" step="0.01" name="split_amount" value="${amount}"></td>
+        <td><button type="button" class="btn btn-soft remove-row">Remove</button></td>
+      </tr>
+    `;
+  }
+
+  function bindRemoveActions() {
+    splitBody.querySelectorAll('.remove-row').forEach(btn => {
+      btn.onclick = () => {
+        if (splitBody.querySelectorAll('tr').length <= 1) return;
+        btn.closest('tr').remove();
+        updateSplitTotal();
+      };
+    });
+    splitBody.querySelectorAll('.split-amount').forEach(input => {
+      input.oninput = updateSplitTotal;
+    });
+  }
+
+  function updateSplitTotal() {
+    let total = 0;
+    splitBody.querySelectorAll('.split-amount').forEach(i => {
+      total += parseFloat(i.value || '0');
+    });
+    if (!amountPaid.value) amountPaid.value = total.toFixed(2);
+  }
+
+  function renderStudents(students, selectedId = '') {
+    const options = ['<option value="">Select student</option>'];
+    students.forEach(s => {
+      const sel = String(s.id) === String(selectedId) ? 'selected' : '';
+      options.push(`<option value="${s.id}" ${sel}>${s.name} (${s.admission_number || '-'})</option>`);
+    });
+    studentSelect.innerHTML = options.join('');
+  }
+
+  function renderMeta(meta) {
+    lastMeta = meta || { votehead_rows: [], target_options: [], outstanding_rows: [] };
+    kpiDue.textContent = meta?.due_total || '0.00';
+    kpiPaid.textContent = meta?.paid_total || '0.00';
+    kpiBalance.textContent = meta?.balance || '0.00';
+
+    splitBody.querySelectorAll('.split-target').forEach(select => {
+      const current = select.value;
+      select.innerHTML = buildTargetOptions(current);
+    });
+
+    if (!meta || !meta.votehead_rows || !meta.votehead_rows.length) {
+      dueBody.innerHTML = '<tr><td colspan="4" class="muted">No due vote heads for this selection.</td></tr>';
+    } else {
+      const rows = [];
+      meta.votehead_rows.forEach(r => {
+        rows.push(
+          `<tr><td>${r.vote_head}</td><td class="right">${r.due}</td><td class="right">${r.paid}</td><td class="right">${r.balance}</td></tr>`
+        );
+      });
+      dueBody.innerHTML = rows.join('');
+    }
+
+    if (!meta || !meta.outstanding_rows || !meta.outstanding_rows.length) {
+      arrearsBody.innerHTML = '<tr><td colspan="4" class="muted">No outstanding arrears up to this selection.</td></tr>';
+    } else {
+      const arrRows = [];
+      meta.outstanding_rows.forEach(r => {
+        arrRows.push(`<tr><td>${r.year}</td><td>${r.term}</td><td>${r.vote_head}</td><td class="right">${r.balance}</td></tr>`);
+      });
+      arrearsBody.innerHTML = arrRows.join('');
+    }
+  }
+
+  async function loadMeta(reloadStudents = false, selectedId = '') {
+    const params = new URLSearchParams();
+    if (classSelect.value) params.set('class_id', classSelect.value);
+    if (studentSelect.value) params.set('student_id', studentSelect.value);
+    if (termSelect.value) params.set('term', termSelect.value);
+    if (yearInput.value) params.set('year', yearInput.value);
+
+    const res = await fetch(`{% url 'add_payment_meta' %}?${params.toString()}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (reloadStudents) {
+      renderStudents(data.students || [], selectedId || studentSelect.value);
+    }
+    renderMeta(data.meta || {});
+  }
+
+  document.getElementById('add-split-row').onclick = () => {
+    splitBody.insertAdjacentHTML('beforeend', rowHtml());
+    bindRemoveActions();
+  };
+
+  document.getElementById('fill-from-balance').onclick = () => {
+    let balanceRows = (lastMeta.outstanding_rows || [])
+      .map(r => ({ key: r.key, balance: parseFloat(r.balance || '0') }))
+      .filter(r => r.balance > 0);
+    if (allocationMode.value !== 'OLDEST_FIRST') {
+      balanceRows = balanceRows.sort((a, b) => b.balance - a.balance);
+    }
+
+    if (!balanceRows.length) {
+      splitBody.innerHTML = rowHtml();
+      bindRemoveActions();
+      return;
+    }
+
+    const totalOutstanding = balanceRows.reduce((s, r) => s + r.balance, 0);
+    let target = parseFloat(amountPaid.value || '0');
+    if (!(target > 0)) {
+      target = totalOutstanding;
+    }
+    target = Math.min(target, totalOutstanding);
+    amountPaid.value = target.toFixed(2);
+
+    let allocations = [];
+    if (allocationMode.value === 'OLDEST_FIRST') {
+      let remaining = target;
+      for (const row of balanceRows) {
+        if (remaining <= 0) break;
+        const move = Math.min(remaining, row.balance);
+        if (move > 0) {
+          allocations.push({ key: row.key, balance: row.balance, amount: Math.round(move * 100) / 100 });
+          remaining = Math.round((remaining - move) * 100) / 100;
+        }
+      }
+    } else {
+      allocations = balanceRows.map(r => {
+        const raw = target * (r.balance / totalOutstanding);
+        const floored = Math.floor(raw * 100) / 100;
+        return { key: r.key, balance: r.balance, amount: floored };
+      });
+
+      let allocated = allocations.reduce((s, r) => s + r.amount, 0);
+      let remainderCents = Math.round((target - allocated) * 100);
+      while (remainderCents > 0) {
+        let moved = false;
+        for (const row of allocations) {
+          if (remainderCents <= 0) break;
+          const cap = row.balance - row.amount;
+          if (cap >= 0.01) {
+            row.amount = Math.round((row.amount + 0.01) * 100) / 100;
+            remainderCents -= 1;
+            moved = true;
+          }
+        }
+        if (!moved) break;
+      }
+    }
+
+    splitBody.innerHTML = '';
+    allocations
+      .filter(r => r.amount > 0)
+      .forEach(r => splitBody.insertAdjacentHTML('beforeend', rowHtml(r.key, r.amount.toFixed(2))));
+
+    if (!splitBody.querySelector('tr')) {
+      splitBody.insertAdjacentHTML('beforeend', rowHtml());
+    }
+    bindRemoveActions();
+  };
+
+  classSelect.onchange = async () => {
+    studentSelect.value = '';
+    await loadMeta(true, '');
+  };
+  studentSelect.onchange = async () => loadMeta(false);
+  termSelect.onchange = async () => loadMeta(false);
+  yearInput.onchange = async () => loadMeta(false);
+  allocationMode.onchange = () => {
+    if (allocationMode.value === 'OLDEST_FIRST') {
+      splitBody.querySelectorAll('.split-target').forEach(s => s.disabled = true);
+      document.getElementById('fill-from-balance').click();
+    } else {
+      splitBody.querySelectorAll('.split-target').forEach(s => s.disabled = false);
+    }
+  };
+
+  bindRemoveActions();
+  (async () => {
+    await loadMeta(true, initialStudentId);
+    allocationMode.onchange();
+  })();
+</script>
+{% endblock %}

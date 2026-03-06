@@ -1,0 +1,11 @@
+<div style="padding:16px;">
+  <h3>Delete Student</h3>
+  <p>Are you sure you want to delete <strong>{{ student.first_name }} {{ student.last_name }}</strong> ({{ student.admission_number }})?</p>
+  <form id="delete-student-form" method="post" action="{% url 'delete_student' student.id %}">
+    {% csrf_token %}
+    <div style="text-align:right;margin-top:8px">
+      <button type="button" class="btn-cancel" onclick="closeGenericModal()">Cancel</button>
+      <button type="submit" class="btn-save" style="background:#dc2626">Delete</button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,413 @@
+{% extends 'base.html' %}
+
+{% block title %}Pay Roll{% endblock %}
+
+{% block header %}
+<h2 style="margin:0">Pay Roll</h2>
+{% endblock %}
+
+{% block content %}
+<style>
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:14px; }
+  .label { font-size:13px; color:#0f3057; }
+  .value { font-size:24px; font-weight:700; color:#0f3057; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .fields .full { grid-column:1 / -1; }
+  .fields label { display:block; font-size:12px; color:#374151; margin-bottom:4px; }
+  .fields input, .fields select { width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px; }
+  .fields select[multiple] { min-height:120px; }
+  .hint { margin-top:4px; font-size:12px; color:#6b7280; }
+  .line-items { border:1px solid #e5e7eb; border-radius:6px; padding:10px; }
+  .line-item-row { display:grid; grid-template-columns:2fr 1fr auto; gap:8px; margin-bottom:8px; }
+  .btn { border:none; background:#0f3057; color:#fff; padding:10px 14px; border-radius:6px; cursor:pointer; transition:background-color .18s ease, transform .08s ease, box-shadow .18s ease; }
+  .btn:hover { background:#0f3057; box-shadow:0 8px 18px rgba(15,48,87,.2); }
+  .btn:active { background:#f59e0b; transform:translateY(1px) scale(.98); box-shadow:none; }
+  .btn:focus-visible { background:#16a34a; outline:2px solid #16a34a; outline-offset:2px; }
+  .btn-secondary { border:1px solid #0f3057; background:#fff; color:#0f3057; padding:10px 14px; border-radius:6px; cursor:pointer; transition:background-color .18s ease, color .18s ease, transform .08s ease, border-color .18s ease; }
+  .btn-secondary:hover { background:#0f3057; border-color:#0f3057; color:#fff; }
+  .btn-secondary:active { background:#f59e0b; border-color:#f59e0b; color:#fff; transform:translateY(1px) scale(.98); }
+  .btn-secondary:focus-visible { background:#16a34a; border-color:#16a34a; color:#fff; outline:2px solid #16a34a; outline-offset:2px; }
+  .icon-btn { border:1px solid #0f3057; color:#0f3057; background:#fff; border-radius:6px; padding:6px 8px; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; min-width:32px; }
+  .icon-btn:hover { background:#0f3057; color:#fff; }
+  .icon-btn:active { background:#f59e0b; color:#fff; border-color:#f59e0b; }
+  .icon-btn:focus-visible { background:#16a34a; color:#fff; border-color:#16a34a; outline:2px solid #16a34a; outline-offset:2px; }
+  .icon-btn.disabled { opacity:.45; pointer-events:none; cursor:not-allowed; }
+  .actions { display:flex; gap:6px; align-items:center; }
+  .table-wrap { overflow:auto; }
+  table { width:100%; border-collapse:collapse; min-width:640px; }
+  th, td { border-bottom:1px solid #f3f4f6; padding:8px; font-size:13px; text-align:left; vertical-align:top; }
+  th { border-bottom:1px solid #e5e7eb; color:#111827; }
+  .right { text-align:right; }
+  .muted { color:#6b7280; }
+  .selected-row { background:#eef6ff; }
+  .remove-row { border:1px solid #0f3057; background:#fff; color:#0f3057; border-radius:6px; padding:8px 10px; cursor:pointer; }
+  .remove-row:hover { background:#0f3057; color:#fff; }
+  .remove-row:active { background:#f59e0b; color:#fff; border-color:#f59e0b; }
+  .modal-backdrop { position:fixed; inset:0; background:rgba(15,48,87,.45); display:none; align-items:center; justify-content:center; padding:16px; z-index:2000; }
+  .modal-backdrop.show { display:flex; }
+  .modal-card { width:min(920px,100%); max-height:90vh; overflow:auto; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:14px; }
+  .modal-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+  @media (max-width:980px) {
+    .grid { grid-template-columns:1fr; }
+    .fields { grid-template-columns:1fr; }
+    .btn, .btn-secondary { width:100%; }
+  }
+</style>
+
+<div class="stats">
+  <div class="card"><div class="label">Staff Members</div><div class="value">{{ staff_count }}</div></div>
+  <div class="card"><div class="label">Payroll Records</div><div class="value">{{ record_count }}</div></div>
+</div>
+
+<div class="grid">
+  <section class="card table-wrap">
+    <h3 style="margin-top:0;color:#0f3057;">Staff List</h3>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add_selected_staff" />
+      <div class="fields" style="margin-bottom:10px;">
+        <div>
+          <label>Month</label>
+          <select name="month" id="payroll-month-input" required>
+            <option value="">Select month</option>
+            {% for value,label in month_options %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Year</label>
+          <input type="number" name="year" id="payroll-year-input" min="2000" step="1" value="{{ current_year }}" required />
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="select-all-staff" /></th>
+            <th>Name</th>
+            <th>Role</th>
+            <th class="right">Basic Salary</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for staff in staff_list %}
+          <tr>
+            <td><input type="checkbox" class="staff-check" name="staff_ids[]" value="{{ staff.id }}" /></td>
+            <td>{{ staff.full_name }}</td>
+            <td>{{ staff.role }}</td>
+            <td class="right">{{ staff.basic_salary }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="muted">No staff records available.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div style="margin-top:10px;">
+        <button type="submit" class="btn">Add Selected To Payroll</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card table-wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+      <h3 style="margin:0;color:#0f3057;">Payroll Records</h3>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <form method="get" id="payroll-filter-form" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0;">
+          <select name="filter_month" id="filter-month" style="min-width:140px;">
+            <option value="">All Months</option>
+            {% for value,label in month_options %}
+            <option value="{{ value }}" {% if filter_month == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <input type="number" name="filter_year" id="filter-year" min="2000" step="1" placeholder="Year" value="{{ filter_year }}" style="width:110px;" />
+        </form>
+        <form method="post" style="margin:0;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="mark_paid" />
+          <input type="hidden" name="filter_month" id="pay-btn-month" value="{{ filter_month }}" />
+          <input type="hidden" name="filter_year" id="pay-btn-year" value="{{ filter_year }}" />
+          <button type="submit" class="btn-secondary" {% if period_paid %}disabled title="Already paid for selected month"{% endif %}>
+            {% if period_paid %}Paid{% else %}Pay{% endif %}
+          </button>
+        </form>
+        <a href="{% url 'export_payroll_pdf' %}" id="export-pdf-link" class="btn-secondary" style="text-decoration:none;display:inline-block;">Export PDF</a>
+        <a href="{% url 'export_payroll_excel' %}" id="export-excel-link" class="btn-secondary" style="text-decoration:none;display:inline-block;">Export Excel</a>
+      </div>
+    </div>
+    <div style="height:8px;"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Staff</th>
+          <th>Month</th>
+          <th class="right">Net Salary</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for rec in record_list %}
+        <tr class="{% if selected_record and selected_record.id == rec.id %}selected-row{% endif %}">
+          <td>{{ rec.staff.full_name }}</td>
+          <td>{{ rec.month }} {{ rec.year }}</td>
+          <td class="right">{{ rec.net_salary }}</td>
+          <td>
+            <div class="actions">
+              {% if rec.is_paid %}
+              <span class="icon-btn disabled" title="Paid month is locked"><i class="fas fa-eye"></i></span>
+              {% else %}
+              <a href="{% url 'payroll_overview' %}?record={{ rec.id }}" class="icon-btn" title="View/Edit"><i class="fas fa-eye"></i></a>
+              {% endif %}
+              <a href="{% url 'generate_payslip' rec.id %}" class="icon-btn" title="Payslip"><i class="fas fa-file-lines"></i></a>
+              {% if rec.month|lower == 'december' %}
+              <a href="{% url 'generate_p9' rec.id %}" class="icon-btn" title="P9 Form"><i class="fas fa-file-invoice"></i></a>
+              {% endif %}
+              {% if rec.is_paid %}
+              <span class="icon-btn disabled" title="Paid month is locked"><i class="fas fa-trash"></i></span>
+              {% else %}
+              <form method="post" action="{% url 'delete_payroll_record' rec.id %}" style="display:inline;" onsubmit="return confirm('Delete payroll for {{ rec.staff.full_name }} ({{ rec.month }} {{ rec.year }})?');">
+                {% csrf_token %}
+                <button type="submit" class="icon-btn" title="Delete"><i class="fas fa-trash"></i></button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="muted">No payroll records available.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+{% if selected_record %}
+<div class="modal-backdrop show" id="payroll-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 style="margin:0;color:#0f3057;">Edit Payroll: {{ selected_record.staff.full_name }}</h3>
+      <a href="{% url 'payroll_overview' %}" class="icon-btn" title="Close"><i class="fas fa-xmark"></i></a>
+    </div>
+    <form method="post" class="fields">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_payroll" />
+      <input type="hidden" name="record_id" value="{{ selected_record.id }}" />
+      <div class="full">
+        <label>Staff</label>
+        <input type="text" value="{{ selected_record.staff.full_name }} ({{ selected_record.staff.role }})" readonly />
+      </div>
+      <div>
+        <label>Month</label>
+        {{ payroll_form.month }}
+      </div>
+      <div>
+        <label>Year</label>
+        {{ payroll_form.year }}
+      </div>
+      <div>
+        <label>Days Worked</label>
+        {{ payroll_form.days_worked }}
+      </div>
+      <div>
+        <label>Payable (%)</label>
+        <input type="text" id="payable-percent" readonly />
+      </div>
+      <div>
+        <label>PAYE (%)</label>
+        {{ payroll_form.paye_rate }}
+      </div>
+      <div>
+        <label>NSSF (%)</label>
+        {{ payroll_form.nssf_rate }}
+      </div>
+      <div>
+        <label>NHIF/SHIF (%)</label>
+        {{ payroll_form.nhif_rate }}
+      </div>
+      <div>
+        <label>Housing Levy (%)</label>
+        {{ payroll_form.housing_levy_rate }}
+      </div>
+      <div class="full">
+        <label>Basic Salary (Full)</label>
+        <input type="text" id="selected-basic-salary" value="{{ selected_record.staff.basic_salary }}" readonly />
+      </div>
+      <div class="full">
+        <label>Payable Basic Salary</label>
+        <input type="text" id="payable-basic-salary" readonly />
+      </div>
+      <div class="full">
+        <label>Allowances (Name + Amount)</label>
+        <div id="allowances-wrap" class="line-items"></div>
+        <button type="button" class="btn-secondary" id="add-allowance-row" style="margin-top:8px;">Add Allowance Row</button>
+      </div>
+      <div class="full">
+        <label>Other Deductions (Name + Amount)</label>
+        <div id="other-deductions-wrap" class="line-items"></div>
+        <button type="button" class="btn-secondary" id="add-deduction-row" style="margin-top:8px;">Add Deduction Row</button>
+      </div>
+      <div class="full">
+        <button type="submit" class="btn">Save Payroll Changes</button>
+        <a href="{% url 'payroll_overview' %}" class="btn-secondary" style="margin-left:8px;text-decoration:none;display:inline-block;">Close</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% else %}
+<section class="card" style="margin-top:14px;">
+  <div class="muted">Click the eye icon on a payroll row to open the edit popup.</div>
+</section>
+{% endif %}
+
+{{ selected_allowances|json_script:"selected-allowances" }}
+{{ selected_deductions|json_script:"selected-deductions" }}
+<script>
+  (function () {
+    const selectAll = document.getElementById('select-all-staff');
+    const checks = Array.from(document.querySelectorAll('.staff-check'));
+    if (selectAll) {
+      selectAll.addEventListener('change', function () {
+        checks.forEach(function (check) { check.checked = selectAll.checked; });
+      });
+    }
+
+    const allowanceWrap = document.getElementById('allowances-wrap');
+    const deductionWrap = document.getElementById('other-deductions-wrap');
+    const addAllowanceBtn = document.getElementById('add-allowance-row');
+    const addDeductionBtn = document.getElementById('add-deduction-row');
+
+    function addRow(wrapper, nameKey, amountKey, nameValue, amountValue) {
+      const row = document.createElement('div');
+      row.className = 'line-item-row';
+      row.innerHTML = `
+        <input type="text" name="${nameKey}" placeholder="Name" value="${nameValue || ''}" />
+        <input type="number" min="0" step="0.01" name="${amountKey}" placeholder="Amount" value="${amountValue || ''}" />
+        <button type="button" class="remove-row">Remove</button>
+      `;
+      row.querySelector('.remove-row').addEventListener('click', function () {
+        row.remove();
+      });
+      wrapper.appendChild(row);
+    }
+
+    if (allowanceWrap && deductionWrap) {
+      const allowanceData = JSON.parse(document.getElementById('selected-allowances').textContent || '[]');
+      const deductionData = JSON.parse(document.getElementById('selected-deductions').textContent || '[]');
+
+      if (allowanceData.length) {
+        allowanceData.forEach(function (item) {
+          addRow(allowanceWrap, 'allowance_name[]', 'allowance_amount[]', item.name, item.amount);
+        });
+      } else {
+        addRow(allowanceWrap, 'allowance_name[]', 'allowance_amount[]', '', '');
+      }
+
+      if (deductionData.length) {
+        deductionData.forEach(function (item) {
+          addRow(deductionWrap, 'other_deduction_name[]', 'other_deduction_amount[]', item.name, item.amount);
+        });
+      } else {
+        addRow(deductionWrap, 'other_deduction_name[]', 'other_deduction_amount[]', '', '');
+      }
+
+      if (addAllowanceBtn) {
+        addAllowanceBtn.addEventListener('click', function () {
+          addRow(allowanceWrap, 'allowance_name[]', 'allowance_amount[]', '', '');
+        });
+      }
+      if (addDeductionBtn) {
+        addDeductionBtn.addEventListener('click', function () {
+          addRow(deductionWrap, 'other_deduction_name[]', 'other_deduction_amount[]', '', '');
+        });
+      }
+    }
+
+    const daysWorkedInput = document.getElementById('id_days_worked');
+    const fullBasicInput = document.getElementById('selected-basic-salary');
+    const payablePercentInput = document.getElementById('payable-percent');
+    const payableBasicInput = document.getElementById('payable-basic-salary');
+    function recalcPayable() {
+      if (!daysWorkedInput || !fullBasicInput || !payablePercentInput || !payableBasicInput) return;
+      const days = parseFloat(daysWorkedInput.value || '0');
+      const basic = parseFloat((fullBasicInput.value || '0').replace(/,/g, ''));
+      const safeDays = Number.isFinite(days) ? Math.min(Math.max(days, 0), 30) : 0;
+      const safeBasic = Number.isFinite(basic) ? basic : 0;
+      const pct = (safeDays / 30) * 100;
+      const payable = (safeBasic * safeDays) / 30;
+      payablePercentInput.value = `${pct.toFixed(2)}%`;
+      payableBasicInput.value = payable.toFixed(2);
+    }
+    if (daysWorkedInput) {
+      daysWorkedInput.addEventListener('input', recalcPayable);
+      recalcPayable();
+    }
+
+    const modal = document.getElementById('payroll-modal');
+    if (modal) {
+      modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+          window.location.href = "{% url 'payroll_overview' %}";
+        }
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+          window.location.href = "{% url 'payroll_overview' %}";
+        }
+      });
+    }
+
+    const monthInput = document.getElementById('payroll-month-input');
+    const yearInput = document.getElementById('payroll-year-input');
+    const payBtnMonth = document.getElementById('pay-btn-month');
+    const payBtnYear = document.getElementById('pay-btn-year');
+    const exportPdfLink = document.getElementById('export-pdf-link');
+    const exportExcelLink = document.getElementById('export-excel-link');
+    function attachExportPeriod(event, link) {
+      if (!link) return;
+      const month = monthInput ? monthInput.value : '';
+      const year = yearInput ? yearInput.value : '';
+      const url = new URL(link.getAttribute('href'), window.location.origin);
+      if (month) url.searchParams.set('month', month);
+      if (year) url.searchParams.set('year', year);
+      link.setAttribute('href', `${url.pathname}${url.search}`);
+    }
+    if (exportPdfLink) {
+      exportPdfLink.addEventListener('click', function (event) {
+        attachExportPeriod(event, exportPdfLink);
+      });
+    }
+    if (exportExcelLink) {
+      exportExcelLink.addEventListener('click', function (event) {
+        attachExportPeriod(event, exportExcelLink);
+      });
+    }
+
+    const filterForm = document.getElementById('payroll-filter-form');
+    const filterMonth = document.getElementById('filter-month');
+    const filterYear = document.getElementById('filter-year');
+    if (filterForm && filterMonth) {
+      filterMonth.addEventListener('change', function () {
+        if (payBtnMonth) payBtnMonth.value = filterMonth.value;
+        filterForm.submit();
+      });
+    }
+    if (filterForm && filterYear) {
+      let yearTimer = null;
+      filterYear.addEventListener('input', function () {
+        if (yearTimer) clearTimeout(yearTimer);
+        if (payBtnYear) payBtnYear.value = filterYear.value;
+        yearTimer = setTimeout(function () {
+          if (filterYear.value && filterYear.value.length >= 4) {
+            filterForm.submit();
+          }
+        }, 350);
+      });
+      filterYear.addEventListener('change', function () {
+        if (payBtnYear) payBtnYear.value = filterYear.value;
+        filterForm.submit();
+      });
+    }
+  })();
+</script>
+{% endblock %}

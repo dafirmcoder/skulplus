@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+:root {
+  --blue:#0f3057;
+  --green:#16a34a;
+  --orange:#f59e0b;
+  --light:#f4f7fb;
+  --card:#ffffff;
+  --border:#e6ecf2;
+}
+
+body { background:var(--light); font-family:'Poppins',sans-serif; }
+
+.page-header {
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;
+}
+
+.btn-add {
+  background:linear-gradient(135deg,var(--green),#22c55e);
+  color:#fff; padding:10px 16px; border-radius:8px; border:none; font-weight:600;
+  cursor:pointer;
+}
+
+.card {
+  background:#fff; border-radius:14px; padding:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.05);
+}
+
+table { width:100%; border-collapse:collapse; }
+th, td { padding:12px 10px; border-bottom:1px solid var(--border); }
+th { color:#777; font-size:13px; text-align:left; }
+
+.avatar {
+  width:40px; height:40px; border-radius:50%; object-fit:cover;
+}
+
+.actions i { margin-right:12px; cursor:pointer; }
+.edit{color:var(--blue)} .delete{color:#dc2626} .view{color:var(--green)}
+
+.badge {
+  padding:5px 10px; border-radius:20px;
+  background:rgba(245,158,11,0.15); color:var(--orange); font-size:12px;
+}
+
+/* MODAL */
+.modal-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,0.45);
+  display:none; align-items:center; justify-content:center; z-index:1000;
+}
+.modal {
+  background:#fff; width:95%; max-width:700px; border-radius:14px; padding:25px;
+}
+.form-grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px;
+}
+.form-group label { font-weight:600; font-size:13px; margin-bottom:6px; display:block; }
+.form-group input, .form-group select, .form-group textarea {
+  width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border);
+}
+.modal-actions { text-align:right; margin-top:12px; }
+.btn-save { background:linear-gradient(135deg,var(--blue),#1a73e8); color:#fff; border:none; padding:8px 14px; border-radius:6px; }
+.btn-cancel { background:#eee; border:none; padding:8px 12px; border-radius:6px; margin-right:6px; }
+.error { color:#dc2626; font-size:12px; }
+</style>
+
+
+<div class="page-header">
+  <h1><i class="fas fa-user-graduate"></i> Students Management</h1>
+  <button class="btn-add" onclick="openModal()"><i class="fas fa-user-plus"></i> Admit Student</button>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Photo</th>
+        <th>Admission No</th>
+        <th>Name</th>
+        <th>Class</th>
+        <th>Parent</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="students-table">
+      {% for student in students %}
+      <tr data-student-id="{{ student.id }}">
+        <td>
+          {% if student.photo %}
+            <img src="{{ student.photo.url }}" class="avatar">
+          {% else %}
+            <img src="https://via.placeholder.com/40" class="avatar">
+          {% endif %}
+        </td>
+        <td>{{ student.admission_number }}</td>
+        <td><strong>{{ student.first_name }} {{ student.last_name }}</strong></td>
+        <td><span class="badge">{{ student.classroom }}</span></td>
+        <td>{{ student.parent_name }}<br><small>{{ student.parent_phone }}</small></td>
+        <td class="actions">
+          <a href="#" onclick="openViewModal({{ student.id }});return false;" title="View"><i class="fas fa-eye view"></i></a>
+          <a href="#" onclick="openEditModal({{ student.id }});return false;" title="Edit"><i class="fas fa-edit edit"></i></a>
+          <a href="#" onclick="openDeleteModal({{ student.id }});return false;" title="Delete"><i class="fas fa-trash delete"></i></a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center;color:#888">No students yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+
+<!-- MODAL -->
+<div class="modal-bg" id="studentModal">
+  <div class="modal">
+    <h2><i class="fas fa-user-plus"></i> Admit New Student</h2>
+
+    <form method="post" enctype="multipart/form-data" id="admit-form">
+      {% csrf_token %}
+      <div id="form-errors"></div>
+
+      <div class="form-grid">
+        {% for field in form %}
+        <div class="form-group">
+          {{ field.label_tag }}
+          {{ field }}
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-save">Save Student</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+  <!-- GENERIC MODAL FOR VIEW/DELETE -->
+  <div class="modal-bg" id="genericModal">
+    <div class="modal" id="genericModalContent"></div>
+  </div>
+
+<script>
+function openModal(){ 
+  document.getElementById("studentModal").style.display="flex"; 
+  // Reset form when opening
+  document.getElementById("admit-form").reset();
+  document.getElementById("form-errors").innerHTML = '';
+}
+function closeModal(){ document.getElementById("studentModal").style.display="none"; }
+
+// Dynamic stream loading when classroom changes
+document.addEventListener('DOMContentLoaded', function(){
+  const classroomSelect = document.querySelector('select[name="classroom"]');
+  const streamSelect = document.querySelector('select[name="stream"]');
+  
+  if (classroomSelect && streamSelect) {
+    classroomSelect.addEventListener('change', function(){
+      const classId = this.value;
+      if (!classId) {
+        streamSelect.innerHTML = '<option value="">---------</option>';
+        return;
+      }
+      
+      fetch(`/load-streams-for-class/?class_id=${classId}`, {
+        method: 'GET',
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+      })
+      .then(res => res.json())
+      .then(data => {
+        streamSelect.innerHTML = '<option value="">---------</option>';
+        if (data.streams && data.streams.length > 0) {
+          data.streams.forEach(stream => {
+            const option = document.createElement('option');
+            option.value = stream.id;
+            option.text = stream.name;
+            streamSelect.appendChild(option);
+          });
+        }
+      })
+      .catch(err => console.error('Error loading streams:', err));
+    });
+  }
+});
+
+// AJAX Submit
+document.getElementById("admit-form").addEventListener("submit", function(e){
+  e.preventDefault();
+  let form = this;
+  let data = new FormData(form);
+
+  fetch("", { method:"POST", body:data, headers:{'X-Requested-With':'XMLHttpRequest'} })
+  .then(res=>res.json())
+  .then(data=>{
+    if(data.success){
+      location.reload(); // simplest refresh like classes page
+    } else {
+      const errDiv = document.getElementById('form-errors');
+      errDiv.innerHTML = '';
+      if (data.errors) {
+        for (const k in data.errors) {
+          const msgs = data.errors[k];
+          const d = document.createElement('div');
+          d.className = 'error';
+          d.textContent = Array.isArray(msgs) ? msgs.join('; ') : msgs;
+          errDiv.appendChild(d);
+        }
+      }
+    }
+  })
+  .catch(err => {
+    const errDiv = document.getElementById('form-errors');
+    errDiv.innerHTML = '<div class="error">Network error: ' + err.message + '</div>';
+  });
+});
+</script>
+
+  <!-- EDIT MODAL (AJAX) -->
+  <div class="modal-bg" id="editModal">
+    <div class="modal" id="editModalContent">
+      <!-- form partial loaded here -->
+    </div>
+  </div>
+
+  <script>
+  function getCookie(name){
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== ''){
+      const cookies = document.cookie.split(';');
+      for (let i=0;i<cookies.length;i++){ const c = cookies[i].trim(); if (c.startsWith(name+'=')){ cookieValue = decodeURIComponent(c.substring(name.length+1)); break; } }
+    }
+    return cookieValue;
+  }
+  function openEditModal(studentId){
+    const url = `/school/students/${studentId}/edit/`;
+    fetch(url, { method: 'GET', credentials: 'same-origin', headers: {'X-Requested-With':'XMLHttpRequest'} })
+      .then(async res => {
+        const html = await res.text();
+        if (!res.ok) {
+          alert('Failed to load form (status ' + res.status + '):\n' + html.slice(0,1000));
+          throw new Error('Failed to load form: ' + res.status);
+        }
+        document.getElementById('editModalContent').innerHTML = html;
+        document.getElementById('editModal').style.display = 'flex';
+        attachEditFormHandler();
+      }).catch(err => { alert('Could not load edit form: '+err.message); });
+  }
+  function closeEditModal(){ document.getElementById('editModal').style.display = 'none'; }
+
+  function attachEditFormHandler(){
+    const form = document.getElementById('edit-student-form');
+    if (!form) return;
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      const fd = new FormData(form);
+      const csrftoken = getCookie('csrftoken') || (form.querySelector('[name="csrfmiddlewaretoken"]') && form.querySelector('[name="csrfmiddlewaretoken"]').value);
+
+      fetch(form.action, {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
+        headers: {'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': csrftoken || ''}
+      }).then(async res => {
+        if (!res.ok){ try{ const data = await res.json(); if (data && data.errors){ showEditErrors(data.errors); return; } }catch(e){} const txt = await res.text(); showEditErrors({'__all__':[txt.slice(0,300)]}); return; }
+        const data = await res.json();
+        if (data.success){
+          const s = data.student;
+          // update row in table
+          const row = document.querySelector(`#students-table tr[data-student-id="${s.id}"]`);
+          if (row){
+            // best-effort updates by cell index similar to students_page
+            row.children[0].querySelector('img').src = s.photo_url || 'https://via.placeholder.com/40';
+            row.children[1].textContent = s.admission_number || '';
+            row.children[2].innerHTML = '<strong>' + (s.first_name||'') + ' ' + (s.last_name||'') + '</strong>';
+            row.children[3].innerHTML = '<span class="badge">' + (s.classroom||'') + '</span>';
+            row.children[4].innerHTML = (s.parent_name||'') + '<br><small>' + (s.parent_phone||'') + '</small>';
+          }
+          closeEditModal();
+        } else if (data.errors){ showEditErrors(data.errors); }
+      }).catch(err => showEditErrors({'__all__':['Network error: '+err.message]}));
+    });
+
+    function showEditErrors(errors){
+      const errDiv = document.getElementById('edit-form-errors'); if (!errDiv) return; errDiv.innerHTML='';
+      for (const k in errors){ const msgs = errors[k]; const d = document.createElement('div'); d.className='error'; d.textContent = Array.isArray(msgs)? msgs.join('; '): msgs; errDiv.appendChild(d); }
+    }
+  }
+  </script>
+
+{% include 'schools/_modals_js.html' %}
+
+{% endblock %}
+

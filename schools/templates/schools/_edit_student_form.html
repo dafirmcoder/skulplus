@@ -1,0 +1,82 @@
+<form id="edit-student-form" method="post" enctype="multipart/form-data" action="{% url 'edit_student' student.id %}">
+  {% csrf_token %}
+  <div id="edit-form-errors"></div>
+
+  <div class="form-grid">
+    {% for field in form %}
+    <div class="form-group">
+      <label>{{ field.label }}</label>
+      {{ field }}
+    </div>
+    {% endfor %}
+
+    {% if allow_pathways and student_level == 'Senior' %}
+    <div class="form-group">
+      <label for="pathway_id">Pathway</label>
+      <select id="pathway_id" name="pathway_id" required>
+        <option value="">Select Pathway</option>
+        {% for p in pathways %}
+          <option value="{{ p.id }}" {% if student_pathway and student_pathway.pathway_id == p.id %}selected{% endif %}>
+            {{ p.code }} - {{ p.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="modal-actions">
+    <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancel</button>
+    <button type="submit" class="btn-save">Save</button>
+  </div>
+</form>
+<script>
+function setupStreamLoading() {
+  const classroomSelect = document.querySelector('select[name="classroom"]');
+  const streamSelect = document.querySelector('select[name="stream"]');
+  
+  if (classroomSelect && streamSelect) {
+    // Load streams when classroom changes
+    classroomSelect.addEventListener('change', function(){
+      const classId = this.value;
+      if (!classId) {
+        streamSelect.innerHTML = '<option value="">---------</option>';
+        return;
+      }
+      
+      fetch(`/load-streams-for-class/?class_id=${classId}`, {
+        method: 'GET',
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+      })
+      .then(res => res.json())
+      .then(data => {
+        const currentStreamId = streamSelect.value;
+        streamSelect.innerHTML = '<option value="">---------</option>';
+        if (data.streams && data.streams.length > 0) {
+          data.streams.forEach(stream => {
+            const option = document.createElement('option');
+            option.value = stream.id;
+            option.text = stream.name;
+            if (stream.id == currentStreamId) {
+              option.selected = true;
+            }
+            streamSelect.appendChild(option);
+          });
+        }
+      })
+      .catch(err => console.error('Error loading streams:', err));
+    });
+    
+    // Trigger stream loading on initial load if classroom is selected
+    if (classroomSelect.value) {
+      classroomSelect.dispatchEvent(new Event('change'));
+    }
+  }
+}
+
+// Call setup immediately (works for AJAX-loaded forms)
+setupStreamLoading();
+
+// Also call on DOMContentLoaded for non-AJAX forms
+document.addEventListener('DOMContentLoaded', setupStreamLoading);
+</script>

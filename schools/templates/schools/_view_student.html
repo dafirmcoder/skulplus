@@ -1,0 +1,16 @@
+<div style="padding:16px;">
+  <h3>Student: {{ student.first_name }} {{ student.last_name }}</h3>
+  <p><strong>Admission No:</strong> {{ student.admission_number }}</p>
+  <p><strong>Class:</strong> {{ student.classroom }}</p>
+  {% if allow_pathways and student_pathway %}
+  <p><strong>Pathway:</strong> {{ student_pathway.pathway.code }} - {{ student_pathway.pathway.name }}</p>
+  {% endif %}
+  <p><strong>Parent:</strong> {{ student.parent_name }} ({{ student.parent_phone }})</p>
+  <p><strong>DOB:</strong> {{ student.date_of_birth }}</p>
+  {% if student.photo %}
+  <p><img src="{{ student.photo.url }}" style="width:120px;height:120px;border-radius:8px;object-fit:cover"></p>
+  {% endif %}
+  <div style="text-align:right;margin-top:8px">
+    <button class="btn-cancel" onclick="closeGenericModal()">Close</button>
+  </div>
+</div>

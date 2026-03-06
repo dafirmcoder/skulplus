@@ -1,0 +1,145 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SkulPlus – The Smart Way to Run Your School</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { margin:0; font-family:'Poppins', sans-serif; background:#f8fafc; color:#333; }
+        header {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:20px 60px; background:white; box-shadow:0 2px 10px rgba(0,0,0,0.05);
+        }
+        header h1 { color:#1a73e8; margin:0; }
+        .nav-buttons a {
+            margin-left:15px; padding:10px 18px; text-decoration:none;
+            border-radius:6px; font-weight:600;
+        }
+        .login-btn { color:#1a73e8; border:2px solid #1a73e8; }
+        .signup-btn { background:#1a73e8; color:white; }
+
+        .hero {
+            padding:90px 60px; display:flex; justify-content:space-between;
+            align-items:center; background:linear-gradient(120deg,#1a73e8,#4c51bf); color:white;
+        }
+        .hero-text { max-width:550px; }
+        .hero h2 { font-size:44px; margin-bottom:20px; }
+        .hero p { font-size:18px; margin-bottom:30px; line-height:1.6; }
+        .hero-buttons a {
+            padding:14px 24px; border-radius:6px; text-decoration:none; font-weight:600;
+            margin-right:15px;
+        }
+        .btn-primary { background:white; color:#1a73e8; }
+        .btn-outline { border:2px solid white; color:white; }
+
+        .section { padding:80px 60px; text-align:center; }
+        .section h2 { font-size:32px; margin-bottom:10px; }
+        .section p.subtitle { color:#666; margin-bottom:40px; }
+
+        .features {
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+            gap:30px; margin-top:40px;
+        }
+        .feature-card {
+            background:white; padding:30px; border-radius:10px;
+            box-shadow:0 6px 20px rgba(0,0,0,0.05);
+        }
+        .feature-card h3 { color:#1a73e8; margin-bottom:10px; }
+
+        .benefits { background:#edf2f7; padding:70px 60px; }
+        .benefits ul { max-width:800px; margin:auto; text-align:left; line-height:1.8; }
+
+        .cta {
+            background:#1a73e8; color:white; text-align:center;
+            padding:80px 20px;
+        }
+        .cta h2 { font-size:34px; margin-bottom:20px; }
+        .cta a {
+            background:white; color:#1a73e8; padding:14px 28px;
+            border-radius:6px; font-weight:600; text-decoration:none;
+        }
+
+        footer {
+            background:#2d3748; color:white; text-align:center;
+            padding:30px 20px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>SkulPlus</h1>
+    <div class="nav-buttons">
+        <a href="{% url 'login' %}" class="login-btn">Login</a>
+        <a href="{% url 'signup' %}" class="signup-btn">Get Started</a>
+    </div>
+</header>
+
+<section class="hero">
+    <div class="hero-text">
+        <h2>Run Your Entire School From One Smart Platform</h2>
+        <p>
+            SkulPlus helps schools manage students, fees, exams, payroll and parent communication — all in one secure cloud system.
+        </p>
+        <div class="hero-buttons">
+            <a href="{% url 'signup' %}" class="btn-primary">Start Free Setup</a>
+            <a href="{% url 'login' %}" class="btn-outline">Login</a>
+        </div>
+    </div>
+    {% if SITE_LOGO_URL %}
+    <img src="{{ SITE_LOGO_URL }}" width="260" alt="SkulPlus logo">
+    {% else %}
+    <img src="{% static 'images/skulplus_logo.png' %}" width="260" alt="SkulPlus logo">
+    {% endif %}
+</section>
+
+<section class="section">
+    <h2>Everything Your School Needs</h2>
+    <p class="subtitle">No more paperwork. No more spreadsheets. Just one powerful system.</p>
+    <div class="features">
+        <div class="feature-card">
+            <h3>📚 Academic Management</h3>
+            <p>Record marks, generate report cards, rank students and analyze subject performance.</p>
+        </div>
+        <div class="feature-card">
+            <h3>💰 Fees & Billing</h3>
+            <p>Track payments, balances, receipts and send automatic SMS fee reminders.</p>
+        </div>
+        <div class="feature-card">
+            <h3>👨‍🏫 Staff & Payroll</h3>
+            <p>Manage teachers, salaries and generate professional payslips instantly.</p>
+        </div>
+        <div class="feature-card">
+            <h3>📢 Parent Communication</h3>
+            <p>Announcements, performance reports and fee updates through the parent portal.</p>
+        </div>
+    </div>
+</section>
+
+<section class="benefits">
+    <h2 style="text-align:center;">Why Schools Love SkulPlus</h2>
+    <ul>
+        <li>✔ Saves administrators hours of manual work</li>
+        <li>✔ Improves transparency with parents</li>
+        <li>✔ Boosts academic performance tracking</li>
+        <li>✔ Secure cloud access from anywhere</li>
+        <li>✔ Built for Cambridge and CBE schools</li>
+    </ul>
+</section>
+
+<section class="cta">
+    <h2>Ready to Transform Your School?</h2>
+    <p>Set up your school in minutes and start managing smarter today.</p>
+    <br>
+    <a href="{% url 'signup' %}">Create Your School Account</a>
+</section>
+
+<footer>
+    <p>© 2026 SkulPlus School Management System</p>
+</footer>
+
+</body>
+</html>

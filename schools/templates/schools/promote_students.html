@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+.page-card{max-width:1100px;margin:20px auto;padding:25px;background:#fff;border-radius:8px}
+.filters{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+.filters select, .filters button{padding:8px 12px;border-radius:6px;border:1px solid #ccc}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #eee;padding:8px}
+</style>
+
+<div class="page-card">
+	<h2>Promote / Demote Students</h2>
+	<div class="filters">
+		<label>From class:</label>
+		<select id="sourceClass">
+			<option value="">Select class</option>
+			{% for c in classes %}
+			<option value="{{ c.id }}">{{ c.name }}</option>
+			{% endfor %}
+		</select>
+
+		<label>To class:</label>
+		<select id="targetClass">
+			<option value="">Select target class</option>
+			{% for c in classes %}
+			<option value="{{ c.id }}">{{ c.name }}</option>
+			{% endfor %}
+		</select>
+
+		<button id="btnLoad">Load Students</button>
+		<button id="btnPromoteSelected" disabled>Promote Selected →</button>
+		<button id="btnPromoteNext" title="Promote to next class (auto)" style="margin-left:6px">Promote to Next</button>
+		<button id="btnUndo" title="Undo last promotion" style="margin-left:6px">Undo</button>
+		<button id="btnLogs" title="Show promotion logs" style="margin-left:6px">Logs</button>
+	</div>
+
+	<table id="studentsTable">
+		<thead>
+			<tr><th><input type="checkbox" id="chkAll"></th><th>#</th><th>Name</th><th>Admission No</th><th>Gender</th><th>Action</th></tr>
+		</thead>
+		<tbody></tbody>
+	</table>
+</div>
+
+<script>
+	var LOAD_URL = "{% url 'load_students_for_subject' %}";
+	var MOVE_URL = "{% url 'move_students' %}";
+	var ADJ_URL = "{% url 'get_adjacent_class' %}";
+	var PROMOTE_NEXT_URL = "{% url 'promote_to_next' %}";
+	var UNDO_URL = "{% url 'undo_promotion' %}";
+	var GRAD_URL = "{% url 'graduate_students' %}";
+	var LOGS_URL = "{% url 'promotion_logs' %}";
+</script>
+<script src="{% static 'js/promote_students.js' %}"></script>
+
+{% endblock %}

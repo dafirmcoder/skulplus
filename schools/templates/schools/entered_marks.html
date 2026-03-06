@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.page-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+.page-head h1{margin:0;color:#0f3057}
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px}
+.filters label{display:block;font-size:12px;color:#64748b;text-transform:uppercase;margin-bottom:4px}
+.filters select{width:100%;padding:8px;border:1px solid #dbe2ea;border-radius:8px;background:#fff}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.tile{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px}
+.tile.clickable{cursor:pointer;transition:.15s ease}
+.tile.clickable:hover{border-color:#93c5fd;background:#eff6ff}
+.tile.active{border-color:#1d4ed8;background:#dbeafe}
+.tile small{display:block;color:#64748b}
+.tile strong{font-size:18px;color:#0f3057}
+table{width:100%;border-collapse:collapse}
+th,td{border-bottom:1px solid #e2e8f0;padding:10px 8px;text-align:left;font-size:13px}
+th{background:#f8fafc;color:#334155}
+.badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.b-draft{background:#dbeafe;color:#1e3a8a}
+.b-pub{background:#fef3c7;color:#92400e}
+.b-lock{background:#fee2e2;color:#991b1b}
+.btn{border:none;border-radius:8px;padding:8px 10px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+.btn-view{background:#0f3057;color:#fff}
+.btn-publish{background:#f59e0b;color:#fff}
+.btn:disabled{opacity:.65;cursor:not-allowed}
+.print-area{display:none}
+.print-stream{page-break-after:always;break-after:page}
+.print-stream:last-child{page-break-after:auto;break-after:auto}
+.print-school-head{display:flex;align-items:center;gap:10px;border-bottom:2px solid #0f3057;padding-bottom:6px;margin-bottom:8px}
+.print-school-logo{width:72px;height:72px;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px;background:#fff;padding:6px}
+.print-school-text{flex:1;text-align:center}
+.print-school-text h1{margin:0;color:#0f3057;font-size:20px}
+.print-school-text p{margin:4px 0;color:#475569;font-size:12px}
+.print-title{margin:0 0 8px;color:#0f3057}
+.print-meta{font-size:11px;color:#334155;margin:0 0 6px}
+.print-section{margin-bottom:8px;break-inside:avoid-page;page-break-inside:avoid}
+.print-section h3{margin:0 0 6px;font-size:12px;color:#0f3057}
+.print-table{width:100%;border-collapse:collapse;font-size:9px}
+.print-table th,.print-table td{border:1px solid #dbe2ea;padding:4px 5px;white-space:nowrap}
+.print-table th{background:#f1f5f9;color:#334155;text-transform:uppercase}
+@media print{
+  @page{size:A4 landscape;margin:0.5in}
+  .page-head,.filters,.summary,.card > table,footer{display:none !important}
+  .card{box-shadow:none;padding:0}
+  .print-area{display:block}
+}
+</style>
+
+<div class="page-head">
+  <h1><i class="fas fa-table-list"></i> Entered Marks</h1>
+</div>
+
+<div class="card">
+  <form method="get" class="filters">
+    <div>
+      <label>Term</label>
+      <select name="term">
+        <option value="">All Terms</option>
+        {% for t in terms %}
+          <option value="{{ t }}" {% if selected_term == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Exam</label>
+      <select name="exam_id">
+        <option value="">All Exams</option>
+        {% for ex in exams %}
+          <option value="{{ ex.id }}" {% if selected_exam_id == ex.id|stringformat:'s' %}selected{% endif %}>{{ ex.title }} - {{ ex.term }} {{ ex.year }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Class</label>
+      <select name="class_id">
+        <option value="">All Classes</option>
+        {% for c in classes %}
+          <option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Stream</label>
+      <select name="stream_id">
+        <option value="">All Streams</option>
+        {% for s in streams %}
+          <option value="{{ s.id }}" {% if selected_stream_id == s.id|stringformat:'s' %}selected{% endif %}>{{ s.classroom.name }} - {{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <input type="hidden" name="status" value="{{ status_filter }}">
+    <input type="hidden" name="lock" value="{{ lock_filter }}">
+    <div style="display:flex;align-items:end;gap:8px">
+      <button id="publishAllBtn" class="btn btn-publish" type="button" {% if draft_row_count == 0 or status_filter != 'draft' %}disabled{% endif %}>Publish All</button>
+      <button id="printDraftBtn" class="btn btn-view" type="button">Print Draft</button>
+    </div>
+  </form>
+
+  <div class="summary">
+    <div class="tile"><small>Total Marksheets</small><strong>{{ summary.total_marksheets }}</strong></div>
+    <div class="tile clickable {% if status_filter == 'draft' %}active{% endif %}" data-filter-type="status" data-filter-value="draft"><small>Draft</small><strong>{{ summary.draft }}</strong></div>
+    <div class="tile clickable {% if status_filter == 'published' %}active{% endif %}" data-filter-type="status" data-filter-value="published"><small>Published</small><strong>{{ summary.published }}</strong></div>
+    <div class="tile clickable {% if lock_filter == 'locked' %}active{% endif %}" data-filter-type="lock" data-filter-value="locked"><small>Locked Exams</small><strong>{{ summary.locked }}</strong></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Exam</th>
+        <th>Term</th>
+        <th>Class</th>
+        <th>Subject</th>
+        <th>Status</th>
+        <th>Entered</th>
+        <th>Lock</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in marksheets %}
+      <tr>
+        <td>{{ m.exam.title }} ({{ m.exam.year }})</td>
+        <td>{{ m.exam.term }}</td>
+        <td>{{ m.school_class.name }}</td>
+        <td>{{ m.subject.name }}</td>
+        <td>
+          {% if m.status == 'published' %}
+            <span class="badge b-pub">Published</span>
+          {% else %}
+            <span class="badge b-draft">Draft</span>
+          {% endif %}
+        </td>
+        <td>{{ m.entered_count }} / {{ m.total_rows }}</td>
+        <td>
+          {% if m.exam.marks_entry_locked %}
+            <span class="badge b-lock">Locked</span>
+          {% else %}
+            <span class="badge b-draft">Open</span>
+          {% endif %}
+        </td>
+        <td>
+          <a class="btn btn-view" href="{% url 'enter_marks' %}?term={{ m.exam.term|urlencode }}&exam_id={{ m.exam.id }}&class_id={{ m.school_class.id }}&subject_id={{ m.subject.id }}&out_of={{ m.out_of }}">Open/Edit</a>
+          {% if m.status == 'draft' %}
+            <button class="btn btn-publish publish-row-btn" type="button" data-marksheet-id="{{ m.id }}">Publish</button>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" style="text-align:center;color:#64748b">No entered marks found for this filter.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div id="draftPrintArea" class="print-area">
+    {% if has_draft_print_data %}
+      {% for stream_pack in draft_print_streams %}
+        {% if stream_pack.sections %}
+          <section class="print-stream">
+            <div class="print-school-head">
+              {% if school.logo %}
+                <img class="print-school-logo" src="{{ school.logo.url }}" alt="{{ school.name }}">
+              {% endif %}
+              <div class="print-school-text">
+                <h1>{{ school.name }}</h1>
+                {% if school.motto %}<p>{{ school.motto }}</p>{% endif %}
+                {% if school.address %}<p>{{ school.address }}</p>{% endif %}
+                {% if school.phone %}<p>{{ school.phone }}</p>{% endif %}
+              </div>
+              {% if school.logo %}
+                <div style="width:72px"></div>
+              {% endif %}
+            </div>
+            <h2 class="print-title">Draft Raw Marks Verification</h2>
+            <p class="print-meta">
+              <strong>Class:</strong> {{ stream_pack.class_name }}
+              &nbsp;|&nbsp;
+              <strong>Stream:</strong> {{ stream_pack.stream_name }}
+              &nbsp;|&nbsp;
+              <strong>Students:</strong> {{ stream_pack.student_count }}
+            </p>
+            {% for sec in stream_pack.sections %}
+              <div class="print-section">
+                <h3>{{ sec.exam_title }} - {{ sec.term }} {{ sec.year }}</h3>
+                <table class="print-table">
+                  <thead>
+                    <tr>
+                      <th>Adm No</th>
+                      <th>Student Name</th>
+                      {% for sub in sec.subjects %}
+                        <th>{{ sub.name }} (Out of {{ sub.out_of }})</th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in sec.rows %}
+                      <tr>
+                        <td>{{ row.adm }}</td>
+                        <td>{{ row.name }}</td>
+                        {% for mark in row.marks %}
+                          <td>{{ mark }}</td>
+                        {% endfor %}
+                      </tr>
+                    {% empty %}
+                      <tr>
+                        <td colspan="{{ sec.subjects|length|add:2 }}">No students in this stream.</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endfor %}
+          </section>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      <p class="print-meta">No draft marks found for the selected filter/stream.</p>
+    {% endif %}
+  </div>
+</div>
+<script>
+  (function () {
+    const form = document.querySelector('.filters');
+    if (!form) return;
+    const printDraftBtn = document.getElementById('printDraftBtn');
+    const publishAllBtn = document.getElementById('publishAllBtn');
+    const draftPrintArea = document.getElementById('draftPrintArea');
+    const hasDraftData = {{ has_draft_print_data|yesno:"true,false" }};
+    const publishRowBtns = Array.from(document.querySelectorAll('.publish-row-btn'));
+
+    const statusInput = form.querySelector('input[name="status"]');
+    const lockInput = form.querySelector('input[name="lock"]');
+
+    form.querySelectorAll('select').forEach(function (selectEl) {
+      selectEl.addEventListener('change', function () {
+        form.submit();
+      });
+    });
+
+    document.querySelectorAll('.tile.clickable').forEach(function (tile) {
+      tile.addEventListener('click', function () {
+        const type = tile.dataset.filterType;
+        const value = tile.dataset.filterValue || '';
+
+        if (type === 'status') {
+          statusInput.value = statusInput.value === value ? '' : value;
+          lockInput.value = '';
+        } else if (type === 'lock') {
+          lockInput.value = lockInput.value === value ? '' : value;
+          statusInput.value = '';
+        }
+        form.submit();
+      });
+    });
+
+    function getCookie(name){
+      const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      if (v) return v.pop();
+      const csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+      return csrfInput ? csrfInput.value : '';
+    }
+
+    function setPublishButtonsDisabled(disabled) {
+      publishRowBtns.forEach(function(btn){ btn.disabled = disabled; });
+      if (publishAllBtn) publishAllBtn.disabled = disabled;
+    }
+
+    function getVisiblePublishButtons() {
+      return publishRowBtns.filter(function (btn) {
+        const row = btn.closest('tr');
+        return !!row && row.offsetParent !== null;
+      });
+    }
+
+    async function publishMarksheet(marksheetId){
+      const resp = await fetch(`/school/publish-marks/${marksheetId}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+      });
+      let data = {};
+      try { data = await resp.json(); } catch (e) {}
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || `Failed to publish marksheet ${marksheetId}`);
+      }
+      return data;
+    }
+
+    publishRowBtns.forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        const marksheetId = btn.dataset.marksheetId;
+        if (!marksheetId) return;
+        if (!confirm('Publish this draft marksheet?')) return;
+        btn.disabled = true;
+        try {
+          await publishMarksheet(marksheetId);
+          window.location.reload();
+        } catch (err) {
+          btn.disabled = false;
+          alert(err.message || 'Publish failed.');
+        }
+      });
+    });
+
+    if (publishAllBtn) {
+      publishAllBtn.addEventListener('click', async function () {
+        if ((statusInput && statusInput.value !== 'draft') || !document.querySelector('.tile.clickable[data-filter-type="status"][data-filter-value="draft"].active')) {
+          alert('Click the Draft tile first, then use Publish All.');
+          return;
+        }
+        const visibleBtns = getVisiblePublishButtons();
+        const ids = visibleBtns.map(function (b) { return b.dataset.marksheetId; }).filter(Boolean);
+        if (!ids.length) {
+          alert('No visible draft rows to publish.');
+          return;
+        }
+        if (!confirm(`Publish all ${ids.length} draft marksheets?`)) return;
+        setPublishButtonsDisabled(true);
+        let successCount = 0;
+        let failCount = 0;
+        for (const id of ids) {
+          try {
+            await publishMarksheet(id);
+            successCount += 1;
+          } catch (e) {
+            failCount += 1;
+          }
+        }
+        alert(`Publish complete. Success: ${successCount}, Failed: ${failCount}`);
+        window.location.reload();
+      });
+    }
+
+    if (printDraftBtn) {
+      printDraftBtn.addEventListener('click', function () {
+        if (!hasDraftData) {
+          alert('No draft raw marks found for this filter/stream.');
+          return;
+        }
+        const content = draftPrintArea ? draftPrintArea.innerHTML : '';
+        if (!content.trim()) {
+          alert('Nothing to print for the current filter.');
+          return;
+        }
+
+        const printHtml = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Draft Raw Marks</title>
+  <style>
+    *{box-sizing:border-box}
+    @page{size:A4 landscape;margin:0.5in}
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111}
+    .print-stream{page-break-after:always;break-after:page}
+    .print-stream:last-child{page-break-after:auto;break-after:auto}
+    .print-school-head{display:flex;align-items:center;gap:16px;border-bottom:3px solid #0f3057;padding-bottom:10px;margin-bottom:14px}
+    .print-school-logo{width:72px;height:72px;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px;background:#fff;padding:6px}
+    .print-school-text{flex:1;text-align:center}
+    .print-school-text h1{margin:0;color:#0f3057;font-size:20px}
+    .print-school-text p{margin:4px 0;color:#475569;font-size:12px}
+    .print-title{margin:0 0 8px;color:#0f3057}
+    .print-meta{font-size:11px;color:#334155;margin:0 0 6px}
+    .print-section{margin-bottom:8px;break-inside:avoid-page;page-break-inside:avoid}
+    .print-section h3{margin:0 0 6px;font-size:12px;color:#0f3057}
+    .print-table{width:100%;border-collapse:collapse;font-size:9px;margin-top:8px}
+    .print-table th,.print-table td{border:1px solid #dbe2ea;padding:4px 5px;font-size:9px;white-space:nowrap}
+    .print-table th{background:#f1f5f9;color:#334155;text-transform:uppercase}
+  </style>
+</head>
+<body>${content}</body>
+</html>`;
+
+        if (window.SkulPlusPrint && typeof window.SkulPlusPrint.printHtml === 'function') {
+          window.SkulPlusPrint.printHtml(printHtml);
+        } else {
+          const w = window.open('', '_blank');
+          if (!w) return;
+          w.document.open();
+          w.document.write(printHtml);
+          w.document.close();
+          setTimeout(function(){ w.print(); }, 400);
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

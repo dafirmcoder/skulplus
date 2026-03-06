@@ -1,0 +1,578 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+:root{
+  --blue:#1e3a8a;
+  --green:#16a34a;
+  --orange:#f59e0b;
+  --bg:#f4f7fb;
+  --card:#ffffff;
+  --border:#e6ecf2;
+}
+body{background:var(--bg);font-family:'Poppins',sans-serif}
+
+.page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.btn{padding:10px 16px;border-radius:8px;font-weight:600;border:none;cursor:pointer}
+.btn-primary{background:linear-gradient(135deg,var(--blue),#2563eb);color:#fff}
+.btn-success{background:linear-gradient(135deg,var(--green),#22c55e);color:#fff}
+.btn-warning{background:linear-gradient(135deg,var(--orange),#fbbf24);color:#fff}
+.btn-cancel{background:#dc2626;color:#fff}
+
+.card{background:var(--card);border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,0.05)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:12px 10px;border-bottom:1px solid var(--border)}
+th{color:#777;font-size:13px;text-align:left}
+
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;z-index:1000}
+.modal{background:#fff;width:95%;max-width:650px;border-radius:14px;padding:25px}
+.form-group{margin-bottom:14px}
+.form-control{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border)}
+.modal-actions{text-align:right;margin-top:12px}
+.table-actions{display:inline-flex;align-items:center;gap:8px}
+.icon-btn{
+  width:30px;height:30px;padding:0;border-radius:8px;
+  border:1px solid #dbe4f0;background:#fff;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:all .2s ease;
+}
+.icon-btn i{font-size:13px;color:#334155}
+.icon-btn:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(15,23,42,.12)}
+.icon-btn:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.btn-allocate i{color:#334155}
+.btn-view-assignments i{color:#334155}
+.btn-edit-teacher{background:#eef2ff;border-color:#c7d2fe}
+.btn-edit-teacher i{color:#4338ca}
+.btn-delete-teacher,.btn-delete-assignment{background:#fef2f2;border-color:#fecaca}
+.btn-delete-teacher i,.btn-delete-assignment i{color:#dc2626}
+</style>
+
+<div class="page-header">
+  <h1><i class="fas fa-chalkboard-teacher"></i> Teachers</h1>
+  <button id="addTeacherBtn" class="btn btn-success"><i class="fas fa-plus"></i> Add Teacher</button>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Class Teacher</th>
+        <th>Class Teacher For</th>
+        <th style="text-align:right">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in teachers_with_classes %}
+      <tr>
+        <td>{{ item.teacher.user.get_full_name }}</td>
+        <td>{{ item.teacher.user.email }}</td>
+        <td>{% if item.teacher.is_class_teacher %}Yes{% else %}No{% endif %}</td>
+        <td>{% for cls in item.class_teacher_for %}{{ cls.name }}{% if cls.section %} {{ cls.section }}{% endif %}{% if cls.stream_name %} ({{ cls.stream_name }}){% endif %}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}</td>
+        <td style="text-align:right">
+          <div class="table-actions">
+            <button class="icon-btn btn-allocate" data-teacher-id="{{ item.teacher.id }}" title="Add Assignment" aria-label="Add Assignment"><i class="fas fa-plus"></i></button>
+            <button class="icon-btn btn-view-assignments" data-teacher-id="{{ item.teacher.id }}" title="View Assignments" aria-label="View Assignments"><i class="fas fa-eye"></i></button>
+            <button title="Edit" aria-label="Edit Teacher" data-teacher-id="{{ item.teacher.id }}" data-first-name="{{ item.teacher.user.first_name }}" data-last-name="{{ item.teacher.user.last_name }}" data-email="{{ item.teacher.user.email }}" data-is-class="{% if item.teacher.is_class_teacher %}1{% else %}0{% endif %}" data-class-teacher-ids="{% for cls in item.class_teacher_for %}{{ cls.id }}{% if not forloop.last %},{% endif %}{% endfor %}" data-class-teacher-streams="{% for cls in item.class_teacher_for %}{{ cls.stream_id|default:'' }}{% if not forloop.last %},{% endif %}{% endfor %}" class="icon-btn btn-edit-teacher"><i class="fas fa-edit"></i></button>
+            <button title="Delete" aria-label="Delete Teacher" data-teacher-id="{{ item.teacher.id }}" class="icon-btn btn-delete-teacher"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="text-align:center;color:#888">No teachers yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ADD TEACHER MODAL -->
+<div id="addTeacherModal" class="modal-bg">
+  <div class="modal">
+    <h3 id="addTeacherModalTitle">Add New Teacher</h3>
+    <form id="addTeacherForm">
+      <div class="form-group"><input type="text" name="first_name" class="form-control" placeholder="First Name" required></div>
+      <div class="form-group"><input type="text" name="last_name" class="form-control" placeholder="Last Name" required></div>
+      <div class="form-group"><input type="email" name="email" id="emailField" class="form-control" placeholder="Email (optional)" ></div>
+      <div class="form-group">
+        <input type="password" name="password" id="passwordField" class="form-control" placeholder="Password" required>
+        <small id="passwordHelper" style="color:#666;display:none">Leave blank to keep existing password</small>
+      </div>
+
+      <div class="form-group">
+        <label><input type="checkbox" id="isClassTeacher" name="is_class_teacher"> Is class teacher</label>
+      </div>
+
+      <div class="form-group" id="classSelectGroup" style="display:none">
+        <select name="class_teacher_for" id="classTeacherSelect" class="form-control">
+          <option value="">Assign Class</option>
+          {% for c in classes %}
+            <option value="{{ c.id }}">{{ c.name }} {{ c.section }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group" id="classTeacherStreamGroup" style="display:none">
+        <select name="class_teacher_stream" id="classTeacherStream" class="form-control">
+          <option value="">All Streams</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-cancel" onclick="closeAddTeacher()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ALLOCATE MODAL -->
+<div id="allocateModal" class="modal-bg">
+  <div class="modal">
+    <h3>Allocate Subject & Class</h3>
+    <form id="allocateForm">
+      <input type="hidden" id="allocTeacherId">
+
+      <div class="form-group">
+        <label>Class</label>
+        <select id="allocClasses" class="form-control" required>
+          <option value="">Select Class</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Stream (optional)</label>
+        <select id="allocStreams" class="form-control">
+          <option value="">All Streams</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Subject</label>
+        <select id="allocSubjects" class="form-control" required disabled>
+          <option value="">Select Subject</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-cancel" onclick="closeAllocate()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Allocation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- VIEW ASSIGNMENTS MODAL -->
+<div id="viewAssignmentsModal" class="modal-bg">
+  <div class="modal">
+    <h3 id="assignmentsTeacherName">Teacher Assignments</h3>
+    <div id="assignmentsList" style="max-height:400px;overflow-y:auto">
+      <!-- Assignments will be loaded here -->
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn" onclick="closeViewAssignments()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
+
+const schoolSystemType = "{{ school.system_type|default:'' }}";
+
+function buildSubjectLabel(s){
+  let label = s.name || '';
+  if (schoolSystemType === 'CBE' && s.level === 'Senior') {
+    const code = s.pathway_code || 'CORE';
+    label = `${label} [${code}]`;
+  }
+  return label;
+}
+
+function renderSubjectCell(a){
+  const name = a.subject_name || 'N/A';
+  if (schoolSystemType === 'CBE' && a.class_level === 'Senior') {
+    const code = a.subject_pathway_code || 'CORE';
+    const badgeClass = code === 'CORE' ? 'badge-core' : `badge-${code.toLowerCase()}`;
+    return `${name} <span class="badge ${badgeClass}">${code}</span>`;
+  }
+  return name;
+}
+
+// element references
+const addTeacherBtn = document.getElementById('addTeacherBtn');
+const addTeacherModal = document.getElementById('addTeacherModal');
+const addTeacherForm = document.getElementById('addTeacherForm');
+const isClassTeacher = document.getElementById('isClassTeacher');
+const classSelectGroup = document.getElementById('classSelectGroup');
+const classTeacherSelect = document.getElementById('classTeacherSelect');
+
+const allocateModal = document.getElementById('allocateModal');
+const allocateForm = document.getElementById('allocateForm');
+const allocTeacherId = document.getElementById('allocTeacherId');
+const allocSubjects = document.getElementById('allocSubjects');
+const allocClasses = document.getElementById('allocClasses');
+const allocStreams = document.getElementById('allocStreams');
+const classTeacherStream = document.getElementById('classTeacherStream');
+const classTeacherStreamGroup = document.getElementById('classTeacherStreamGroup');
+
+const viewAssignmentsModal = document.getElementById('viewAssignmentsModal');
+const assignmentsList = document.getElementById('assignmentsList');
+const assignmentsTeacherName = document.getElementById('assignmentsTeacherName');
+
+addTeacherBtn.addEventListener('click', ()=> addTeacherModal.style.display = 'flex');
+function closeAddTeacher(){
+  addTeacherModal.style.display = 'none';
+  addTeacherForm.removeAttribute('data-editing');
+  addTeacherForm.reset();
+  document.getElementById('addTeacherModalTitle').textContent = 'Add New Teacher';
+  document.getElementById('passwordField').setAttribute('required', 'required');
+  document.getElementById('passwordHelper').style.display = 'none';
+}
+function closeAllocate(){ allocateModal.style.display = 'none'; }
+function closeViewAssignments(){ viewAssignmentsModal.style.display = 'none'; }
+
+isClassTeacher.addEventListener('change', ()=> {
+  classSelectGroup.style.display = isClassTeacher.checked ? 'block' : 'none';
+  classTeacherStreamGroup.style.display = isClassTeacher.checked ? 'block' : 'none';
+  if (!isClassTeacher.checked) {
+    classTeacherSelect.value = '';
+    classTeacherStream.innerHTML = '<option value="">All Streams</option>';
+  }
+});
+
+// Load streams when class teacher class is selected
+classTeacherSelect.addEventListener('change', async function() {
+  const classId = this.value;
+  classTeacherStream.innerHTML = '<option value="">All Streams</option>';
+  
+  if (!classId) return;
+  
+  try {
+    const resp = await fetch(`/school/load-streams-for-class/?class_id=${classId}`, {
+      method: 'GET',
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const data = await resp.json();
+    if (data.streams && data.streams.length > 0) {
+      data.streams.forEach(stream => {
+        classTeacherStream.add(new Option(stream.name, stream.id));
+      });
+    }
+  } catch (err) {
+    console.error('Error loading streams:', err);
+  }
+});
+
+addTeacherForm.addEventListener('submit', e => {
+  e.preventDefault();
+  // if editing, call edit URL
+  const editing = addTeacherForm.getAttribute('data-editing');
+  let url = window.location.pathname;
+  if(editing){ url = '{% url "edit_teacher" pk=0 %}'.replace('/0/', `/${editing}/`); }
+  
+  const formData = Object.fromEntries(new FormData(addTeacherForm));
+  
+  // If editing and password is empty, remove it from payload
+  if(editing && !formData.password){
+    delete formData.password;
+  }
+  
+  fetch(url,{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'X-CSRFToken': getCookie('csrftoken'),
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify(formData)
+  }).then(r => r.json()).then(d => {
+    if(d.success) {
+      const isAdding = !editing;
+      if(isAdding) {
+        alert(`Teacher created successfully!\n\nLogin Email: ${d.teacher.email}\nPassword: The password you just set\n\nShare these credentials with the teacher.`);
+      }
+      location.reload();
+    } else {
+      alert(d.error||'Error');
+    }
+  }).catch(()=>alert('Network error'));
+});
+
+// attach edit/delete handlers
+document.querySelectorAll('.btn-edit-teacher').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const id = btn.getAttribute('data-teacher-id');
+    const first = btn.getAttribute('data-first-name') || '';
+    const last = btn.getAttribute('data-last-name') || '';
+    const email = btn.getAttribute('data-email') || '';
+    const isClass = btn.getAttribute('data-is-class') === '1';
+    const classTeacherIds = btn.getAttribute('data-class-teacher-ids') || '';
+    const classTeacherStreams = btn.getAttribute('data-class-teacher-streams') || '';
+    
+    document.getElementById('addTeacherModalTitle').textContent = 'Edit Teacher';
+    addTeacherForm.elements['first_name'].value = first;
+    addTeacherForm.elements['last_name'].value = last;
+    addTeacherForm.elements['email'].value = email;
+    document.getElementById('passwordField').value = '';
+    document.getElementById('passwordField').removeAttribute('required');
+    document.getElementById('passwordHelper').style.display = 'block';
+    isClassTeacher.checked = isClass;
+    classSelectGroup.style.display = isClass ? 'block' : 'none';
+    classTeacherStreamGroup.style.display = isClass ? 'block' : 'none';
+    
+    // Set the class teacher assignment if available
+    if (classTeacherIds) {
+      const classId = classTeacherIds.split(',')[0]; // Get first class ID
+      const streamId = classTeacherStreams.split(',')[0]; // Get first stream ID
+      classTeacherSelect.value = classId;
+      // Trigger stream loading
+      classTeacherSelect.dispatchEvent(new Event('change'));
+      
+      // After a short delay, set the stream value (after streams have loaded)
+      setTimeout(() => {
+        if (streamId && streamId !== '') {
+          classTeacherStream.value = streamId;
+        } else {
+          classTeacherStream.value = '';
+        }
+      }, 100);
+    }
+    
+    addTeacherForm.setAttribute('data-editing', id);
+    addTeacherModal.style.display = 'flex';
+  });
+});
+
+document.querySelectorAll('.btn-delete-teacher').forEach(btn => {
+  btn.addEventListener('click', ()=>{
+    const id = btn.getAttribute('data-teacher-id');
+    if(!confirm('Delete this teacher? This action cannot be undone.')) return;
+    const url = '{% url "delete_teacher" pk=0 %}'.replace('/0/', `/${id}/`);
+    fetch(url,{
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'}
+    }).then(r => r.json()).then(d => { if(d.success) location.reload(); else alert(d.error||'Error'); }).catch(()=>alert('Network error'));
+  });
+});
+
+// Handle class selection change to load streams
+allocClasses.addEventListener('change', async function() {
+  const classId = this.value;
+  allocStreams.innerHTML = '<option value="">All Streams</option>';
+  allocSubjects.innerHTML = '<option value="">Select Subject</option>';
+  allocSubjects.disabled = true;
+  if (!classId) return;
+  
+  // Load streams for selected class
+  try {
+    const resp = await fetch(`/school/load-streams-for-class/?class_id=${classId}`, {
+      method: 'GET',
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const data = await resp.json();
+    if (data.streams && data.streams.length > 0) {
+      data.streams.forEach(stream => {
+        allocStreams.add(new Option(stream.name, stream.id));
+      });
+    }
+  } catch (err) {
+    console.error('Error loading streams:', err);
+  }
+
+  await loadAllocSubjects(classId, '');
+});
+
+allocStreams.addEventListener('change', async function() {
+  const classId = allocClasses.value;
+  if (!classId) {
+    allocSubjects.innerHTML = '<option value="">Select Subject</option>';
+    allocSubjects.disabled = true;
+    return;
+  }
+  await loadAllocSubjects(classId, this.value || '');
+});
+
+async function loadAllocSubjects(classId, streamId) {
+  allocSubjects.innerHTML = '<option value="">Select Subject</option>';
+  allocSubjects.disabled = true;
+  if (!classId) return;
+  try {
+    let url = '{% url "load_school_subjects_classes" %}?class_id=' + encodeURIComponent(classId);
+    if (streamId) url += '&stream_id=' + encodeURIComponent(streamId);
+    const resp = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, credentials: 'same-origin'});
+    if (!resp.ok) throw new Error('Status ' + resp.status);
+    const data = await resp.json();
+    (data.subjects || []).forEach(s => {
+      const opt = new Option(buildSubjectLabel(s), s.id);
+      if (s.pathway_code) opt.dataset.pathwayCode = s.pathway_code;
+      if (s.level) opt.dataset.level = s.level;
+      allocSubjects.add(opt);
+    });
+    allocSubjects.disabled = (allocSubjects.options.length <= 1);
+  } catch (err) {
+    console.error('Error loading subjects:', err);
+  }
+}
+
+document.querySelectorAll('.btn-allocate').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.teacherId;
+    allocTeacherId.value = id;
+
+    // load available subjects & classes for this school
+    const headers = {'X-Requested-With': 'XMLHttpRequest'};
+      try{
+        const resp = await fetch('{% url "load_school_subjects_classes" %}', {headers, credentials: 'same-origin'});
+        if(!resp.ok) throw new Error('Status '+resp.status);
+        const data = await resp.json();
+      allocClasses.innerHTML = '<option value="">Select Class</option>';
+      // some endpoints return only name; keep compatibility
+      data.classes.forEach(c => allocClasses.add(new Option((c.name || c.display_name || '') + (c.section?(' '+c.section):''), c.id)));
+
+      // Clear form for new allocation
+      allocSubjects.innerHTML = '<option value="">Select Subject</option>';
+      allocSubjects.disabled = true;
+      allocSubjects.value = '';
+      allocClasses.value = '';
+      allocStreams.innerHTML = '<option value="">All Streams</option>';
+      allocStreams.value = '';
+
+      allocateModal.style.display = 'flex';
+    }catch(err){
+      alert('Failed to load allocation data');
+    }
+  });
+});
+
+// View assignments button handler
+document.querySelectorAll('.btn-view-assignments').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const teacherId = btn.dataset.teacherId;
+    const teacherName = btn.closest('tr').querySelector('td:first-child').textContent;
+    
+    assignmentsTeacherName.textContent = `${teacherName}'s Assignments`;
+    assignmentsList.innerHTML = '<p style="text-align:center;color:#888">Loading...</p>';
+    viewAssignmentsModal.style.display = 'flex';
+    
+    try {
+      const baseUrl = '{% url "allocate_teacher" teacher_id=0 %}';
+      const url = baseUrl.replace('/0/', `/${teacherId}/`);
+      const resp = await fetch(url, {
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        credentials: 'same-origin'
+      });
+      
+      if (!resp.ok) throw new Error('Failed to load assignments');
+      
+      const data = await resp.json();
+      
+      if (data.assignments && data.assignments.length > 0) {
+        let html = '<table style="width:100%;border-collapse:collapse">';
+        html += '<thead><tr style="border-bottom:2px solid #e6ecf2"><th style="padding:10px;text-align:left">Subject</th><th style="padding:10px;text-align:left">Class</th><th style="padding:10px;text-align:left">Stream</th><th style="padding:10px;text-align:right">Actions</th></tr></thead><tbody>';
+        
+        data.assignments.forEach(a => {
+          html += `<tr style="border-bottom:1px solid #e6ecf2">
+            <td style="padding:10px">${renderSubjectCell(a)}</td>
+            <td style="padding:10px">${a.class_name || 'N/A'}</td>
+            <td style="padding:10px">${a.stream_name || 'All Streams'}</td>
+            <td style="padding:10px;text-align:right">
+              <button class="icon-btn btn-delete-assignment" data-assignment-id="${a.id}" title="Delete"><i class="fas fa-trash"></i></button>
+            </td>
+          </tr>`;
+        });
+        
+        html += '</tbody></table>';
+        assignmentsList.innerHTML = html;
+        
+        // Attach delete handlers
+        assignmentsList.querySelectorAll('.btn-delete-assignment').forEach(delBtn => {
+          delBtn.addEventListener('click', async () => {
+            if (!confirm('Delete this assignment?')) return;
+            
+            const assignmentId = delBtn.dataset.assignmentId;
+            const deleteUrl = '{% url "delete_teacher_assignment" assignment_id=0 %}'.replace('/0/', `/${assignmentId}/`);
+            
+            try {
+              const delResp = await fetch(deleteUrl, {
+                method: 'POST',
+                headers: {
+                  'X-CSRFToken': getCookie('csrftoken'),
+                  'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+              });
+              
+              const delData = await delResp.json();
+              if (delData.success) {
+                delBtn.closest('tr').remove();
+                if (assignmentsList.querySelectorAll('tbody tr').length === 0) {
+                  assignmentsList.innerHTML = '<p style="text-align:center;color:#888">No assignments</p>';
+                }
+              } else {
+                alert(delData.error || 'Failed to delete assignment');
+              }
+            } catch (err) {
+              console.error(err);
+              alert('Network error');
+            }
+          });
+        });
+      } else {
+        assignmentsList.innerHTML = '<p style="text-align:center;color:#888">No assignments yet</p>';
+      }
+    } catch (err) {
+      console.error(err);
+      assignmentsList.innerHTML = '<p style="text-align:center;color:red">Error loading assignments</p>';
+    }
+  });
+});
+
+allocateForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const subjectId = parseInt(allocSubjects.value);
+  const classId = parseInt(allocClasses.value);
+  const streamId = allocStreams.value ? parseInt(allocStreams.value) : null;
+  
+  if (!subjectId || !classId) {
+    alert('Please select class, then stream (optional), then subject.');
+    return;
+  }
+  
+  const payload = {
+    subject_id: subjectId,
+    class_id: classId,
+    stream_id: streamId
+  };
+
+  const baseAllocUrlPost = '{% url "allocate_teacher" teacher_id=0 %}';
+  const allocPostUrl = baseAllocUrlPost.replace('/0/', `/${allocTeacherId.value}/`);
+  fetch(allocPostUrl,{
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken'),
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify(payload)
+  }).then(r => {
+    if(!r.ok) return r.json().then(err=>Promise.reject(err));
+    return r.json();
+  }).then(d => {
+    if(d.success){ 
+      closeAllocate(); 
+      location.reload(); // Reload to show updated assignments
+    } else { 
+      alert(d.error||'Error saving allocation'); 
+    }
+  }).catch(err=>{ console.error(err); alert(err.error||err.message||'Network error'); });
+});
+</script>
+
+{% endblock %}

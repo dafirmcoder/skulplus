@@ -1,0 +1,45 @@
+<script>
+function openViewModal(studentId){
+  const url = `/school/students/${studentId}/`;
+  fetch(url, { method:'GET', credentials:'same-origin', headers:{'X-Requested-With':'XMLHttpRequest'} })
+    .then(async res => {
+      const html = await res.text();
+      if(!res.ok){ alert('Failed to load view (status '+res.status+'):\n'+html.slice(0,1000)); throw new Error('Failed'); }
+      const container = document.getElementById('genericModalContent');
+      if (!container) return; container.innerHTML = html; document.getElementById('genericModal').style.display = 'flex';
+    })
+    .catch(err=> alert('Could not load view: '+err.message));
+}
+
+function openDeleteModal(studentId){
+  const url = `/school/students/${studentId}/delete/`;
+  fetch(url, { method:'GET', credentials:'same-origin', headers:{'X-Requested-With':'XMLHttpRequest'} })
+    .then(async res => {
+      const html = await res.text();
+      if(!res.ok){ alert('Failed to load delete (status '+res.status+'):\n'+html.slice(0,1000)); throw new Error('Failed'); }
+      const container = document.getElementById('genericModalContent');
+      if (!container) return; container.innerHTML = html; document.getElementById('genericModal').style.display = 'flex'; attachDeleteHandler(studentId);
+    })
+    .catch(err=> alert('Could not load delete confirm: '+err.message));
+}
+
+function closeGenericModal(){ const gm = document.getElementById('genericModal'); if (gm) gm.style.display='none'; }
+
+function attachDeleteHandler(studentId){
+  const form = document.getElementById('delete-student-form'); if(!form) return;
+  // remove previous listeners by cloning
+  const newForm = form.cloneNode(true);
+  form.parentNode.replaceChild(newForm, form);
+  newForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    const fd = new FormData(newForm);
+    const csrftoken = (newForm.querySelector('[name="csrfmiddlewaretoken"]') && newForm.querySelector('[name="csrfmiddlewaretoken"]').value) || '';
+    fetch(newForm.action, { method:'POST', body:fd, credentials:'same-origin', headers:{'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': csrftoken} })
+      .then(async res => {
+        if (!res.ok){ const txt = await res.text(); alert('Delete failed (status '+res.status+'): '+txt.slice(0,500)); return; }
+        const data = await res.json();
+        if (data.success){ const row = document.querySelector(`tr[data-student-id="${studentId}"]`); if (row) row.remove(); closeGenericModal(); }
+      }).catch(err => alert('Network error: '+err.message));
+  });
+}
+</script>

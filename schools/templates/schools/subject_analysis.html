@@ -1,0 +1,1292 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- template reload marker -->
+
+<style>
+body{font-family:Arial, sans-serif;background:#f4f7fb;overflow-x:hidden}
+.card{background:#fff;padding:20px;border-radius:10px;box-shadow:0 5px 20px rgba(0,0,0,.05);margin-bottom:20px;overflow-x:auto;max-width:100%}
+.header-section{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:20px}
+.button-group{display:flex;gap:10px;flex-wrap:wrap}
+.btn{padding:10px 16px;border-radius:6px;border:none;cursor:pointer;font-weight:600;font-size:14px}
+.btn-primary{background:#0f3057;color:white}
+.btn-print{background:#10b981;color:white}
+.btn-pdf{background:#ef4444;color:white}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px;table-layout:fixed}
+th,td{border:1px solid #ddd;padding:5px;text-align:center;white-space:normal;word-break:break-word}
+th{background:#0f3057;color:white}
+.mean-row{background:#f1f5f9;font-weight:bold}
+.subject-header{background:#e2e8f0;font-weight:bold;text-align:center}
+.trend-up{color:#16a34a;font-weight:bold}
+.trend-down{color:#dc2626;font-weight:bold}
+.trend-flat{color:#64748b;font-weight:bold}
+.badge{white-space:normal}
+#results{max-width:100%}
+.stream-analysis-table{font-size:11px;line-height:1.25}
+.stream-analysis-table th{font-size:10px;letter-spacing:.2px;padding:4px 3px}
+.stream-analysis-table td{font-size:11px;padding:4px 3px}
+.stream-analysis-table .badge{font-size:9px;padding:1px 5px;line-height:1.1}
+</style>
+
+<div class="header-section">
+  <h2>{% if analysis_scope == 'subject' %}Subject Analysis{% else %}Full Class Analysis{% endif %}</h2>
+  <div class="button-group">
+    <button id="printBtn" class="btn btn-print" onclick="printAnalysis()" disabled>🖨️ Print</button>
+    <button id="pdfBtn" class="btn btn-pdf" onclick="exportPDF()" disabled>📥 Export PDF</button>
+  </div>
+</div>
+
+<div>
+    <label>Class:</label>
+    <select id="classSelect">
+        <option value="">Select class</option>
+        {% for class in classes %}
+            <option value="{{ class.id }}">{{ class.name }}</option>
+        {% endfor %}
+    </select>
+
+    <label>Exam:</label>
+    <select id="examSelect">
+        <option value="">Select exam</option>
+        {% for exam in exams %}
+            <option value="{{ exam.id }}">{{ exam.title }} - {{ exam.term }}</option>
+        {% endfor %}
+    </select>
+
+    <label>Term:</label>
+    <select id="termSelect">
+        <option value="">Select term</option>
+        {% for term in terms %}
+            <option value="{{ term }}">{{ term }}</option>
+        {% endfor %}
+    </select>
+
+    <label>Compare Exam:</label>
+    <select id="compareExamSelect">
+        <option value="">Auto (previous exam)</option>
+        {% for exam in exams %}
+            <option value="{{ exam.id }}">{{ exam.title }} - {{ exam.term }}</option>
+        {% endfor %}
+    </select>
+
+    <label><input type="checkbox" id="splitByStream" checked> Split by Stream</label>
+
+    <button class="btn btn-primary" onclick="loadAnalysis()">Run Analysis</button>
+</div>
+
+<div id="results"></div>
+
+<div id="schoolMeta"
+    data-school-name="{{ school.name|default:'' }}"
+    data-school-address="{{ school.address|default:'' }}"
+    data-school-phone="{{ school.phone|default:'' }}"
+    data-school-email="{{ school.email|default:'' }}"
+    data-school-logo="{% if school.logo %}{{ school.logo.url }}{% elif SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% endif %}">
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+let currentAnalysisData = null;
+const analysisScope = "{{ analysis_scope|default:'class' }}";
+
+function isJuniorClass(cls){
+    return cls && cls.class_level === 'Junior';
+}
+
+function isPrimaryClass(cls){
+    return cls && cls.class_level === 'Primary';
+}
+
+function levelLabel(cls){
+    return (isJuniorClass(cls) || isPrimaryClass(cls)) ? 'LEVEL' : 'GRADE';
+}
+
+function meanLevelLabel(cls){
+    return (isJuniorClass(cls) || isPrimaryClass(cls)) ? 'MEAN LEVEL' : 'MEAN GRADE';
+}
+
+function formatLevelBadge(level, cls){
+    if (!isPrimaryClass(cls)) return level || '';
+    const code = (level || '').toUpperCase();
+    const badgeClass = code === 'EE' ? 'badge-ee' : code === 'ME' ? 'badge-me' : code === 'AE' ? 'badge-ae' : code === 'BE' ? 'badge-be' : 'badge-core';
+    return code ? `<span class="badge ${badgeClass}">${code}</span>` : '';
+}
+
+function formatSubjectName(sub, cls){
+    if (!cls || !cls.is_cbe_senior) return sub;
+    const meta = (cls.subject_pathways || {})[sub] || {};
+    const code = meta.code || 'CORE';
+    const badgeClass = code === 'CORE' ? 'badge-core' : `badge-${code.toLowerCase()}`;
+    return `${sub} <span class="badge ${badgeClass}">${code}</span>`;
+}
+
+function formatPathwayBadge(pathway, cls){
+    if (!cls || !cls.is_cbe_senior || !pathway) return pathway || '';
+    const upper = String(pathway).toUpperCase();
+    let badgeClass = 'badge-core';
+    if (upper.includes('STEM')) badgeClass = 'badge-stem';
+    else if (upper.includes('ART')) badgeClass = 'badge-arts';
+    else if (upper.includes('SOC')) badgeClass = 'badge-social';
+    return `<span class="badge ${badgeClass}">${pathway}</span>`;
+}
+
+function loadAnalysis(){
+    const classId = document.getElementById('classSelect').value;
+    const examId = document.getElementById('examSelect').value;
+    const term = document.getElementById('termSelect').value;
+    const compareExamId = document.getElementById('compareExamSelect').value;
+    const splitByStream = document.getElementById('splitByStream').checked;
+
+    if(!classId){
+        alert("Select class");
+        return;
+    }
+
+    if(!examId && !term){
+        alert("Select exam or term");
+        return;
+    }
+
+    const params = new URLSearchParams();
+    params.append("class_id", classId);
+    if(examId) params.append("exam_id", examId);
+    if(term) params.append("term", term);
+    if(compareExamId) params.append("compare_exam_id", compareExamId);
+    if(splitByStream) params.append("split_by_stream", "true");
+    params.append("scope", analysisScope);
+
+    fetch(`{% url 'whole_school_subject_stream_analysis' %}?${params.toString()}`)
+    .then(r=>r.json())
+    .then(data=>{
+        if(data.error){
+            alert('Error: ' + data.error);
+            return;
+        }
+        currentAnalysisData = data;
+        const container = document.getElementById('results');
+        container.innerHTML='';
+
+        data.classes.forEach(cls => {
+            renderOverallGradeSummary(container, cls);
+            renderTopStudentsOverall(container, cls);
+            renderPathwayAnalysis(container, cls);
+            renderClassSummary(container, cls);
+            renderSubjectStatistics(container, cls);
+            renderClassGradeSummary(container, cls);
+            renderClassTable(container, cls);
+            renderSubjectGradeTables(container, cls);
+        });
+
+        document.getElementById('printBtn').disabled = false;
+        document.getElementById('pdfBtn').disabled = false;
+    })
+    .catch(err => {
+        alert('Error: ' + err.message);
+    });
+}
+
+function renderClassSummary(container, cls){
+    const card = document.createElement('div');
+    card.className='card';
+
+    let header = `<tr><th>SUBJECT</th><th>MEAN MARK</th><th>${meanLevelLabel(cls)}</th></tr>`;
+    let rows = '';
+    cls.subjects.forEach(sub => {
+        rows += `<tr>
+            <td>${formatSubjectName(sub, cls)}</td>
+            <td>${cls.class_subject_means[sub] ?? ''}</td>
+            <td>${formatLevelBadge(cls.class_subject_levels[sub], cls)}</td>
+        </tr>`;
+    });
+
+    card.innerHTML = `
+        <h3 style="margin:0 0 10px;color:#0f3057">${cls.class_name} - Subject Summary</h3>
+        <table>${header}${rows}</table>
+    `;
+    container.appendChild(card);
+}
+
+function renderOverallGradeSummary(container, cls){
+    const rowsData = cls.overall_grade_summary || [];
+    if (!rowsData.length) return;
+
+    const card = document.createElement('div');
+    card.className='card';
+
+    const grades = cls.grades || [];
+    let header = `<tr><th>STREAM</th>`;
+    grades.forEach(g => header += `<th>${g}</th>`);
+    header += `<th>ENTRIES</th><th>MEAN MARKS</th><th>MM DEV</th><th>MEAN POINTS</th><th>MP DEV</th><th>PREV MN PTS</th><th>DEV</th><th>${levelLabel(cls)}</th></tr>`;
+
+    let rows = '';
+    rowsData.forEach(row => {
+        let gradeCells = '';
+        grades.forEach(g => {
+            gradeCells += `<td>${row.grade_counts?.[g] ?? 0}</td>`;
+        });
+        rows += `
+            <tr>
+                <td>${row.stream}</td>
+                ${gradeCells}
+                <td>${row.entries ?? ''}</td>
+                <td>${row.mean_marks ?? ''}</td>
+                <td>${row.mm_dev ?? ''}</td>
+                <td>${row.mean_points ?? ''}</td>
+                <td>${row.mp_dev ?? ''}</td>
+                <td>${row.previous_mean_points ?? ''}</td>
+                <td>${row.dev ?? ''}</td>
+                <td>${formatLevelBadge(row.mean_grade, cls)}</td>
+            </tr>`;
+    });
+
+    card.innerHTML = `
+        <h3 style="margin:0 0 10px;color:#0f3057">Overall Grade Summary</h3>
+        <table>
+            <thead>${header}</thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+    container.appendChild(card);
+}
+
+function renderTopStudentsOverall(container, cls){
+    const rowsData = cls.top_students_overall || [];
+    if (!rowsData.length) return;
+
+    const card = document.createElement('div');
+    card.className='card';
+
+    let rows = '';
+    rowsData.forEach(row => {
+        rows += `
+            <tr>
+                <td>${row.admission_number}</td>
+                <td>${row.name}</td>
+                <td>${row.stream ?? ''}</td>
+                <td>${row.stream_rank ?? ''}</td>
+                <td>${row.overall_rank ?? ''}</td>
+                <td>${row.mean_marks ?? ''}</td>
+                <td>${row.total_marks ?? ''}</td>
+                <td>${row.mean_points ?? ''}</td>
+                <td>${formatLevelBadge(row.grade, cls)}</td>
+            </tr>`;
+    });
+
+    card.innerHTML = `
+        <h3 style="margin:0 0 10px;color:#0f3057">Top Students - Overall</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>ADMNO</th>
+                    <th>NAME</th>
+                    <th>STREAM</th>
+                    <th>STRM RANK</th>
+                    <th>OVRL RANK</th>
+                    <th>MEAN MARKS</th>
+                    <th>TOTAL MARKS</th>
+                    <th>MEAN POINTS</th>
+                    <th>${levelLabel(cls)}</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+    container.appendChild(card);
+}
+
+function renderPathwayAnalysis(container, cls){
+    const analysis = cls.pathway_analysis || {};
+    if (!analysis.enabled) return;
+
+    const card = document.createElement('div');
+    card.className='card';
+
+    let html = `<h3 style="margin:0 0 10px;color:#0f3057">Pathway Performance Summary</h3>`;
+    html += `<p><strong>Level:</strong> ${analysis.level || ''}</p>`;
+
+    if (analysis.level === 'Senior') {
+        const stats = analysis.pathway_stats || [];
+        let rows = '';
+        stats.forEach(r => {
+            rows += `<tr><td>${formatPathwayBadge(r.pathway, cls)}</td><td>${r.mean_points}</td><td>${r.entries}</td></tr>`;
+        });
+
+        html += `
+            <h4 style="margin:8px 0 4px">Mean Points per Pathway</h4>
+            <table>
+                <thead><tr><th>PATHWAY</th><th>MEAN POINTS</th><th>ENTRIES</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <p style="margin-top:8px"><strong>Best Pathway:</strong> ${formatPathwayBadge(analysis.best_pathway, cls)}</p>
+        `;
+
+        const subjectContrib = analysis.subject_contributions || {};
+        Object.keys(subjectContrib).forEach(pathway => {
+            let srows = '';
+            subjectContrib[pathway].forEach(s => {
+                srows += `<tr><td>${formatSubjectName(s.subject, cls)}</td><td>${s.mean_mark}</td><td>${s.mean_grade}</td><td>${s.mean_points}</td></tr>`;
+            });
+            html += `
+                <h4 style="margin:12px 0 4px">${pathway} Subject Contribution</h4>
+                <table>
+                    <thead><tr><th>SUBJECT</th><th>MEAN MARK</th><th>MEAN GRADE</th><th>KNEC POINTS</th></tr></thead>
+                    <tbody>${srows}</tbody>
+                </table>
+            `;
+        });
+
+        const studentPoints = analysis.student_points || [];
+        let prows = '';
+        studentPoints.forEach(s => {
+            prows += `<tr><td>${s.admission_number}</td><td>${s.name}</td><td>${s.stream || ''}</td><td>${s.total_points}</td><td>${s.mean_marks ?? ''}</td></tr>`;
+        });
+        html += `
+            <h4 style="margin:12px 0 4px">Total Points per Student</h4>
+            <table>
+                <thead><tr><th>ADMNO</th><th>NAME</th><th>STREAM</th><th>TOTAL POINTS</th><th>MEAN MARKS</th></tr></thead>
+                <tbody>${prows}</tbody>
+            </table>
+        `;
+    }
+
+    if (analysis.level === 'Junior') {
+        const areas = analysis.learning_area_performance || [];
+        let rows = '';
+        areas.forEach(a => {
+            rows += `<tr><td>${a.learning_area}</td><td>${a.mean_mark ?? ''}</td><td>${a.mean_grade ?? ''}</td></tr>`;
+        });
+        html += `
+            <h4 style="margin:8px 0 4px">Learning Area Performance</h4>
+            <table>
+                <thead><tr><th>LEARNING AREA</th><th>MEAN MARK</th><th>${meanLevelLabel(cls)}</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+
+        const bands = analysis.competency_levels || {};
+        let bandRow = '';
+        Object.keys(bands).forEach(k => {
+            bandRow += `<th>${k}</th>`;
+        });
+        let bandVals = '';
+        Object.keys(bands).forEach(k => {
+            bandVals += `<td>${bands[k]}</td>`;
+        });
+        html += `
+            <h4 style="margin:12px 0 4px">Competency Levels</h4>
+            <table>
+                <thead><tr>${bandRow}</tr></thead>
+                <tbody><tr>${bandVals}</tr></tbody>
+            </table>
+        `;
+    }
+
+    card.innerHTML = html;
+    container.appendChild(card);
+}
+
+function renderSubjectStatistics(container, cls){
+    const card = document.createElement('div');
+    card.className='card';
+
+    const prevMeans = cls.previous_subject_means || {};
+    let rows = '';
+    cls.subjects.forEach(sub => {
+        const current = cls.class_subject_means[sub];
+        const previous = prevMeans[sub];
+        let change = '';
+        let trend = '';
+        let trendClass = '';
+        if (current !== undefined && previous !== undefined) {
+            const diff = (current - previous);
+            change = (diff >= 0 ? '+' : '') + diff.toFixed(2);
+            trend = diff > 0 ? '&#9650;' : diff < 0 ? '&#9660;' : '&#9632;';
+            trendClass = diff > 0 ? 'trend-up' : diff < 0 ? 'trend-down' : 'trend-flat';
+        }
+        rows += `
+            <tr>
+                <td>${formatSubjectName(sub, cls)}</td>
+                <td>${previous ?? ''}</td>
+                <td>${current ?? ''}</td>
+                <td>${change}</td>
+                <td><span class="${trendClass}">${trend}</span></td>
+                <td>${formatLevelBadge(cls.class_subject_levels[sub], cls)}</td>
+            </tr>`;
+    });
+
+    card.innerHTML = `
+        <h3 style="margin:0 0 10px;color:#0f3057">Subject Statistics</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>NAME</th>
+                    <th>PREVIOUS</th>
+                    <th>POINTS</th>
+                    <th>CHANGE</th>
+                    <th>TREND</th>
+                    <th>${meanLevelLabel(cls)}</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+    container.appendChild(card);
+}
+
+function renderClassGradeSummary(container, cls){
+    const card = document.createElement('div');
+    card.className='card';
+
+    const grades = cls.grades || [];
+    const totals = cls.subject_grade_totals || {};
+
+    let header = `<tr><th>SUBJECT</th>`;
+    grades.forEach(g => header += `<th>${g}</th>`);
+    header += `<th>ENTRIES</th><th>MEAN MARKS</th><th>${meanLevelLabel(cls)}</th></tr>`;
+
+    let rows = '';
+    cls.subjects.forEach(sub => {
+        const counts = totals[sub] || {};
+        let entries = 0;
+        let row = `<tr><td>${formatSubjectName(sub, cls)}</td>`;
+        grades.forEach(g => {
+            const val = counts[g] ?? 0;
+            entries += val;
+            row += `<td>${val}</td>`;
+        });
+        row += `<td>${entries}</td>`;
+        row += `<td>${cls.class_subject_means[sub] ?? ''}</td>`;
+        row += `<td>${formatLevelBadge(cls.class_subject_levels[sub], cls)}</td>`;
+        row += `</tr>`;
+        rows += row;
+    });
+
+    card.innerHTML = `
+        <h3 style="margin:0 0 10px;color:#0f3057">Class Grade Summary</h3>
+        <table>
+            <thead>${header}</thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+    container.appendChild(card);
+}
+
+function renderClassTable(container, cls){
+    const card = document.createElement('div');
+    card.className='card';
+
+    let header = `<tr>
+        <th>CLASS</th>
+        <th>STREAM</th>`;
+
+    cls.subjects.forEach(sub=>{
+        const shortName = cls.subject_shorts[sub] || sub.substring(0,3).toUpperCase();
+        header += `<th colspan="2">${shortName}</th>`;
+    });
+
+    header += `<th>CLASS MEAN</th></tr>`;
+
+    let subHeader = `<tr><td></td><td></td>`;
+    cls.subjects.forEach(()=> subHeader += `<td>MARK</td><td>${levelLabel(cls)}</td>`);
+    subHeader += `<td></td></tr>`;
+
+    let rows = '';
+
+    cls.streams.forEach(stream=>{
+        rows += `<tr>
+            <td>${cls.class_name}</td>
+            <td>${stream.stream_name}</td>`;
+
+        cls.subjects.forEach(sub=>{
+            rows += `<td>${stream.means[sub] ?? ''}</td>
+                     <td>${formatLevelBadge(stream.levels[sub], cls)}</td>`;
+        });
+
+        rows += `<td>${stream.class_mean}</td></tr>`;
+    });
+
+    rows += `<tr class="mean-row">
+        <td></td>
+        <td>MEAN</td>`;
+
+    cls.subjects.forEach(sub=>{
+        rows += `<td>${cls.class_subject_means[sub] ?? ''}</td>
+                 <td>${formatLevelBadge(cls.class_subject_levels[sub], cls)}</td>`;
+    });
+
+    rows += `<td>${cls.overall_class_mean}</td></tr>`;
+
+    card.innerHTML = `
+        <h3 style="margin:0 0 10px;color:#0f3057">${cls.class_name} - Stream Subject Analysis</h3>
+        <table class="stream-analysis-table">${header}${subHeader}${rows}</table>
+    `;
+    container.appendChild(card);
+}
+
+function renderSubjectGradeTables(container, cls){
+    const grades = cls.grades || [];
+    const distribution = cls.subject_grade_distribution || {};
+    const totals = cls.subject_grade_totals || {};
+    const streamNames = (cls.streams || []).map(s => s.stream_name);
+
+    cls.subjects.forEach(sub => {
+        const card = document.createElement('div');
+        card.className='card';
+
+        let header = `<tr><th>STREAM</th>`;
+        grades.forEach(g => header += `<th>${g}</th>`);
+        header += `<th>TOTAL</th></tr>`;
+
+        let rows = '';
+        const subjectDist = distribution[sub] || {};
+
+        const orderedStreams = streamNames.length
+            ? streamNames
+            : Object.keys(subjectDist);
+
+        orderedStreams.forEach(streamName => {
+            const counts = subjectDist[streamName] || {};
+            let total = 0;
+            let row = `<tr><td>${streamName}</td>`;
+            grades.forEach(g => {
+                const val = counts[g] ?? 0;
+                total += val;
+                row += `<td>${val}</td>`;
+            });
+            row += `<td>${total}</td></tr>`;
+            rows += row;
+        });
+
+        const totalCounts = totals[sub] || {};
+        let grandTotal = 0;
+        let totalRow = `<tr class="mean-row"><td>CLASS TOTAL</td>`;
+        grades.forEach(g => {
+            const val = totalCounts[g] ?? 0;
+            grandTotal += val;
+            totalRow += `<td>${val}</td>`;
+        });
+        totalRow += `<td>${grandTotal}</td></tr>`;
+
+        card.innerHTML = `
+            <h3 style="margin:0 0 10px;color:#0f3057">${cls.class_name} - ${formatSubjectName(sub, cls)} Grade Distribution</h3>
+            <table>${header}${rows}${totalRow}</table>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function buildTablesHTML(classes, tableFontSize, streamTableFontSize){
+    let tablesHTML = '';
+    const streamFontSize = streamTableFontSize || tableFontSize;
+    classes.forEach(cls => {
+        let summaryRows = '';
+        cls.subjects.forEach(sub => {
+            summaryRows += `<tr><td>${formatSubjectName(sub, cls)}</td><td>${cls.class_subject_means[sub] ?? ''}</td><td>${formatLevelBadge(cls.class_subject_levels[sub], cls)}</td></tr>`;
+        });
+
+        let header = `<tr><th>CLASS</th><th>STREAM</th>`;
+        cls.subjects.forEach(sub => {
+            const shortName = cls.subject_shorts[sub] || sub.substring(0,3).toUpperCase();
+            header += `<th colspan="2">${shortName}</th>`;
+        });
+        header += `<th>CLASS MEAN</th></tr>`;
+
+        let subHeader = `<tr><td></td><td></td>`;
+        cls.subjects.forEach(() => subHeader += `<td>MARK</td><td>${levelLabel(cls)}</td>`);
+        subHeader += `<td></td></tr>`;
+
+        let rows = '';
+        cls.streams.forEach(stream => {
+            rows += `<tr><td>${cls.class_name}</td><td>${stream.stream_name}</td>`;
+            cls.subjects.forEach(sub => {
+                rows += `<td>${stream.means[sub] ?? ''}</td><td>${formatLevelBadge(stream.levels[sub], cls)}</td>`;
+            });
+            rows += `<td>${stream.class_mean}</td></tr>`;
+        });
+
+        rows += `<tr style="background:#f1f5f9;font-weight:bold"><td></td><td>MEAN</td>`;
+        cls.subjects.forEach(sub => {
+            rows += `<td>${cls.class_subject_means[sub] ?? ''}</td><td>${formatLevelBadge(cls.class_subject_levels[sub], cls)}</td>`;
+        });
+        rows += `<td>${cls.overall_class_mean}</td></tr>`;
+
+        let gradeTablesHTML = '';
+        if (cls.subjects && cls.subjects.length) {
+            cls.subjects.forEach(sub => {
+                const grades = cls.grades || [];
+                const distribution = cls.subject_grade_distribution || {};
+                const totals = cls.subject_grade_totals || {};
+                const streamNames = (cls.streams || []).map(s => s.stream_name);
+                const subjectDist = distribution[sub] || {};
+
+                let gHeader = `<tr><th>STREAM</th>`;
+                grades.forEach(g => gHeader += `<th>${g}</th>`);
+                gHeader += `<th>TOTAL</th></tr>`;
+
+                let gRows = '';
+                const orderedStreams = streamNames.length ? streamNames : Object.keys(subjectDist);
+                orderedStreams.forEach(streamName => {
+                    const counts = subjectDist[streamName] || {};
+                    let total = 0;
+                    let row = `<tr><td>${streamName}</td>`;
+                    grades.forEach(g => {
+                        const val = counts[g] ?? 0;
+                        total += val;
+                        row += `<td>${val}</td>`;
+                    });
+                    row += `<td>${total}</td></tr>`;
+                    gRows += row;
+                });
+
+                const totalCounts = totals[sub] || {};
+                let grandTotal = 0;
+                let totalRow = `<tr style="background:#f1f5f9;font-weight:bold"><td>CLASS TOTAL</td>`;
+                grades.forEach(g => {
+                    const val = totalCounts[g] ?? 0;
+                    grandTotal += val;
+                    totalRow += `<td>${val}</td>`;
+                });
+                totalRow += `<td>${grandTotal}</td></tr>`;
+
+                gradeTablesHTML += `
+                    <h4 style="margin:10px 0 4px">${formatSubjectName(sub, cls)} Grade Distribution</h4>
+                    <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-top:6px">
+                        <thead>${gHeader}</thead>
+                        <tbody>${gRows}${totalRow}</tbody>
+                    </table>
+                `;
+            });
+        }
+
+        const prevMeans = cls.previous_subject_means || {};
+        let subjectStatsRows = '';
+        cls.subjects.forEach(sub => {
+            const current = cls.class_subject_means[sub];
+            const previous = prevMeans[sub];
+            let change = '';
+            let trend = '';
+            let trendClass = '';
+            if (current !== undefined && previous !== undefined) {
+                const diff = (current - previous);
+                change = (diff >= 0 ? '+' : '') + diff.toFixed(2);
+                trend = diff > 0 ? '&#9650;' : diff < 0 ? '&#9660;' : '&#9632;';
+                trendClass = diff > 0 ? 'trend-up' : diff < 0 ? 'trend-down' : 'trend-flat';
+            }
+            subjectStatsRows += `
+                <tr>
+                    <td>${formatSubjectName(sub, cls)}</td>
+                    <td>${previous ?? ''}</td>
+                    <td>${current ?? ''}</td>
+                    <td>${change}</td>
+                    <td><span class="${trendClass}">${trend}</span></td>
+                    <td>${formatLevelBadge(cls.class_subject_levels[sub], cls)}</td>
+                </tr>`;
+        });
+
+        const grades = cls.grades || [];
+        const totals = cls.subject_grade_totals || {};
+        let gradeSummaryHeader = `<tr><th>SUBJECT</th>`;
+        grades.forEach(g => gradeSummaryHeader += `<th>${g}</th>`);
+        gradeSummaryHeader += `<th>ENTRIES</th><th>MEAN MARKS</th><th>${meanLevelLabel(cls)}</th></tr>`;
+
+        let gradeSummaryRows = '';
+        cls.subjects.forEach(sub => {
+            const counts = totals[sub] || {};
+            let entries = 0;
+            let row = `<tr><td>${formatSubjectName(sub, cls)}</td>`;
+            grades.forEach(g => {
+                const val = counts[g] ?? 0;
+                entries += val;
+                row += `<td>${val}</td>`;
+            });
+            row += `<td>${entries}</td>`;
+            row += `<td>${cls.class_subject_means[sub] ?? ''}</td>`;
+            row += `<td>${formatLevelBadge(cls.class_subject_levels[sub], cls)}</td>`;
+            row += `</tr>`;
+            gradeSummaryRows += row;
+        });
+
+        const overallRows = cls.overall_grade_summary || [];
+        let overallGradeRows = '';
+        if (overallRows.length) {
+            overallRows.forEach(row => {
+                let gradeCells = '';
+                grades.forEach(g => {
+                    gradeCells += `<td>${row.grade_counts?.[g] ?? 0}</td>`;
+                });
+                overallGradeRows += `
+                    <tr>
+                        <td>${row.stream}</td>
+                        ${gradeCells}
+                        <td>${row.entries ?? ''}</td>
+                        <td>${row.mean_marks ?? ''}</td>
+                        <td>${row.mm_dev ?? ''}</td>
+                        <td>${row.mean_points ?? ''}</td>
+                        <td>${row.mp_dev ?? ''}</td>
+                        <td>${row.previous_mean_points ?? ''}</td>
+                        <td>${row.dev ?? ''}</td>
+                        <td>${formatLevelBadge(row.mean_grade, cls)}</td>
+                    </tr>`;
+            });
+        }
+
+        let overallGradeHeader = `<tr><th>STREAM</th>`;
+        grades.forEach(g => overallGradeHeader += `<th>${g}</th>`);
+        overallGradeHeader += `<th>ENTRIES</th><th>MEAN MARKS</th><th>MM DEV</th><th>MEAN POINTS</th><th>MP DEV</th><th>PREV MN PTS</th><th>DEV</th><th>${levelLabel(cls)}</th></tr>`;
+
+        const topRows = cls.top_students_overall || [];
+        let topStudentsRows = '';
+        topRows.forEach(row => {
+            topStudentsRows += `
+                <tr>
+                    <td>${row.admission_number}</td>
+                    <td>${row.name}</td>
+                    <td>${row.stream ?? ''}</td>
+                    <td>${row.stream_rank ?? ''}</td>
+                    <td>${row.overall_rank ?? ''}</td>
+                    <td>${row.mean_marks ?? ''}</td>
+                    <td>${row.total_marks ?? ''}</td>
+                    <td>${row.mean_points ?? ''}</td>
+                    <td>${row.grade ?? ''}</td>
+                </tr>`;
+        });
+
+        const pathwayAnalysis = cls.pathway_analysis || {};
+        let pathwayHTML = '';
+        if (pathwayAnalysis.enabled) {
+            if (pathwayAnalysis.level === 'Senior') {
+                const stats = pathwayAnalysis.pathway_stats || [];
+                let prow = '';
+                stats.forEach(r => {
+                    prow += `<tr><td>${formatPathwayBadge(r.pathway, cls)}</td><td>${r.mean_points}</td><td>${r.entries}</td></tr>`;
+                });
+                pathwayHTML += `
+                    <h4 style="margin:8px 0 4px">Pathway Performance Summary</h4>
+                    <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-bottom:10px">
+                        <thead><tr><th>PATHWAY</th><th>MEAN POINTS</th><th>ENTRIES</th></tr></thead>
+                        <tbody>${prow}</tbody>
+                    </table>
+                    <p style="margin:6px 0"><strong>Best Pathway:</strong> ${formatPathwayBadge(pathwayAnalysis.best_pathway, cls)}</p>
+                `;
+
+                const contrib = pathwayAnalysis.subject_contributions || {};
+                Object.keys(contrib).forEach(pathway => {
+                    let srows = '';
+                    contrib[pathway].forEach(s => {
+                        srows += `<tr><td>${formatSubjectName(s.subject, cls)}</td><td>${s.mean_mark}</td><td>${s.mean_grade}</td><td>${s.mean_points}</td></tr>`;
+                    });
+                    pathwayHTML += `
+                        <h4 style="margin:8px 0 4px">${pathway} Subject Contribution</h4>
+                        <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-bottom:10px">
+                            <thead><tr><th>SUBJECT</th><th>MEAN MARK</th><th>MEAN GRADE</th><th>KNEC POINTS</th></tr></thead>
+                            <tbody>${srows}</tbody>
+                        </table>
+                    `;
+                });
+
+                const studentPoints = pathwayAnalysis.student_points || [];
+                let srows = '';
+                studentPoints.forEach(s => {
+                    srows += `<tr><td>${s.admission_number}</td><td>${s.name}</td><td>${s.stream || ''}</td><td>${s.total_points}</td><td>${s.mean_marks ?? ''}</td></tr>`;
+                });
+                pathwayHTML += `
+                    <h4 style="margin:8px 0 4px">Total Points per Student</h4>
+                    <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-bottom:10px">
+                        <thead><tr><th>ADMNO</th><th>NAME</th><th>STREAM</th><th>TOTAL POINTS</th><th>MEAN MARKS</th></tr></thead>
+                        <tbody>${srows}</tbody>
+                    </table>
+                `;
+            }
+
+            if (pathwayAnalysis.level === 'Junior') {
+                const areas = pathwayAnalysis.learning_area_performance || [];
+                let lrows = '';
+                areas.forEach(a => {
+                    lrows += `<tr><td>${a.learning_area}</td><td>${a.mean_mark ?? ''}</td><td>${a.mean_grade ?? ''}</td></tr>`;
+                });
+                pathwayHTML += `
+                    <h4 style="margin:8px 0 4px">Learning Area Performance</h4>
+                    <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-bottom:10px">
+                        <thead><tr><th>LEARNING AREA</th><th>MEAN MARK</th><th>${meanLevelLabel(cls)}</th></tr></thead>
+                        <tbody>${lrows}</tbody>
+                    </table>
+                `;
+
+                const bands = pathwayAnalysis.competency_levels || {};
+                let bh = '';
+                let bv = '';
+                Object.keys(bands).forEach(k => {
+                    bh += `<th>${k}</th>`;
+                    bv += `<td>${bands[k]}</td>`;
+                });
+                pathwayHTML += `
+                    <h4 style="margin:8px 0 4px">Competency Levels</h4>
+                    <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-bottom:10px">
+                        <thead><tr>${bh}</tr></thead>
+                        <tbody><tr>${bv}</tr></tbody>
+                    </table>
+                `;
+            }
+        }
+
+        tablesHTML += `<div style="page-break-inside:auto;margin-bottom:30px">
+            <h3 style="color:#0f3057">${cls.class_name} - ${cls.exam_title}</h3>
+            <h4 style="margin:8px 0 4px">Overall Grade Summary</h4>
+            <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-bottom:10px">
+                <thead>${overallGradeHeader}</thead>
+                <tbody>${overallGradeRows}</tbody>
+            </table>
+            <h4 style="margin:8px 0 4px">Top Students - Overall</h4>
+            <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-bottom:10px">
+                <thead>
+                    <tr>
+                        <th>ADMNO</th>
+                        <th>NAME</th>
+                        <th>STREAM</th>
+                        <th>STRM RANK</th>
+                        <th>OVRL RANK</th>
+                        <th>MEAN MARKS</th>
+                        <th>TOTAL MARKS</th>
+                        <th>MEAN POINTS</th>
+                        <th>GRADE</th>
+                    </tr>
+                </thead>
+                <tbody>${topStudentsRows}</tbody>
+            </table>
+            ${pathwayHTML}
+            <h4 style="margin:8px 0 4px">Class Subject Summary</h4>
+            <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-bottom:10px">
+                <thead><tr><th>SUBJECT</th><th>MEAN MARK</th><th>${meanLevelLabel(cls)}</th></tr></thead>
+                <tbody>${summaryRows}</tbody>
+            </table>
+            <h4 style="margin:8px 0 4px">Subject Statistics</h4>
+            <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-bottom:10px">
+                <thead>
+                    <tr>
+                        <th>NAME</th>
+                        <th>PREVIOUS</th>
+                        <th>POINTS</th>
+                        <th>CHANGE</th>
+                        <th>TREND</th>
+                        <th>${meanLevelLabel(cls)}</th>
+                    </tr>
+                </thead>
+                <tbody>${subjectStatsRows}</tbody>
+            </table>
+            <h4 style="margin:8px 0 4px">Class Grade Summary</h4>
+            <table style="width:100%;border-collapse:collapse;font-size:${tableFontSize};margin-bottom:10px">
+                <thead>${gradeSummaryHeader}</thead>
+                <tbody>${gradeSummaryRows}</tbody>
+            </table>
+            <h4 style="margin:8px 0 4px">Stream Subject Analysis</h4>
+            <table class="stream-analysis-table" style="width:100%;border-collapse:collapse;font-size:${streamFontSize}">
+                <thead>${header}${subHeader}</thead>
+                <tbody>${rows}</tbody>
+            </table>
+            ${gradeTablesHTML}
+        </div>`;
+    });
+    return tablesHTML;
+}
+
+function printAnalysis(){
+    if(!currentAnalysisData) return;
+
+    const classes = currentAnalysisData.classes;
+    const tablesHTML = buildTablesHTML(classes, '10px', '9px');
+
+    const meta = document.getElementById('schoolMeta');
+    const schoolName = meta?.dataset.schoolName || 'School';
+    const schoolAddress = meta?.dataset.schoolAddress || '';
+    const schoolPhone = meta?.dataset.schoolPhone || '';
+    const schoolEmail = meta?.dataset.schoolEmail || '';
+    let schoolLogo = meta?.dataset.schoolLogo || '';
+    if (schoolLogo && schoolLogo.startsWith('/')) {
+        schoolLogo = `${window.location.origin}${schoolLogo}`;
+    }
+    const contactLineParts = [schoolAddress, schoolPhone, schoolEmail].filter(Boolean);
+    const contactLine = contactLineParts.join(' | ');
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Subject Analysis</title>
+            <style>
+                @page { size: A4 landscape; margin: 0.5in; }
+                *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+                body{font-family:Arial, sans-serif;padding:20px;background:#fff;color:#333}
+                .header{border-bottom:3px solid #0f3057;padding-bottom:10px;margin-bottom:20px}
+                .header-row{display:flex;align-items:center;gap:16px}
+                .logo{width:70px;height:70px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;background:#fff;padding:6px}
+                .header-text{flex:1;text-align:center}
+                .header h2{margin:0;color:#0f3057}
+                .header p{margin:4px 0;font-size:12px;color:#666}
+                h3{color:#0f3057;margin-top:15px}
+                table{width:100%;border-collapse:collapse;margin-top:8px;font-size:9px;table-layout:fixed}
+                th,td{border:1px solid #ddd;padding:3px;text-align:center;white-space:normal;word-break:break-word}
+                th{background:#0f3057;color:white}
+                .mean-row{background:#f1f5f9 !important;font-weight:bold}
+                .subject-header{background:#e2e8f0 !important;font-weight:bold;text-align:center}
+                .stream-analysis-table th{font-size:9px;padding:3px 2px}
+                .stream-analysis-table td{font-size:8px;padding:3px 2px}
+                .trend-up{color:#16a34a !important;font-weight:700}
+                .trend-down{color:#dc2626 !important;font-weight:700}
+                .trend-flat{color:#64748b !important;font-weight:700}
+                .badge{display:inline-block;padding:2px 6px;border-radius:999px;font-size:10px;font-weight:600;color:#0f172a;background:#e2e8f0}
+                .badge-stem{background:#dbeafe !important;color:#1e3a8a !important}
+                .badge-arts{background:#fce7f3 !important;color:#9d174d !important}
+                .badge-social{background:#dcfce7 !important;color:#166534 !important}
+                .badge-core{background:#e2e8f0 !important;color:#0f172a !important}
+                .badge-ee{background:#16a34a !important;color:#fff !important}
+                .badge-me{background:#2563eb !important;color:#fff !important}
+                .badge-ae{background:#f59e0b !important;color:#fff !important}
+                .badge-be{background:#dc2626 !important;color:#fff !important}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="header-row">
+                    ${schoolLogo ? `<img class="logo" src="${schoolLogo}" alt="${schoolName}" />` : ''}
+                    <div class="header-text">
+                        <h2>${schoolName}</h2>
+                        <p>${contactLine}</p>
+                        <p>Whole School Subject Stream Analysis</p>
+                        <p>Generated: ${new Date().toLocaleDateString()}</p>
+                    </div>
+                    ${schoolLogo ? `<div style="width:70px"></div>` : ''}
+                </div>
+            </div>
+            ${tablesHTML}
+        </body>
+        </html>
+    `;
+    if (window.SkulPlusPrint && window.SkulPlusPrint.printHtml) {
+        window.SkulPlusPrint.printHtml(html);
+    } else {
+        window.print();
+    }
+}
+
+function exportPDF(){
+    if(!currentAnalysisData) return;
+
+    const classes = currentAnalysisData.classes;
+    const tablesHTML = buildTablesHTML(classes, '8px', '7px');
+
+    const meta = document.getElementById('schoolMeta');
+    const schoolName = meta?.dataset.schoolName || 'School';
+    const schoolAddress = meta?.dataset.schoolAddress || '';
+    const schoolPhone = meta?.dataset.schoolPhone || '';
+    const schoolEmail = meta?.dataset.schoolEmail || '';
+    let schoolLogo = meta?.dataset.schoolLogo || '';
+    if (schoolLogo && schoolLogo.startsWith('/')) {
+        schoolLogo = `${window.location.origin}${schoolLogo}`;
+    }
+
+    const contactLineParts = [schoolAddress, schoolPhone, schoolEmail].filter(Boolean);
+    const contactLine = contactLineParts.join(' | ');
+
+    const html = `
+        <style>
+            *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+            body{font-family:Arial, sans-serif;color:#333}
+            .header{border-bottom:3px solid #0f3057;padding-bottom:10px;margin-bottom:20px}
+            .header-row{display:flex;align-items:center;gap:16px}
+            .logo{width:70px;height:70px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;background:#fff;padding:6px}
+            .header-text{flex:1;text-align:center}
+            .header h2{margin:0;color:#0f3057}
+            .header p{margin:4px 0;font-size:12px;color:#666}
+            h3{color:#0f3057;margin-top:15px}
+            table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8px;margin-top:8px}
+            th,td{border:1px solid #ddd;padding:2px;text-align:center;word-break:break-word}
+            th{background:#0f3057;color:white;font-weight:bold}
+            .mean-row{background:#f1f5f9 !important;font-weight:bold}
+            .subject-header{background:#e2e8f0 !important;font-weight:bold;text-align:center}
+            .stream-analysis-table th{font-size:8px;padding:2px 1px}
+            .stream-analysis-table td{font-size:7px;padding:2px 1px}
+            .trend-up{color:#16a34a !important;font-weight:700}
+            .trend-down{color:#dc2626 !important;font-weight:700}
+            .trend-flat{color:#64748b !important;font-weight:700}
+            .footer{margin-top:30px;border-top:2px solid #0f3057;padding-top:10px;text-align:center;font-size:10px;color:#666}
+            .badge{display:inline-block;padding:2px 6px;border-radius:999px;font-size:9px;font-weight:600;color:#0f172a;background:#e2e8f0}
+            .badge-stem{background:#dbeafe !important;color:#1e3a8a !important}
+            .badge-arts{background:#fce7f3 !important;color:#9d174d !important}
+            .badge-social{background:#dcfce7 !important;color:#166534 !important}
+            .badge-core{background:#e2e8f0 !important;color:#0f172a !important}
+            .badge-ee{background:#16a34a !important;color:#fff !important}
+            .badge-me{background:#2563eb !important;color:#fff !important}
+            .badge-ae{background:#f59e0b !important;color:#fff !important}
+            .badge-be{background:#dc2626 !important;color:#fff !important}
+        </style>
+        <div class="header">
+            <div class="header-row">
+                ${schoolLogo ? `<img class="logo" src="${schoolLogo}" alt="${schoolName}" />` : ''}
+                <div class="header-text">
+                    <h2>${schoolName}</h2>
+                    <p>${contactLine}</p>
+                    <p>Whole School Subject Stream Analysis</p>
+                    <p>Generated: ${new Date().toLocaleDateString()}</p>
+                </div>
+                ${schoolLogo ? `<div style="width:70px"></div>` : ''}
+            </div>
+        </div>
+        ${tablesHTML}
+        <div class="footer">
+            <p>SKULPLUS+ Student Information Reporting Management System</p>
+        </div>
+    `;
+
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = html;
+    tempContainer.style.padding = '16px';
+    document.body.appendChild(tempContainer);
+
+    const className = (classes[0] && classes[0].class_name) ? classes[0].class_name : 'class';
+    const fileName = `subject_analysis_${className.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+
+    const options = {
+        margin: [10, 10, 10, 10],
+        filename: fileName,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+
+    html2pdf().set(options).from(tempContainer).save().then(() => {
+        document.body.removeChild(tempContainer);
+    }).catch(() => {
+        document.body.removeChild(tempContainer);
+    });
+}
+
+function printAnalysis_legacy(){
+    if(!currentAnalysisData) return;
+    
+    let tablesHTML = '';
+    const classes = currentAnalysisData.classes;
+
+    classes.forEach(cls => {
+        let summaryRows = '';
+        cls.subjects.forEach(sub => {
+            summaryRows += `<tr><td>${sub}</td><td>${cls.class_subject_means[sub] ?? ''}</td><td>${cls.class_subject_levels[sub] ?? ''}</td></tr>`;
+        });
+
+        let header = `<tr><th>CLASS</th><th>STREAM</th>`;
+        cls.subjects.forEach(sub => {
+            const shortName = cls.subject_shorts[sub] || sub.substring(0,3).toUpperCase();
+            header += `<th colspan="2">${shortName}</th>`;
+        });
+        header += `<th>CLASS MEAN</th></tr>`;
+
+        let subHeader = `<tr><td></td><td></td>`;
+        cls.subjects.forEach(() => subHeader += `<td>MARK</td><td>LVL</td>`);
+        subHeader += `<td></td></tr>`;
+
+        let rows = '';
+        cls.streams.forEach(stream => {
+            rows += `<tr><td>${cls.class_name}</td><td>${stream.stream_name}</td>`;
+            cls.subjects.forEach(sub => {
+                rows += `<td>${stream.means[sub] ?? ''}</td><td>${stream.levels[sub] ?? ''}</td>`;
+            });
+            rows += `<td>${stream.class_mean}</td></tr>`;
+        });
+
+        rows += `<tr style="background:#f1f5f9;font-weight:bold"><td></td><td>MEAN</td>`;
+        cls.subjects.forEach(sub => {
+            rows += `<td>${cls.class_subject_means[sub] ?? ''}</td><td>${cls.class_subject_levels[sub] ?? ''}</td>`;
+        });
+        rows += `<td>${cls.overall_class_mean}</td></tr>`;
+
+        let gradeTablesHTML = '';
+        if (cls.subjects && cls.subjects.length) {
+            cls.subjects.forEach(sub => {
+                const grades = cls.grades || [];
+                const distribution = cls.subject_grade_distribution || {};
+                const totals = cls.subject_grade_totals || {};
+                const streamNames = (cls.streams || []).map(s => s.stream_name);
+                const subjectDist = distribution[sub] || {};
+
+                let gHeader = `<tr><th>STREAM</th>`;
+                grades.forEach(g => gHeader += `<th>${g}</th>`);
+                gHeader += `<th>TOTAL</th></tr>`;
+
+                let gRows = '';
+                const orderedStreams = streamNames.length ? streamNames : Object.keys(subjectDist);
+                orderedStreams.forEach(streamName => {
+                    const counts = subjectDist[streamName] || {};
+                    let total = 0;
+                    let row = `<tr><td>${streamName}</td>`;
+                    grades.forEach(g => {
+                        const val = counts[g] ?? 0;
+                        total += val;
+                        row += `<td>${val}</td>`;
+                    });
+                    row += `<td>${total}</td></tr>`;
+                    gRows += row;
+                });
+
+                const totalCounts = totals[sub] || {};
+                let grandTotal = 0;
+                let totalRow = `<tr style="background:#f1f5f9;font-weight:bold"><td>CLASS TOTAL</td>`;
+                grades.forEach(g => {
+                    const val = totalCounts[g] ?? 0;
+                    grandTotal += val;
+                    totalRow += `<td>${val}</td>`;
+                });
+                totalRow += `<td>${grandTotal}</td></tr>`;
+
+                gradeTablesHTML += `
+                    <h4 style="margin:10px 0 4px">${sub} Grade Distribution</h4>
+                    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px">
+                        <thead>${gHeader}</thead>
+                        <tbody>${gRows}${totalRow}</tbody>
+                    </table>
+                `;
+            });
+        }
+
+        tablesHTML += `<div style="page-break-inside:avoid;margin-bottom:30px">
+            <h3 style="color:#0f3057">${cls.class_name} - ${cls.exam_title}</h3>
+            <h4 style="margin:8px 0 4px">Class Subject Summary</h4>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px">
+                <thead><tr><th>SUBJECT</th><th>MEAN MARK</th><th>MEAN GRADE</th></tr></thead>
+                <tbody>${summaryRows}</tbody>
+            </table>
+            <h4 style="margin:8px 0 4px">Stream Subject Analysis</h4>
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>${header}${subHeader}</thead>
+                <tbody>${rows}</tbody>
+            </table>
+            ${gradeTablesHTML}
+        </div>`;
+    });
+    
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Whole School Subject Stream Analysis</title>
+            <style>
+                body{font-family:Arial, sans-serif;padding:20px;background:#fff}
+                h2,h3{color:#0f3057}
+                table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+                th,td{border:1px solid #ddd;padding:6px;text-align:center}
+                th{background:#0f3057;color:white}
+                .page-break{page-break-after:always}
+            </style>
+        </head>
+        <body>
+            <h2>Whole School Subject Stream Analysis</h2>
+            <p>Generated: ${new Date().toLocaleString()}</p>
+            ${tablesHTML}
+        </body>
+        </html>
+    `;
+
+    if (window.SkulPlusPrint && window.SkulPlusPrint.printHtml) {
+        window.SkulPlusPrint.printHtml(html);
+    } else {
+        window.print();
+    }
+}
+
+function exportPDF_legacy(){
+    if(!currentAnalysisData) return;
+
+    const classes = currentAnalysisData.classes || [];
+    let tablesHTML = '';
+
+    classes.forEach(cls => {
+        let header = `<tr><th>CLASS</th><th>STREAM</th>`;
+        cls.subjects.forEach(sub => {
+            const shortName = cls.subject_shorts?.[sub] || sub.substring(0,3).toUpperCase();
+            header += `<th colspan="2">${shortName}</th>`;
+        });
+        header += `<th>CLASS MEAN</th></tr>`;
+
+        let subHeader = `<tr><td></td><td></td>`;
+        cls.subjects.forEach(() => subHeader += `<td>MARK</td><td>LVL</td>`);
+        subHeader += `<td></td></tr>`;
+
+        let rows = '';
+        cls.streams.forEach(stream => {
+            rows += `<tr><td>${cls.class_name}</td><td>${stream.stream_name}</td>`;
+            cls.subjects.forEach(sub => {
+                rows += `<td>${stream.means?.[sub] ?? ''}</td><td>${stream.levels?.[sub] ?? ''}</td>`;
+            });
+            rows += `<td>${stream.class_mean ?? ''}</td></tr>`;
+
+            // Optional performance metrics row per stream
+            rows += `<tr style="font-size:10px;background:#fafafa"><td></td><td>Perf</td>`;
+            cls.subjects.forEach(sub => {
+                const perf = stream.performance ? stream.performance[sub] : null;
+                if (perf) {
+                    rows += `<td colspan="2">Hi:${perf.highest} Lo:${perf.lowest}<br>Pass:${perf.pass_rate}% (${perf.entries})</td>`;
+                } else {
+                    rows += `<td colspan="2"></td>`;
+                }
+            });
+            rows += `<td></td></tr>`;
+        });
+
+        rows += `<tr style="background:#f1f5f9;font-weight:bold"><td></td><td>MEAN</td>`;
+        cls.subjects.forEach(sub => {
+            rows += `<td>${cls.class_subject_means?.[sub] ?? ''}</td><td>${cls.class_subject_levels?.[sub] ?? ''}</td>`;
+        });
+        rows += `<td>${cls.overall_class_mean ?? ''}</td></tr>`;
+
+        tablesHTML += `<div style="page-break-inside:avoid;margin-bottom:30px">
+            <h3>${cls.class_name} - ${cls.exam_title || ''}</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:10px">
+                <thead>${header}${subHeader}</thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    });
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Whole School Subject Stream Analysis</title>
+            <style>
+                @page {
+                    margin: 0.5in;
+                    @bottom-center { content: "Page " counter(page); font-size: 10px; }
+                }
+                body{font-family:Arial, sans-serif;color:#333}
+                .header{border-bottom:3px solid #0f3057;padding-bottom:10px;margin-bottom:20px;text-align:center}
+                .header h2{margin:0;color:#0f3057}
+                .header p{margin:4px 0;font-size:12px;color:#666}
+                h3{color:#0f3057;margin-top:15px}
+                table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
+                th,td{border:1px solid #ddd;padding:5px;text-align:center}
+                th{background:#0f3057;color:white;font-weight:bold}
+                .footer{margin-top:30px;border-top:2px solid #0f3057;padding-top:10px;text-align:center;font-size:10px;color:#666}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h2>SKULPLUS+ - Academic Performance Report</h2>
+                <p>Whole School Subject Stream Analysis</p>
+                <p>Generated: ${new Date().toLocaleDateString()}</p>
+            </div>
+            ${tablesHTML}
+            <div class="footer">
+                <p>SKULPLUS+ Student Information Reporting Management System</p>
+            </div>
+        </body>
+        </html>
+    `;
+
+    if (window.SkulPlusPrint && window.SkulPlusPrint.printHtml) {
+        window.SkulPlusPrint.printHtml(html);
+    } else {
+        window.print();
+    }
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="padding:24px;max-width:600px;margin:40px auto;background:#fff;border-radius:8px">
+  <h2>Delete Student</h2>
+  <p>Are you sure you want to delete <strong>{{ student.first_name }} {{ student.last_name }}</strong> ({{ student.admission_number }})?</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" style="padding:8px 12px;background:#dc2626;color:#fff;border:none;border-radius:6px">Delete</button>
+    <a href="{% url 'students_page' %}" style="margin-left:8px;padding:8px 12px;border-radius:6px;border:1px solid #ccc;background:#fff;display:inline-block;text-decoration:none;color:#333">Cancel</a>
+  </form>
+</div>
+{% endblock %}

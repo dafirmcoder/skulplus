@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div style="max-width:800px;margin:30px auto;background:#fff;padding:20px;border-radius:8px">
+  <h2>Edit Student: {{ student.first_name }} {{ student.last_name }}</h2>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px">
+      {% for field in form %}
+      <div>
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.errors %}
+          <div style="color:#dc2626">{{ field.errors }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      {% if allow_pathways and student_level == 'Senior' %}
+      <div>
+        <label for="pathway_id">Pathway</label>
+        <select id="pathway_id" name="pathway_id" required>
+          <option value="">Select Pathway</option>
+          {% for p in pathways %}
+            <option value="{{ p.id }}" {% if student_pathway and student_pathway.pathway_id == p.id %}selected{% endif %}>
+              {{ p.code }} - {{ p.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
+
+    <div style="margin-top:16px">
+      <button type="submit" style="padding:8px 12px;background:#1e3a8a;color:#fff;border:none;border-radius:6px">Save</button>
+      <a href="#" onclick="openDeleteModal({{ student.id }});return false;" style="margin-left:8px;padding:8px 12px;border-radius:6px;border:1px solid #ccc;background:#fff;text-decoration:none;color:#333">Delete</a>
+      <a href="{% url 'edit_students' %}" style="margin-left:8px;padding:8px 12px;border-radius:6px;border:1px solid #ccc;background:#fff;text-decoration:none;color:#333">Back</a>
+    </div>
+  </form>
+</div>
+<!-- generic modal container for view/delete -->
+<div class="modal-bg" id="genericModal">
+  <div class="modal" id="genericModalContent"></div>
+</div>
+{% include 'schools/_modals_js.html' %}
+{% endblock %}

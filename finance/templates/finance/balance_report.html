@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+
+{% block title %}Balance Report{% endblock %}
+
+{% block header %}
+<h2 style="margin:0">Balance Report - {{ school.name }}</h2>
+{% endblock %}
+
+{% block content %}
+<style>
+  .report-grid { display:grid; grid-template-columns: 1fr; gap:14px; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:16px; }
+  .filters { display:grid; grid-template-columns: 1fr 1fr 1fr auto auto auto; gap:10px; align-items:end; }
+  .label { display:block; font-size:13px; color:#374151; margin-bottom:4px; }
+  .input, .select { width:100%; padding:9px; border:1px solid #d1d5db; border-radius:6px; }
+  .btn { border:none; padding:10px 14px; border-radius:6px; cursor:pointer; font-weight:600; }
+  .btn-primary { background:#0f3057; color:#fff; }
+  .btn-soft { background:#fff; color:#1f2937; border:1px solid #d1d5db; }
+  .table-wrap { overflow:auto; }
+  .table { width:100%; border-collapse:collapse; min-width:980px; font-size:13px; }
+  .table th, .table td { border-bottom:1px solid #f3f4f6; padding:10px; text-align:left; }
+  .table th { background:#f9fafb; color:#111827; }
+  .right { text-align:right !important; }
+  .balance-outstanding { color:#dc2626; font-weight:700; }
+  .balance-cleared { color:#2563eb; font-weight:700; }
+  .balance-overpaid { color:#16a34a; font-weight:700; }
+  .muted { color:#6b7280; }
+  .no-print { display: block; }
+  .print-only { display: none; }
+  @media (max-width: 1100px) {
+    .filters { grid-template-columns: 1fr 1fr; }
+  }
+  @media print {
+    .no-print { display:none !important; }
+    .print-only { display:block !important; }
+    .card { border:none; padding:0; }
+    .table { min-width:0; }
+    .balance-outstanding { color:#dc2626 !important; font-weight:700; }
+    .balance-cleared { color:#2563eb !important; font-weight:700; }
+    .balance-overpaid { color:#16a34a !important; font-weight:700; }
+  }
+</style>
+
+<div class="report-grid">
+  <section class="card no-print">
+    <form method="get" class="filters" id="balance-filter-form">
+      <div>
+        <label class="label">Term</label>
+        <select name="term" class="select" data-autofilter>
+          <option value="Term 1" {% if term == 'Term 1' %}selected{% endif %}>Term 1</option>
+          <option value="Term 2" {% if term == 'Term 2' %}selected{% endif %}>Term 2</option>
+          <option value="Term 3" {% if term == 'Term 3' %}selected{% endif %}>Term 3</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Year</label>
+        <input type="number" name="year" value="{{ year }}" class="input" data-autofilter />
+      </div>
+      <div>
+        <label class="label">Class</label>
+        <select name="classroom" class="select" data-autofilter>
+          <option value="">All Classes</option>
+          {% for c in classes %}
+            <option value="{{ c.id }}" {% if request.GET.classroom == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Apply Filter</button>
+      <button type="button" class="btn btn-soft" id="btn-print-balances">Print Balances</button>
+      <button type="submit" name="export_excel" value="1" class="btn btn-soft">Export Excel</button>
+      <button type="submit" name="export_pdf" value="1" class="btn btn-soft">Export PDF</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="print-only" id="print-header" style="margin-bottom:10px;">
+      <div style="display:flex;gap:10px;align-items:flex-start;border-bottom:2px solid #0f3057;padding-bottom:8px;">
+        {% if school.logo %}
+          <img src="{{ school.logo.url }}" alt="{{ school.name }} logo" style="width:62px;height:62px;object-fit:contain;border:1px solid #e5e7eb;border-radius:6px;padding:4px;background:#fff;" />
+        {% endif %}
+        <div>
+          <h3 style="margin:0;color:#0f3057;">{{ school.name }} - Balance Report</h3>
+          <div class="muted">
+            {% if school.address %}{{ school.address }}{% endif %}
+            {% if school.phone %}{% if school.address %} | {% endif %}{{ school.phone }}{% endif %}
+            {% if school.email %} | {{ school.email }}{% endif %}
+          </div>
+          <div class="muted">
+            Class:
+            {% if request.GET.classroom %}
+              {% for c in classes %}{% if request.GET.classroom == c.id|stringformat:'s' %}{{ c.name }}{% endif %}{% endfor %}
+            {% else %}
+              All Classes
+            {% endif %}
+            | Term: {{ term }} | Year: {{ year }}
+          </div>
+          <div class="muted">Prepared by: {{ request.user.get_full_name|default:request.user.username }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="table" id="balances-table">
+        <thead>
+          <tr>
+            <th>Admission No</th>
+            <th>Student</th>
+            <th>School</th>
+            <th>Class</th>
+            <th class="right">Fees Due</th>
+            <th class="right">Paid</th>
+            <th class="right">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in report_data %}
+          <tr>
+            <td>{{ row.admission_number }}</td>
+            <td>{{ row.student.first_name }} {{ row.student.last_name }}</td>
+            <td>{{ row.school }}</td>
+            <td>{{ row.classroom }}</td>
+            <td class="right">{{ row.due }}</td>
+            <td class="right">{{ row.paid }}</td>
+            <td class="right {% if row.balance > 0 %}balance-outstanding{% elif row.balance < 0 %}balance-overpaid{% else %}balance-cleared{% endif %}">{{ row.balance }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="muted">No students found for this filter.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+  (function(){
+    const form = document.getElementById('balance-filter-form');
+    if (!form) return;
+    const controls = form.querySelectorAll('[data-autofilter]');
+    controls.forEach(el => {
+      el.addEventListener('change', () => form.submit());
+      if (el.tagName === 'INPUT') {
+        el.addEventListener('keyup', (e) => {
+          if (e.key === 'Enter') form.submit();
+        });
+      }
+    });
+
+    const printBtn = document.getElementById('btn-print-balances');
+    printBtn?.addEventListener('click', () => {
+      const url = new URL(window.location.href);
+      url.searchParams.set('print_pdf', '1');
+      url.searchParams.delete('export_pdf');
+      url.searchParams.delete('export_excel');
+      if (window.SkulPlusPrint && window.SkulPlusPrint.printUrl) {
+        window.SkulPlusPrint.printUrl(url.toString());
+      } else {
+        window.open(url.toString(), '_blank');
+      }
+    });
+  })();
+</script>
+{% endblock %}

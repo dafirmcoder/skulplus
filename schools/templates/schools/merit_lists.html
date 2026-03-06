@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<style>
+.reports-header h1 { margin: 0; font-size: 26px; color: #0f3057; }
+.reports-header p { margin: 4px 0 0; color: #6b7280; }
+.card { background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 20px 50px rgba(15,48,87,0.07); margin-bottom: 24px; }
+.filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 18px; margin-bottom: 16px; }
+.filters-grid label { display: block; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px; color: #6b7280; }
+.filters-grid select { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; font-size: 14px; background: #f8fafc; }
+.filters-grid select,
+.filters-grid select option {
+  color: #0f3057 !important;
+  background: #ffffff !important;
+}
+.primary-btn { background: linear-gradient(135deg, #1a73e8, #0f5bd3); color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+.secondary-btn { border: 1px solid #dbe2ea; background: #fff; color: #0f3057; padding: 12px 18px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+.secondary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.merit-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; border: 1px solid rgba(15,48,87,0.08); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.table-wrapper { overflow-x: auto; }
+.school-head { text-align:center; margin-bottom: 14px; }
+.school-head h3 { margin: 0; color:#0f3057; }
+.school-head p { margin: 2px 0; color:#475569; }
+.report-title { font-weight:700; font-size:14px; margin-top:6px; }
+.merit-table { width: 100%; border-collapse: collapse; }
+.merit-table th, .merit-table td { padding: 10px 12px; border: 1px solid #e2e8f0; font-size: 13px; }
+.merit-table th { text-transform: uppercase; letter-spacing: 0.4px; font-size: 11px; color: #475569; background:#f1f5f9; }
+.merit-table .center { text-align:center; }
+.merit-table .lvl { background:#fef9c3; color:#1e3a8a; font-weight:700; text-align:center; }
+.summary-row td { background:#f8fafc; font-weight:700; }
+.analysis-card { margin-top: 16px; border-top: 1px dashed #e2e8f0; padding-top: 12px; }
+.dist-table { width:100%; max-width:560px; border-collapse:collapse; margin-top:8px; }
+.dist-table th,.dist-table td { border:1px solid #e2e8f0; padding:8px 10px; text-align:center; }
+.empty-state { text-align: center; padding: 40px 10px; color: #94a3b8; font-size: 15px; }
+</style>
+
+<div class="reports-header" style="margin-bottom: 24px;">
+  <h1>Merit Lists</h1>
+  <p>Class merit list structure aligned to your VBA report layout.</p>
+</div>
+
+<div class="card">
+  <div class="filters-grid">
+    <div>
+      <label>Class</label>
+      <select id="classSelect">
+        <option value="">Select class</option>
+        {% for cls in classes %}
+        <option value="{{ cls.id }}">{{ cls.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Stream</label>
+      <select id="streamSelect"><option value="">All Streams</option></select>
+    </div>
+    <div>
+      <label>Exam</label>
+      <select id="examSelect">
+        <option value="">Select exam</option>
+        {% for exam in exams %}
+          <option value="{{ exam.id }}" data-term="{{ exam.term }}">{{ exam.title }} - {{ exam.term }} {{ exam.year }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Term</label>
+      <select id="termSelect">
+        <option value="">Select term</option>
+        {% for t in terms %}
+        <option value="{{ t }}">{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button id="loadMeritBtn" class="primary-btn">Generate Merit List</button>
+    <button id="printMeritBtn" class="secondary-btn" disabled><i class="fas fa-print"></i> Print</button>
+    <button id="pdfMeritBtn" class="secondary-btn" disabled><i class="fas fa-file-pdf"></i> Export PDF</button>
+  </div>
+</div>
+
+<div class="card">
+  <div id="schoolHead" class="school-head" style="display:none;">
+    <h3 id="schoolName">-</h3>
+    <p id="schoolMotto"></p>
+    <p id="reportTitle" class="report-title"></p>
+  </div>
+
+  <div id="meritSummary" class="merit-summary" style="display:none;">
+    <div><small>Class</small><strong id="summaryClass">-</strong></div>
+    <div><small>Exam</small><strong id="summaryExam">-</strong></div>
+    <div><small>Students</small><strong id="summaryPopulation">0</strong></div>
+    <div><small>Subjects</small><strong id="summarySubjects">0</strong></div>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="merit-table" id="meritTable" style="display:none;">
+      <thead><tr id="meritHeaderRow"></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="meritEmpty" class="empty-state">Select class and exam to view results.</div>
+  </div>
+  <div id="streamTablesContainer" style="display:none;margin-top:18px"></div>
+
+  <div class="analysis-card" id="levelDistribution" style="display:none;">
+    <strong>LEVEL DISTRIBUTION</strong>
+    <table class="dist-table">
+      <thead><tr id="levelDistHeader"></tr></thead>
+      <tbody><tr id="levelDistData"></tr></tbody>
+    </table>
+  </div>
+
+  <div class="analysis-card" id="classMeanCard" style="display:none;">
+    <strong id="classMeanText"></strong>
+  </div>
+</div>
+
+<script>
+const loadBtn = document.getElementById('loadMeritBtn');
+const printBtn = document.getElementById('printMeritBtn');
+const pdfBtn = document.getElementById('pdfMeritBtn');
+const classSelect = document.getElementById('classSelect');
+const streamSelect = document.getElementById('streamSelect');
+const examSelect = document.getElementById('examSelect');
+const termSelect = document.getElementById('termSelect');
+const table = document.getElementById('meritTable');
+const tbody = table.querySelector('tbody');
+const headerRow = document.getElementById('meritHeaderRow');
+const emptyState = document.getElementById('meritEmpty');
+const summary = document.getElementById('meritSummary');
+const schoolHead = document.getElementById('schoolHead');
+const streamTablesContainer = document.getElementById('streamTablesContainer');
+let lastMeritData = null;
+
+function updateButtonState() {
+  loadBtn.disabled = !classSelect.value || !examSelect.value || !termSelect.value;
+}
+
+function setSelectLoading(selectEl, label) {
+  selectEl.innerHTML = `<option value="">${label}</option>`;
+}
+
+classSelect.addEventListener('change', function() {
+  updateButtonState();
+  setSelectLoading(streamSelect, 'Loading streams...');
+  streamSelect.disabled = true;
+
+  if (!classSelect.value) {
+    streamSelect.innerHTML = '<option value="">All Streams</option>';
+    updateButtonState();
+    return;
+  }
+
+  fetch('/school/load-streams-for-class/?class_id=' + classSelect.value + '&scope=class_teacher')
+    .then(r => r.json())
+    .then(data => {
+      streamSelect.innerHTML = '<option value="">All Streams</option>';
+      (data.streams || []).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        streamSelect.appendChild(opt);
+      });
+      streamSelect.disabled = false;
+    })
+    .catch(() => {
+      streamSelect.innerHTML = '<option value="">All Streams</option>';
+      streamSelect.disabled = false;
+    });
+});
+
+examSelect.addEventListener('change', function() {
+  const selected = examSelect.options[examSelect.selectedIndex];
+  if (selected && selected.dataset.term && !termSelect.value) {
+    termSelect.value = selected.dataset.term;
+  }
+  updateButtonState();
+});
+streamSelect.addEventListener('change', updateButtonState);
+termSelect.addEventListener('change', updateButtonState);
+document.addEventListener('DOMContentLoaded', function() {
+  streamSelect.disabled = !classSelect.value;
+  updateButtonState();
+});
+
+loadBtn.addEventListener('click', function(){
+  if (loadBtn.disabled) return;
+  loadBtn.textContent = 'Loading...';
+  loadBtn.disabled = true;
+  emptyState.textContent = '';
+
+  const params = new URLSearchParams({
+    class_id: classSelect.value,
+    stream_id: streamSelect.value,
+    exam_id: examSelect.value,
+    term: termSelect.value
+  });
+
+  fetch("{% url 'merit_lists_data' %}?"+params)
+    .then(r => r.json())
+    .then(data => {
+      loadBtn.textContent = 'Generate Merit List';
+      updateButtonState();
+
+      if (!data.success) {
+        emptyState.textContent = data.error || 'No data found.';
+        emptyState.style.display = 'block';
+        table.style.display = 'none';
+        streamTablesContainer.innerHTML = '';
+        streamTablesContainer.style.display = 'none';
+        summary.style.display = 'none';
+        schoolHead.style.display = 'none';
+        document.getElementById('levelDistribution').style.display='none';
+        document.getElementById('classMeanCard').style.display='none';
+        tbody.innerHTML = '';
+        printBtn.disabled = true;
+        pdfBtn.disabled = true;
+        lastMeritData = null;
+        return;
+      }
+
+      document.getElementById('schoolName').textContent = data.school?.name || '-';
+      document.getElementById('schoolMotto').textContent = data.school?.motto || '';
+      document.getElementById('reportTitle').textContent = data.report?.title || '';
+      schoolHead.style.display = 'block';
+
+      document.getElementById('summaryClass').textContent = data.summary?.class || '-';
+      document.getElementById('summaryExam').textContent = data.summary?.exam || '-';
+      document.getElementById('summaryPopulation').textContent = data.summary?.population ?? 0;
+      document.getElementById('summarySubjects').textContent = data.summary?.subjects ?? 0;
+      summary.style.display = 'grid';
+
+      const subjects = data.subjects || [];
+      renderMeritTable(
+        headerRow,
+        tbody,
+        subjects,
+        data.students || [],
+        data.sub_mss || {},
+        data.sub_lvl || {},
+        (data.class_mean || {}).level || '-'
+      );
+
+      table.style.display = 'table';
+      emptyState.style.display = 'none';
+
+      renderLevelDistribution(data.level_distribution || {}, data.level_order || []);
+      const cm = data.class_mean || {};
+      document.getElementById('classMeanText').textContent = `CLASS MEAN: ${cm.score ?? '-'} (${cm.level ?? '-'})`;
+      document.getElementById('classMeanCard').style.display = 'block';
+      printBtn.disabled = false;
+      pdfBtn.disabled = false;
+      lastMeritData = data;
+
+      // Per-stream tables (only when all streams selected)
+      streamTablesContainer.innerHTML = '';
+      const streamTables = data.stream_tables || [];
+      if (!streamSelect.value && streamTables.length) {
+        streamTables.forEach(st => {
+          const block = document.createElement('div');
+          block.className = 'analysis-card';
+          block.innerHTML = `
+            <h4 style="margin:0 0 10px;color:#0f3057">STREAM ${st.stream}</h4>
+            <div class="table-wrapper">
+              <table class="merit-table">
+                <thead><tr></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          `;
+          streamTablesContainer.appendChild(block);
+          const h = block.querySelector('thead tr');
+          const b = block.querySelector('tbody');
+          renderMeritTable(
+            h,
+            b,
+            subjects,
+            st.students || [],
+            st.sub_mss || {},
+            st.sub_lvl || {},
+            (st.class_mean || {}).level || '-'
+          );
+        });
+        streamTablesContainer.style.display = 'block';
+      } else {
+        streamTablesContainer.style.display = 'none';
+      }
+    })
+    .catch(() => {
+      loadBtn.textContent = 'Generate Merit List';
+      updateButtonState();
+      emptyState.textContent = 'An error occurred. Please try again.';
+      emptyState.style.display = 'block';
+      table.style.display = 'none';
+      streamTablesContainer.innerHTML = '';
+      streamTablesContainer.style.display = 'none';
+      summary.style.display = 'none';
+      schoolHead.style.display = 'none';
+      document.getElementById('levelDistribution').style.display='none';
+      document.getElementById('classMeanCard').style.display='none';
+      tbody.innerHTML = '';
+      printBtn.disabled = true;
+      pdfBtn.disabled = true;
+      lastMeritData = null;
+    });
+});
+
+function asAbsoluteUrl(url){
+  if (!url) return '';
+  return url.startsWith('/') ? `${window.location.origin}${url}` : url;
+}
+
+function buildMeritDocumentHtml(){
+  if (!lastMeritData) return '';
+  const school = lastMeritData.school || {};
+  const report = lastMeritData.report || {};
+  const subjects = lastMeritData.subjects || [];
+  const generatedAt = new Date().toLocaleString();
+  const streamTables = lastMeritData.stream_tables || [];
+
+  function renderHeader(title){
+    const logoUrl = asAbsoluteUrl(school.logo_url || '');
+    const contactBits = [school.address, school.phone, school.email].filter(Boolean);
+    const contactLine = contactBits.join(' | ');
+    return `
+      <div class="doc-header">
+        <div class="doc-header-row">
+          ${logoUrl ? `<img class="doc-logo" src="${logoUrl}" alt="${school.name || 'School'}" />` : ''}
+          <div class="doc-title">
+            <h2>${school.name || ''}</h2>
+            <p>${school.motto || ''}</p>
+            <p>${contactLine}</p>
+            <p>${title}</p>
+            <p>Generated: ${generatedAt}</p>
+          </div>
+          ${logoUrl ? '<div style="width:72px"></div>' : ''}
+        </div>
+      </div>`;
+  }
+
+  function renderMeritTableHtml(rows, subMss, subLvl, finalLevel){
+    let head = '<tr><th class="center">ADM</th><th>NAME</th><th class="center">STRM</th>';
+    subjects.forEach(s => {
+      head += `<th class="center">${s.code}</th><th class="center">LVL</th>`;
+    });
+    head += '<th class="center">EXAM TOTAL</th><th class="center">LVL</th><th class="center">POS</th></tr>';
+
+    let body = '';
+    (rows || []).forEach((r) => {
+      body += `<tr><td class="center">${r.adm || ''}</td><td>${r.name || ''}</td><td class="center">${r.stream || ''}</td>`;
+      subjects.forEach(s => {
+        const rec = (r.subjects || {})[String(s.id)] || {mark:'-', level:'-'};
+        body += `<td class="center">${rec.mark ?? '-'}</td><td class="lvl">${rec.level ?? '-'}</td>`;
+      });
+      body += `<td class="center">${r.total ?? '-'}</td><td class="lvl">${r.total_level ?? '-'}</td><td class="center">${r.pos || ''}</td></tr>`;
+    });
+
+    let mssRow = '<tr class="summary-row"><td></td><td>SUB MSS</td><td></td>';
+    subjects.forEach(s => {
+      mssRow += `<td class="center">${(subMss || {})[String(s.id)] ?? '-'}</td><td class="lvl">-</td>`;
+    });
+    mssRow += '<td></td><td></td><td></td></tr>';
+
+    let lvlRow = '<tr class="summary-row"><td></td><td>SUB LVL</td><td></td>';
+    subjects.forEach(s => {
+      lvlRow += '<td class="center">-</td>';
+      lvlRow += `<td class="lvl">${(subLvl || {})[String(s.id)] ?? '-'}</td>`;
+    });
+    lvlRow += `<td></td><td class="lvl">${finalLevel ?? '-'}</td><td></td></tr>`;
+
+    return `
+      <table class="merit-table">
+        <thead>${head}</thead>
+        <tbody>${body}${mssRow}${lvlRow}</tbody>
+      </table>`;
+  }
+
+  function renderDistribution(dist, order){
+    const keys = (order && order.length) ? order : Object.keys(dist || {});
+    let h = '';
+    let d = '';
+    keys.forEach(k => {
+      h += `<th>${k}</th>`;
+      d += `<td>${(dist || {})[k] ?? 0}</td>`;
+    });
+    return `
+      <div class="analysis-card">
+        <strong>LEVEL DISTRIBUTION</strong>
+        <table class="dist-table">
+          <thead><tr>${h}</tr></thead>
+          <tbody><tr>${d}</tr></tbody>
+        </table>
+      </div>`;
+  }
+
+  const combined = `
+    <section class="merit-page">
+      ${renderHeader(report.title || '')}
+      ${renderMeritTableHtml(lastMeritData.students || [], lastMeritData.sub_mss || {}, lastMeritData.sub_lvl || {}, (lastMeritData.class_mean || {}).level || '-')}
+      ${renderDistribution(lastMeritData.level_distribution || {}, lastMeritData.level_order || [])}
+      <div class="analysis-card"><strong>CLASS MEAN: ${(lastMeritData.class_mean || {}).score ?? '-'} (${(lastMeritData.class_mean || {}).level ?? '-'})</strong></div>
+      <div class="doc-footer">SKULPLUS+ Student Information Reporting Management System</div>
+    </section>`;
+
+  const streams = streamTables.map(st => `
+    <section class="merit-page">
+      ${renderHeader(`${report.title || ''} | STREAM ${st.stream || ''}`)}
+      ${renderMeritTableHtml(st.students || [], st.sub_mss || {}, st.sub_lvl || {}, (st.class_mean || {}).level || '-')}
+      ${renderDistribution(st.level_distribution || {}, lastMeritData.level_order || [])}
+      <div class="analysis-card"><strong>STREAM MEAN: ${(st.class_mean || {}).score ?? '-'} (${(st.class_mean || {}).level ?? '-'})</strong></div>
+      <div class="doc-footer">SKULPLUS+ Student Information Reporting Management System</div>
+    </section>`).join('');
+
+  return `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Merit List - ${report.class || ''}</title>
+    <style>
+      @page { size: A4 landscape; margin: 0.5in; }
+      body { font-family: Arial, sans-serif; color:#111827; }
+      .merit-page { page-break-after: always; break-after: page; }
+      .merit-page:last-child { page-break-after: auto; break-after: auto; }
+      .doc-header { border-bottom: 3px solid #0f3057; padding-bottom: 10px; margin-bottom: 14px; }
+      .doc-header-row { display:flex; align-items:center; gap:16px; }
+      .doc-logo { width:72px; height:72px; object-fit:contain; border:1px solid #e2e8f0; border-radius:6px; background:#fff; padding:6px; }
+      .doc-title { flex:1; text-align:center; }
+      .doc-title h2 { margin:0; color:#0f3057; font-size:20px; }
+      .doc-title p { margin:4px 0; color:#475569; font-size:12px; }
+      .merit-table { width:100%; border-collapse:collapse; margin-top:8px; }
+      .merit-table th, .merit-table td { border:1px solid #dbe2ea; padding:4px 5px; font-size:9px; white-space:nowrap; }
+      .merit-table th { background:#f1f5f9; color:#334155; text-transform:uppercase; }
+      .center { text-align:center; }
+      .lvl { background:#fef9c3; color:#1e3a8a; font-weight:700; text-align:center; }
+      .summary-row td { background:#f8fafc; font-weight:700; }
+      .analysis-card { margin-top:14px; }
+      .dist-table { width:100%; max-width:720px; border-collapse:collapse; margin-top:6px; }
+      .dist-table th,.dist-table td { border:1px solid #dbe2ea; padding:6px; text-align:center; font-size:11px; }
+      h4 { margin:12px 0 6px; color:#0f3057; }
+      .doc-footer { margin-top:14px; padding-top:8px; border-top:1px solid #dbe2ea; font-size:10px; color:#64748b; text-align:right; }
+    </style>
+  </head>
+  <body>
+    ${combined}
+    ${streams}
+  </body>
+  </html>`;
+}
+
+printBtn.addEventListener('click', function(){
+  if (!lastMeritData) return;
+  const html = buildMeritDocumentHtml();
+  if (window.SkulPlusPrint && window.SkulPlusPrint.printHtml) {
+    window.SkulPlusPrint.printHtml(html);
+  } else {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+  }
+});
+
+pdfBtn.addEventListener('click', async function(){
+  if (!lastMeritData) return;
+  const html = buildMeritDocumentHtml();
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  const report = lastMeritData.report || {};
+  const cls = String(report.class || 'class').replace(/\s+/g, '_');
+  const exam = String(report.exam || 'exam').replace(/\s+/g, '_');
+  const date = new Date().toISOString().slice(0,10);
+  const fileName = `merit_list_${cls}_${exam}_${date}.pdf`;
+
+  if (!window.html2canvas || !window.jspdf || !window.jspdf.jsPDF) {
+    alert('PDF export libraries are not loaded. Please refresh the page and try again.');
+    return;
+  }
+
+  document.body.appendChild(wrap);
+  try {
+    const node = wrap.querySelector('body') || wrap;
+    const pages = Array.from(node.querySelectorAll('.merit-page'));
+    const renderPages = pages.length ? pages : [node];
+    const jsPDFCtor = window.jspdf.jsPDF;
+    const pdf = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'landscape', compress: true });
+    const totalPages = renderPages.length;
+
+    for (let i = 0; i < renderPages.length; i++) {
+      const pageEl = renderPages[i];
+      const canvas = await window.html2canvas(pageEl, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: pageEl.scrollWidth,
+        windowHeight: pageEl.scrollHeight
+      });
+
+      if (i > 0) pdf.addPage('a4', 'landscape');
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const marginX = 4;
+      const marginTop = 4;
+      const marginBottom = 8;
+      const maxW = pageWidth - (marginX * 2);
+      const maxH = pageHeight - marginTop - marginBottom;
+
+      let drawW = maxW;
+      let drawH = (canvas.height * drawW) / canvas.width;
+      if (drawH > maxH) {
+        drawH = maxH;
+        drawW = (canvas.width * drawH) / canvas.height;
+      }
+      const drawX = (pageWidth - drawW) / 2;
+      const drawY = marginTop + ((maxH - drawH) / 2);
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.94);
+      pdf.addImage(imgData, 'JPEG', drawX, drawY, drawW, drawH, undefined, 'FAST');
+
+      const pageLabel = `Page ${i + 1} of ${totalPages}`;
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(pageLabel, pageWidth - 28, pageHeight - 3.5);
+    }
+
+    pdf.save(fileName);
+  } finally {
+    document.body.removeChild(wrap);
+  }
+});
+
+function renderLevelDistribution(dist, levelOrder){
+  if(!dist || Object.keys(dist).length === 0){
+    document.getElementById('levelDistribution').style.display='none';
+    return;
+  }
+  const h = document.getElementById('levelDistHeader');
+  const d = document.getElementById('levelDistData');
+  h.innerHTML = '';
+  d.innerHTML = '';
+  const keys = (levelOrder && levelOrder.length) ? levelOrder : Object.keys(dist);
+  keys.forEach(l => {
+    h.innerHTML += `<th>${l}</th>`;
+    d.innerHTML += `<td>${dist[l] ?? 0}</td>`;
+  });
+  document.getElementById('levelDistribution').style.display='block';
+}
+function renderMeritTable(tableHeaderEl, tableBodyEl, subjects, rows, subMss, subLvl, finalLevel){
+  tableHeaderEl.innerHTML = '<th class="center">ADM</th><th>NAME</th><th class="center">STRM</th>';
+  subjects.forEach(s => {
+    tableHeaderEl.innerHTML += `<th class="center">${s.code}</th><th class="center">LVL</th>`;
+  });
+  tableHeaderEl.innerHTML += '<th class="center">EXAM TOTAL</th><th class="center">LVL</th><th class="center">POS</th>';
+
+  tableBodyEl.innerHTML = '';
+  (rows || []).forEach((r) => {
+    let tr = `<tr><td class="center">${r.adm || ''}</td><td>${r.name || ''}</td><td class="center">${r.stream || ''}</td>`;
+    subjects.forEach(s => {
+      const rec = (r.subjects || {})[String(s.id)] || {mark:'-', level:'-'};
+      tr += `<td class="center">${rec.mark ?? '-'}</td><td class="lvl">${rec.level ?? '-'}</td>`;
+    });
+    tr += `<td class="center">${r.total ?? '-'}</td><td class="lvl">${r.total_level ?? '-'}</td><td class="center">${r.pos || ''}</td></tr>`;
+    tableBodyEl.innerHTML += tr;
+  });
+
+  let mssRow = '<tr class="summary-row"><td></td><td>SUB MSS</td><td></td>';
+  subjects.forEach(s => {
+    mssRow += `<td class="center">${(subMss || {})[String(s.id)] ?? '-'}</td><td class="lvl">-</td>`;
+  });
+  mssRow += '<td></td><td></td><td></td></tr>';
+  tableBodyEl.innerHTML += mssRow;
+
+  let lvlRow = '<tr class="summary-row"><td></td><td>SUB LVL</td><td></td>';
+  subjects.forEach(s => {
+    lvlRow += '<td class="center">-</td>';
+    lvlRow += `<td class="lvl">${(subLvl || {})[String(s.id)] ?? '-'}</td>`;
+  });
+  lvlRow += `<td></td><td class="lvl">${finalLevel ?? '-'}</td><td></td></tr>`;
+  tableBodyEl.innerHTML += lvlRow;
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+{% endblock %}

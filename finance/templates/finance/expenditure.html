@@ -1,0 +1,387 @@
+{% extends 'base.html' %}
+
+{% block title %}Expenditure{% endblock %}
+
+{% block header %}
+<h2 style="margin:0">Expenditure</h2>
+{% endblock %}
+
+{% block content %}
+<style>
+  .grid { display:grid; grid-template-columns:0.7fr 1.3fr; gap:14px; align-items:start; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px; }
+  .capture-card { max-width:430px; width:100%; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:14px; }
+  .label { font-size:13px; color:#6b7280; }
+  .value { font-size:24px; font-weight:700; color:#0f3057; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .fields .full { grid-column:1 / -1; }
+  .fields label { display:block; font-size:12px; color:#374151; margin-bottom:4px; }
+  .fields input, .fields select { width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px; }
+  .btn { border:none; background:#0f3057; color:#fff; padding:10px 14px; border-radius:6px; cursor:pointer; }
+  .table-wrap { overflow:auto; }
+  table { width:100%; border-collapse:collapse; min-width:820px; }
+  th, td { border-bottom:1px solid #f3f4f6; padding:8px; font-size:13px; text-align:left; vertical-align:top; }
+  th { border-bottom:1px solid #e5e7eb; }
+  .head-filter { margin-top:6px; width:100%; padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:12px; background:#fff; }
+  .right { text-align:right; }
+  .muted { color:#6b7280; }
+  .link-btn { border:1px solid #0f3057; color:#0f3057; background:#fff; border-radius:6px; padding:4px 8px; text-decoration:none; font-size:12px; }
+  .link-btn:hover { background:#0f3057; color:#fff; }
+  .modal-backdrop { position:fixed; inset:0; background:rgba(15,48,87,.45); display:none; align-items:center; justify-content:center; padding:16px; z-index:2000; }
+  .modal-backdrop.show { display:flex; }
+  .modal-card { width:min(980px,100%); height:min(86vh,760px); background:#fff; border:1px solid #e5e7eb; border-radius:10px; display:flex; flex-direction:column; overflow:hidden; }
+  .modal-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid #e5e7eb; }
+  .modal-body { flex:1; padding:10px; background:#f8fafc; }
+  .modal-body img { width:100%; height:100%; border:none; border-radius:6px; background:#fff; object-fit:contain; }
+  .pdf-viewer { width:100%; height:100%; display:none; flex-direction:column; gap:8px; }
+  .pdf-toolbar { display:flex; align-items:center; gap:8px; }
+  .pdf-toolbar button { border:1px solid #0f3057; background:#fff; color:#0f3057; border-radius:6px; padding:5px 10px; cursor:pointer; }
+  .pdf-toolbar button:hover { background:#0f3057; color:#fff; }
+  .pdf-canvas-wrap { flex:1; overflow:auto; background:#fff; border:1px solid #e5e7eb; border-radius:6px; display:flex; justify-content:center; align-items:flex-start; }
+  #evidence-pdf-canvas { max-width:100%; height:auto; }
+  .close-btn { border:1px solid #0f3057; background:#fff; color:#0f3057; border-radius:6px; padding:6px 10px; cursor:pointer; }
+  .close-btn:hover { background:#0f3057; color:#fff; }
+  .table-tools { display:flex; justify-content:flex-end; gap:8px; margin-bottom:8px; }
+  @media (max-width:980px) {
+    .grid { grid-template-columns:1fr; }
+    .fields { grid-template-columns:1fr; }
+  }
+</style>
+
+<div class="stats">
+  <div class="card">
+    <div class="label">Total Amount (Unit Sum)</div>
+    <div class="value">{{ total_amount }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Total Expenditure Value</div>
+    <div class="value">{{ total_value }}</div>
+  </div>
+</div>
+
+<div class="grid">
+  <section class="card capture-card">
+    <h3 style="margin-top:0;color:#0f3057;">Capture Expense</h3>
+    <form method="post" enctype="multipart/form-data" class="fields">
+      {% csrf_token %}
+      <div>
+        <label>Date</label>
+        {{ form.date }}
+      </div>
+      <div>
+        <label>Item</label>
+        {{ form.item }}
+      </div>
+      <div>
+        <label>Amount</label>
+        {{ form.amount }}
+      </div>
+      <div>
+        <label>Quantity</label>
+        {{ form.quantity }}
+      </div>
+      <div>
+        <label>Votehead</label>
+        {{ form.vote_head }}
+      </div>
+      <div>
+        <label>Payment Method</label>
+        {{ form.payment_method }}
+      </div>
+      <div>
+        <label>Receipt/Invoice No.</label>
+        {{ form.receipt_invoice_no }}
+      </div>
+      <div class="full">
+        <label>Evidence Document (PDF/Image)</label>
+        {{ form.evidence_document }}
+      </div>
+      <div class="full">
+        <button type="submit" class="btn">Save Expenditure</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card table-wrap">
+    <h3 style="margin-top:0;color:#0f3057;">Recent Expenditure Entries</h3>
+    <div class="table-tools">
+      <button type="button" class="link-btn" id="expenditure-export-pdf">Export PDF</button>
+      <button type="button" class="link-btn" id="expenditure-print-pdf">Print</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>
+            Date
+            <select class="head-filter js-col-filter" data-filter-key="date">
+              <option value="">All</option>
+              {% for d in date_choices %}
+                <option value="{{ d|date:'Y-m-d' }}" {% if filters.date == d|date:'Y-m-d' %}selected{% endif %}>
+                  {{ d|date:'Y-m-d' }}
+                </option>
+              {% endfor %}
+            </select>
+          </th>
+          <th>Item</th>
+          <th>
+            Votehead
+            <select class="head-filter js-col-filter" data-filter-key="vote_head">
+              <option value="">All</option>
+              {% for v in vote_head_choices %}
+                <option value="{{ v }}" {% if filters.vote_head == v %}selected{% endif %}>{{ v }}</option>
+              {% endfor %}
+            </select>
+          </th>
+          <th>Receipt/Invoice</th>
+          <th class="right">Amount</th>
+          <th class="right">Qty</th>
+          <th class="right">Total</th>
+          <th>
+            Source
+            <select class="head-filter js-col-filter" data-filter-key="source">
+              <option value="">All</option>
+              {% for value, label in source_choices %}
+                <option value="{{ value }}" {% if filters.source == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </th>
+          <th>
+            Payment
+            <select class="head-filter js-col-filter" data-filter-key="payment_method">
+              <option value="">All</option>
+              {% for value, label in payment_method_choices %}
+                <option value="{{ value }}" {% if filters.payment_method == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </th>
+          <th>Evidence</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in expenditures %}
+        <tr>
+          <td>{{ row.date }}</td>
+          <td>{{ row.item }}</td>
+          <td>{{ row.vote_head }}</td>
+          <td>{{ row.receipt_invoice_no|default:'-' }}</td>
+          <td class="right">{{ row.amount }}</td>
+          <td class="right">{{ row.quantity }}</td>
+          <td class="right">{{ row.total_value }}</td>
+          <td>{{ row.get_source_display }}</td>
+          <td>{{ row.payment_method }}</td>
+          <td>
+            {% if row.evidence_document %}
+              <a
+                href="{% url 'expenditure_evidence' row.id %}?mode=preview"
+                class="link-btn evidence-view"
+                data-preview-url="{% url 'expenditure_evidence' row.id %}?mode=preview"
+                data-download-url="{% url 'expenditure_evidence' row.id %}?mode=download"
+                data-file-name="{{ row.evidence_document.name|lower }}"
+                data-name="{{ row.item|escape }}"
+              >View</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="10" class="muted">No expenditure entries yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<div class="modal-backdrop" id="evidence-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <strong id="evidence-title">Evidence Document</strong>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <a href="#" id="evidence-download" class="link-btn" download>Download</a>
+        <button type="button" class="close-btn" id="evidence-close">Close</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div id="evidence-pdf-viewer" class="pdf-viewer">
+        <div class="pdf-toolbar">
+          <button type="button" id="pdf-prev">Prev</button>
+          <button type="button" id="pdf-next">Next</button>
+          <span id="pdf-page-info" class="muted">Page 0 / 0</span>
+        </div>
+        <div class="pdf-canvas-wrap">
+          <canvas id="evidence-pdf-canvas"></canvas>
+        </div>
+      </div>
+      <img id="evidence-img" alt="Evidence Preview" style="display:none;" />
+      <div id="evidence-unsupported" class="muted" style="display:none;padding:12px;">Preview unavailable. Use Download.</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+  (function () {
+    const modal = document.getElementById('evidence-modal');
+    const closeBtn = document.getElementById('evidence-close');
+    const pdfViewer = document.getElementById('evidence-pdf-viewer');
+    const pdfCanvas = document.getElementById('evidence-pdf-canvas');
+    const pdfPrev = document.getElementById('pdf-prev');
+    const pdfNext = document.getElementById('pdf-next');
+    const pdfPageInfo = document.getElementById('pdf-page-info');
+    const imgView = document.getElementById('evidence-img');
+    const unsupported = document.getElementById('evidence-unsupported');
+    const downloadLink = document.getElementById('evidence-download');
+    const title = document.getElementById('evidence-title');
+    let pdfDoc = null;
+    let pdfPageNum = 1;
+    let pdfPageRendering = false;
+
+    function hideAllPreview() {
+      pdfViewer.style.display = 'none';
+      imgView.style.display = 'none';
+      unsupported.style.display = 'none';
+      imgView.src = '';
+      const ctx = pdfCanvas.getContext('2d');
+      ctx.clearRect(0, 0, pdfCanvas.width || 1, pdfCanvas.height || 1);
+      pdfDoc = null;
+      pdfPageNum = 1;
+      pdfPageRendering = false;
+      pdfPageInfo.textContent = 'Page 0 / 0';
+    }
+
+    function updatePdfPager() {
+      const total = pdfDoc ? pdfDoc.numPages : 0;
+      pdfPageInfo.textContent = `Page ${pdfPageNum} / ${total}`;
+      pdfPrev.disabled = !pdfDoc || pdfPageNum <= 1;
+      pdfNext.disabled = !pdfDoc || pdfPageNum >= total;
+    }
+
+    async function renderPdfPage(pageNum) {
+      if (!pdfDoc || pdfPageRendering) return;
+      pdfPageRendering = true;
+      try {
+        const page = await pdfDoc.getPage(pageNum);
+        const baseViewport = page.getViewport({ scale: 1 });
+        const wrapWidth = document.querySelector('.pdf-canvas-wrap').clientWidth - 24;
+        const scale = Math.max(0.7, Math.min(2.2, wrapWidth / baseViewport.width));
+        const viewport = page.getViewport({ scale: scale });
+        pdfCanvas.width = viewport.width;
+        pdfCanvas.height = viewport.height;
+        const ctx = pdfCanvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      } catch (e) {
+        unsupported.style.display = 'block';
+        pdfViewer.style.display = 'none';
+      } finally {
+        pdfPageRendering = false;
+        updatePdfPager();
+      }
+    }
+
+    async function openPdf(previewUrl) {
+      if (!window.pdfjsLib) {
+        unsupported.style.display = 'block';
+        return;
+      }
+      try {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        pdfDoc = await window.pdfjsLib.getDocument({ url: previewUrl, withCredentials: true }).promise;
+        pdfPageNum = 1;
+        pdfViewer.style.display = 'flex';
+        await renderPdfPage(pdfPageNum);
+      } catch (e) {
+        unsupported.style.display = 'block';
+      }
+    }
+
+    function openModal(previewUrl, downloadUrl, name, fileName) {
+      hideAllPreview();
+      downloadLink.href = downloadUrl || previewUrl;
+      title.textContent = name ? `Evidence: ${name}` : 'Evidence Document';
+      const clean = (fileName || '').toLowerCase();
+      if (clean.endsWith('.pdf')) {
+        openPdf(previewUrl);
+      } else if (clean.endsWith('.png') || clean.endsWith('.jpg') || clean.endsWith('.jpeg') || clean.endsWith('.webp') || clean.endsWith('.gif')) {
+        imgView.src = previewUrl;
+        imgView.style.display = 'block';
+      } else {
+        unsupported.style.display = 'block';
+      }
+      modal.classList.add('show');
+    }
+
+    function closeModal() {
+      modal.classList.remove('show');
+      hideAllPreview();
+    }
+
+    document.querySelectorAll('.evidence-view').forEach(function (el) {
+      el.addEventListener('click', function (event) {
+        event.preventDefault();
+        openModal(
+          el.getAttribute('data-preview-url'),
+          el.getAttribute('data-download-url'),
+          el.getAttribute('data-name'),
+          el.getAttribute('data-file-name')
+        );
+      });
+    });
+
+    closeBtn.addEventListener('click', closeModal);
+    pdfPrev.addEventListener('click', function () {
+      if (!pdfDoc || pdfPageNum <= 1) return;
+      pdfPageNum -= 1;
+      renderPdfPage(pdfPageNum);
+    });
+    pdfNext.addEventListener('click', function () {
+      if (!pdfDoc || pdfPageNum >= pdfDoc.numPages) return;
+      pdfPageNum += 1;
+      renderPdfPage(pdfPageNum);
+    });
+    modal.addEventListener('click', function (event) {
+      if (event.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && modal.classList.contains('show')) closeModal();
+    });
+
+    document.querySelectorAll('.js-col-filter').forEach(function (filterEl) {
+      filterEl.addEventListener('change', function () {
+        const key = filterEl.getAttribute('data-filter-key');
+        const value = (filterEl.value || '').trim();
+        const url = new URL(window.location.href);
+        if (value) {
+          url.searchParams.set(key, value);
+        } else {
+          url.searchParams.delete(key);
+        }
+        window.location.href = url.toString();
+      });
+    });
+
+    const exportBtn = document.getElementById('expenditure-export-pdf');
+    const printBtn = document.getElementById('expenditure-print-pdf');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', function () {
+        const url = new URL(window.location.href);
+        url.searchParams.set('export_pdf', '1');
+        url.searchParams.delete('print_pdf');
+        window.location.href = url.toString();
+      });
+    }
+    if (printBtn) {
+      printBtn.addEventListener('click', function () {
+        const url = new URL(window.location.href);
+        url.searchParams.set('print_pdf', '1');
+        url.searchParams.delete('export_pdf');
+        if (window.SkulPlusPrint && window.SkulPlusPrint.printUrl) {
+          window.SkulPlusPrint.printUrl(url.toString());
+        } else {
+          window.open(url.toString(), '_blank');
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

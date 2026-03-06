@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+:root{
+  --blue:#0f3057;
+  --green:#16a34a;
+  --orange:#f59e0b;
+  --light:#f4f7fb;
+  --border:#e6ecf2;
+}
+
+body{background:var(--light);font-family:'Poppins',sans-serif}
+
+.page-card{
+  max-width:1100px;margin:20px auto;padding:25px;
+  background:#fff;border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.05)
+}
+
+.page-title{
+  text-align:center;color:var(--blue);
+  margin-bottom:20px;font-weight:700
+}
+
+.filters{
+  display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px
+}
+
+.filters select, .filters button{
+  padding:10px 14px;border-radius:8px;font-size:14px;border:1px solid #ccc
+}
+
+.btn-primary{background:var(--blue);color:#fff;border:none;font-weight:600}
+.btn-green{background:var(--green);color:#fff;border:none;font-weight:600}
+.btn-teal{background:#20c997;color:#fff;border:none;font-weight:600}
+.btn-red{background:#dc3545;color:#fff;border:none;font-weight:600}
+
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{border:1px solid var(--border);padding:8px}
+th{background:var(--blue);color:#fff;font-size:13px}
+
+.no-print{display:block}
+@media print{
+  .no-print{display:none}
+  body{background:#fff}
+}
+</style>
+
+<div class="page-card">
+  <h2 class="page-title"><i class="fas fa-list"></i> Class List Generator</h2>
+
+  <div class="filters no-print">
+    <select id="classSelect">
+      <option value="">Select Class</option>
+      {% for c in classes %}
+      <option value="{{ c.id }}">{{ c.name }}</option>
+      {% endfor %}
+    </select>
+
+    <select id="streamSelect" disabled>
+      <option value="">All Streams</option>
+    </select>
+
+    <select id="subjectSelect" disabled>
+      <option value="">Select Subject (Optional)</option>
+      {% for s in subjects %}
+      <option value="{{ s.id }}">
+        {% if allow_pathways and s.education_level and s.education_level.name == 'Senior' %}
+          {{ s.name }} [{{ s.pathway.code|default:"CORE" }}]
+        {% else %}
+          {{ s.name }}
+        {% endif %}
+      </option>
+      {% endfor %}
+    </select>
+
+    <button class="btn-primary" id="btnGenerate" onclick="generateList()"><i class="fas fa-search"></i> Generate</button>
+    <button class="btn-green" id="btnPrint"><i class="fas fa-print"></i> Print</button>
+    <button class="btn-teal" id="btnExcel"><i class="fas fa-file-excel"></i> Excel</button>
+    <button class="btn-red" id="btnPdf"><i class="fas fa-file-pdf"></i> PDF</button>
+  </div>
+
+  <h3 id="listTitle"></h3>
+
+  <table id="studentTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Student Name</th>
+        <th>Admission No</th>
+        <th>Gender</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+const classSelect = document.getElementById('classSelect');
+const streamSelect = document.getElementById('streamSelect');
+const subjectSelect = document.getElementById('subjectSelect');
+const btnPrint = document.getElementById('btnPrint');
+const btnExcel = document.getElementById('btnExcel');
+const btnPdf = document.getElementById('btnPdf');
+
+// Load streams when class changes
+classSelect.addEventListener('change', async function() {
+  const classId = this.value;
+  streamSelect.innerHTML = '<option value="">All Streams</option>';
+  streamSelect.disabled = !classId;
+  
+  if (!classId) {
+    generateList();
+    return;
+  }
+  
+  try {
+    console.log('Loading streams for class:', classId);
+    const resp = await fetch(`/school/load-streams-for-class/?class_id=${classId}`, {
+      method: 'GET',
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    console.log('Response status:', resp.status);
+    const data = await resp.json();
+    console.log('Streams data:', data);
+    if (data.streams && data.streams.length > 0) {
+      data.streams.forEach(stream => {
+        const option = document.createElement('option');
+        option.value = stream.id;
+        option.text = stream.name;
+        streamSelect.appendChild(option);
+        console.log('Added stream:', stream.name);
+      });
+      streamSelect.disabled = false;
+    } else {
+      console.log('No streams returned');
+      streamSelect.disabled = true;
+    }
+  } catch (err) {
+    console.error('Error loading streams:', err);
+    streamSelect.disabled = true;
+  }
+  
+  generateList();
+});
+
+streamSelect.addEventListener('change', generateList);
+
+subjectSelect.addEventListener('change', generateList);
+
+// initial state
+function toggleExportButtons(enabled){
+  [btnPrint, btnExcel, btnPdf].forEach(b=>{ if(b){ b.disabled = !enabled; b.style.opacity = enabled ? '1' : '0.5'; } });
+}
+
+toggleExportButtons(false);
+
+// auto-select first class and trigger list on load
+document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const presetClassId = params.get('class_id');
+  const presetStreamId = params.get('stream_id');
+  const presetSubjectId = params.get('subject_id');
+
+  if (presetClassId) {
+    classSelect.value = presetClassId;
+    subjectSelect.disabled = !classSelect.value;
+    classSelect.dispatchEvent(new Event('change'));
+
+    if (presetSubjectId) {
+      subjectSelect.value = presetSubjectId;
+      generateList();
+    }
+
+    if (presetStreamId) {
+      const applyStream = () => {
+        streamSelect.value = presetStreamId;
+        generateList();
+      };
+      setTimeout(applyStream, 250);
+    }
+    return;
+  }
+
+  if(classSelect && !classSelect.value && classSelect.options.length>1){
+    classSelect.selectedIndex = 1;
+    subjectSelect.disabled = !classSelect.value;
+    // Trigger change event to load streams
+    classSelect.dispatchEvent(new Event('change'));
+  }
+});
+
+function generateList(){
+    const classId = classSelect.value;
+    const streamId = streamSelect.value;
+    const subjectId = subjectSelect.value;
+    const tbody = document.querySelector('#studentTable tbody');
+
+    if(!classId){
+        tbody.innerHTML = '';
+        document.getElementById('listTitle').innerText = '';
+        return;
+    }
+
+    let url = `{% url 'load_students_for_subject' %}?class_id=${classId}`;
+    if(streamId) url += `&stream_id=${streamId}`;
+    if(subjectId) url += `&subject_id=${subjectId}`;
+
+    // loading state
+    document.getElementById('listTitle').innerText = 'Loading...';
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#888">Loading...</td></tr>`;
+    toggleExportButtons(false);
+
+    fetch(url, {credentials:'same-origin', headers:{'X-Requested-With':'XMLHttpRequest'}})
+    .then(res => res.json())
+    .then(data => {
+      const students = data.students || [];
+      const className = classSelect.options[classSelect.selectedIndex].text;
+      const subjectName = subjectId ? subjectSelect.options[subjectSelect.selectedIndex].text : '';
+      document.getElementById('listTitle').innerText = subjectId ?
+        `Class List - ${className} | Subject: ${subjectName}` :
+        `Class List - ${className}`;
+
+      tbody.innerHTML = '';
+
+      if(students.length === 0){
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#888">No students found</td></tr>`;
+        toggleExportButtons(false);
+        return;
+      }
+
+      students.forEach((s, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${s.name}</td>
+          <td>${s.admission_number || ''}</td>
+          <td>${s.gender || ''}</td>`;
+        tbody.appendChild(tr);
+      });
+      toggleExportButtons(true);
+    }).catch(err=>{
+      console.error(err);
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#888">Error loading students</td></tr>`;
+      document.getElementById('listTitle').innerText = '';
+      toggleExportButtons(false);
+    });
+}
+// Server-side export handlers: open corresponding endpoint in new tab
+function openExport(url, useDirectPrint){
+  const classId = classSelect.value;
+  if(!classId){ alert('Select a class first'); return; }
+  const streamId = streamSelect.value;
+  const subjectId = subjectSelect.value;
+  let full = `${url}?class_id=${classId}`;
+  if(streamId) full += `&stream_id=${streamId}`;
+  if(subjectId) full += `&subject_id=${subjectId}`;
+  if (useDirectPrint && window.SkulPlusPrint && window.SkulPlusPrint.printUrl) {
+    window.SkulPlusPrint.printUrl(full);
+  } else {
+    window.open(full, '_blank');
+  }
+}
+
+btnExcel.addEventListener('click', ()=> openExport(`{% url 'export_class_list_excel' %}`));
+btnPdf.addEventListener('click', ()=> openExport(`{% url 'export_class_list_pdf' %}`));
+btnPrint.addEventListener('click', ()=> openExport(`{% url 'print_class_list' %}`, true));
+</script>
+
+{% endblock %}

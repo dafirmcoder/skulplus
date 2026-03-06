@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<h1>School Details</h1>
+{% if school %}
+  <div style="display:flex;gap:20px;align-items:flex-start">
+    <div style="flex:1">
+        <form method="post" enctype="multipart/form-data" id="schoolDetailsForm">
+        {% csrf_token %}
+        <div style="margin-bottom:8px">
+          <label><strong>School Name</strong></label>
+          {{ form.name }}
+        </div>
+        <div style="margin-bottom:8px">
+          <label><strong>Motto</strong></label>
+          {{ form.motto }}
+        </div>
+        <div style="margin-bottom:8px">
+          <label><strong>School Category</strong></label>
+          {{ form.school_category }}
+        </div>
+        <div style="margin-bottom:8px">
+          <label><strong>Address</strong></label>
+          {{ form.address }}
+        </div>
+        <div style="margin-bottom:8px">
+          <label><strong>Phone</strong></label>
+          {{ form.phone }}
+        </div>
+        <div style="margin-bottom:8px">
+          <label><strong>Email</strong></label>
+          {{ form.email }}
+        </div>
+
+        <div style="margin-bottom:8px">
+          <label><strong>Logo</strong></label><br>
+          {% if school.logo %}
+            <img id="logoPreview" src="{{ school.logo.url }}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
+          {% else %}
+            <img id="logoPreview" src="{% static 'images/skulplus_logo.png' %}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
+          {% endif %}
+          <button type="button" class="btn" onclick="openImageModal('logo')">Change Logo</button>
+          {{ form.logo }}
+        </div>
+
+        <div style="margin-bottom:8px">
+          <label><strong>School Stamp (for documents)</strong></label><br>
+          {% if school.stamp %}
+            <img id="stampPreview" src="{{ school.stamp.url }}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
+          {% else %}
+            <img id="stampPreview" src="{% static 'images/skulplus_logo.png' %}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
+          {% endif %}
+          <button type="button" class="btn" onclick="openImageModal('stamp')">Change Stamp</button>
+          {{ form.stamp }}
+        </div>
+
+        <div style="margin-bottom:8px">
+          <label><strong>Headteacher Signature</strong></label><br>
+          {% if school.head_signature %}
+            <img id="signaturePreview" src="{{ school.head_signature.url }}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
+          {% else %}
+            <img id="signaturePreview" src="{% static 'images/skulplus_logo.png' %}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
+          {% endif %}
+          <button type="button" class="btn" onclick="openImageModal('signature')">Change Signature</button>
+          {{ form.head_signature }}
+        </div>
+
+        <!-- Hidden inputs to receive base64 cropped images from modal -->
+        <input type="hidden" name="logo_data" id="logo_data">
+        <input type="hidden" name="stamp_data" id="stamp_data">
+        <input type="hidden" name="signature_data" id="signature_data">
+
+        <div>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+    <div style="width:260px">
+      <h3>Current Details</h3>
+      <p><strong>Name:</strong> {{ school.name }}</p>
+      <p><strong>Motto:</strong> {{ school.motto }}</p>
+      <p><strong>Type:</strong> {{ school.school_type }}</p>
+      <p><strong>Category:</strong> {{ school.get_school_category_display }}</p>
+      <p><strong>Address:</strong> {{ school.address }}</p>
+      <p><strong>Phone:</strong> {{ school.phone }}</p>
+      <p><strong>Email:</strong> {{ school.email }}</p>
+    </div>
+  </div>
+{% else %}
+  <p>No school assigned to your account.</p>
+{% endif %}
+{% endblock %}
+
+<!-- IMAGE CROP MODAL -->
+<div id="imageModal" class="modal-bg" style="display:none;align-items:center;justify-content:center">
+  <div class="modal" style="max-width:800px">
+    <h3 id="modalTitle">Upload Image</h3>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1">
+        <input type="file" id="imageFileInput" accept="image/*">
+        <div style="margin-top:8px">
+          <canvas id="imageCanvas" style="max-width:100%;border:1px solid #ddd"></canvas>
+        </div>
+      </div>
+      <div style="width:220px">
+        <p>Instructions:</p>
+        <p>1. Choose an image file.</p>
+        <p>2. Drag on the canvas to select a crop rectangle.</p>
+        <p>3. Click <strong>Crop & Save</strong> to apply.</p>
+        <div style="margin-top:12px">
+          <button class="btn btn-primary" id="cropSaveBtn">Crop & Save</button>
+          <button class="btn" id="cancelCropBtn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Basic canvas cropping UI
+let currentField = null;
+const imageModal = document.getElementById('imageModal');
+const fileInput = document.getElementById('imageFileInput');
+const canvas = document.getElementById('imageCanvas');
+const ctx = canvas.getContext('2d');
+let img = new Image();
+let startX=0,startY=0,selW=0,selH=0,dragging=false,scale=1;
+
+function openImageModal(field){
+  currentField = field; document.getElementById('modalTitle').innerText = 'Upload '+field;
+  imageModal.style.display = 'flex'; fileInput.value = '';
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+document.getElementById('cancelCropBtn').addEventListener('click', ()=>{ imageModal.style.display='none'; });
+
+fileInput.addEventListener('change', (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){ img.onload = function(){
+    // fit canvas to image at max width 700
+    const maxW = 700; const ratio = img.width / img.height;
+    canvas.width = Math.min(maxW, img.width);
+    canvas.height = Math.round(canvas.width / ratio);
+    scale = img.width / canvas.width;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  }; img.src = ev.target.result;
+  }; reader.readAsDataURL(f);
+});
+
+canvas.addEventListener('mousedown', (e)=>{ const r=canvas.getBoundingClientRect(); startX = e.clientX - r.left; startY = e.clientY - r.top; dragging=true; });
+canvas.addEventListener('mousemove', (e)=>{ if(!dragging) return; const r=canvas.getBoundingClientRect(); const x = e.clientX - r.left; const y = e.clientY - r.top; selW = x - startX; selH = y - startY; // redraw
+  ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0,canvas.width,canvas.height); ctx.strokeStyle='red'; ctx.lineWidth=2; ctx.strokeRect(startX, startY, selW, selH);
+});
+canvas.addEventListener('mouseup', ()=>{ dragging=false; });
+
+document.getElementById('cropSaveBtn').addEventListener('click', ()=>{
+  // compute crop on original image scale
+  if(!img.src) return alert('Load an image first');
+  const sx = Math.round(Math.min(startX, startX+selW) * scale);
+  const sy = Math.round(Math.min(startY, startY+selH) * scale);
+  const sw = Math.round(Math.abs(selW) * scale);
+  const sh = Math.round(Math.abs(selH) * scale);
+  // create offscreen canvas to draw cropped area
+  const off = document.createElement('canvas'); off.width = sw || Math.round(canvas.width*scale); off.height = sh || Math.round(canvas.height*scale);
+  const offCtx = off.getContext('2d');
+  offCtx.drawImage(img, sx, sy, sw || img.width, sh || img.height, 0, 0, off.width, off.height);
+  const dataUrl = off.toDataURL('image/png');
+  // set hidden input based on currentField
+  if(currentField === 'logo'){
+    document.getElementById('logo_data').value = dataUrl;
+    document.getElementById('logoPreview').src = dataUrl;
+  } else if(currentField === 'stamp'){
+    document.getElementById('stamp_data').value = dataUrl;
+    document.getElementById('stampPreview').src = dataUrl;
+  } else if(currentField === 'signature'){
+    document.getElementById('signature_data').value = dataUrl;
+    document.getElementById('signaturePreview').src = dataUrl;
+  }
+  imageModal.style.display='none';
+});
+
+// On submit, if base64 inputs are set we leave them; otherwise form file inputs (fallback) will be used
+document.getElementById('schoolDetailsForm').addEventListener('submit', ()=>{
+  // nothing special needed; server handles base64 or files
+});
+</script>

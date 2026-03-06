@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Class List</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #fff; margin: 0; padding: 0; }
+    @page { size: A4 portrait; margin: 8mm 12mm 12mm 12mm; }
+    .print-card { max-width: 800px; margin: 0 auto; padding: 0; background: #fff; }
+    .header { display: grid; grid-template-columns: 80px 1fr 80px; align-items: center; text-align: center; margin-bottom: 6px; margin-top: 0; }
+    .header img { width: 70px; height: 70px; object-fit: contain; }
+    .school-name { font-weight: 800; letter-spacing: 0.5px; font-size: 16px; }
+    .tagline { font-size: 12px; margin-top: 2px; }
+    .phone { color: #1f7a1f; font-weight: 700; margin-top: 2px; font-size: 11px; }
+    .class-line { margin: 6px 0 4px; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; border: 2px solid #000; }
+    th, td { border: 1px solid #000; padding: 6px 8px; font-size: 13px; text-align: left; }
+    th { background: #e6f4f1; text-align: center; font-weight: bold; }
+    .summary-row td { font-weight: 700; background: #f2f2f2; }
+    .footer { display: flex; justify-content: space-between; font-size: 11px; margin-top: 8px; }
+    @media print {
+      * { margin: 0; padding: 0; }
+      body { margin: 0; padding: 0; }
+      .print-card { margin: 0; padding: 0; }
+      @page { size: A4 portrait; margin: 8mm 12mm 12mm 12mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-card">
+    <div class="header">
+      {% if school.logo %}
+        <img src="{{ school.logo.url }}" alt="{{ school.name }}">
+      {% else %}
+        <div></div>
+      {% endif %}
+      <div>
+        <div class="school-name">{{ school.name|upper }}</div>
+        <div class="tagline">WE PLAY, LEARN, GROW</div>
+        {% if school.phone %}<div class="phone">{{ school.phone }}</div>{% endif %}
+      </div>
+      <div></div>
+    </div>
+
+    <div class="class-line">Class List: <span>{{ class_name }}</span></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>SN</th>
+          <th>Adm No</th>
+          <th>Name</th>
+          <th>MARKS</th>
+          <th>OUT OF</th>
+          <th>% (/100)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in students %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ s.admission_number }}</td>
+          <td>{{ s.first_name }} {{ s.last_name }}</td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" style="text-align:center;color:#888">No students found</td></tr>
+        {% endfor %}
+        <tr class="summary-row">
+          <td></td>
+          <td>Boys:</td>
+          <td>{{ boys_count }}</td>
+          <td></td><td></td><td></td>
+        </tr>
+        <tr class="summary-row">
+          <td></td>
+          <td>Girls:</td>
+          <td>{{ girls_count }}</td>
+          <td></td><td></td><td></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="footer">
+      <div>Generated on {{ generated_on }}</div>
+      <div class="page-number"></div>
+      <div>Skul Plus+</div>
+    </div>
+  </div>
+
+  <script>window.onload = function(){ window.print(); };</script>
+</body>
+</html>

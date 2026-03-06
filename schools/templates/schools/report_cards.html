@@ -1,0 +1,469 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.rc-header { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+.rc-header h1 { margin:0; color:#0f3057; font-size:24px; }
+.rc-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.rc-btn { border:none; border-radius:8px; padding:10px 14px; font-weight:600; cursor:pointer; }
+.rc-btn-primary { background:#0f3057; color:#fff; }
+.rc-btn-print { background:#10b981; color:#fff; }
+.rc-btn:disabled { opacity:.6; cursor:not-allowed; }
+
+.rc-filter-card { background:#fff; border-radius:12px; padding:16px; box-shadow:0 8px 24px rgba(0,0,0,.06); margin-bottom:16px; }
+.rc-filter-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+.rc-filter-grid label { display:block; font-size:12px; text-transform:uppercase; color:#64748b; margin-bottom:4px; }
+.rc-filter-grid select { width:100%; border:1px solid #e2e8f0; border-radius:8px; padding:9px 10px; background:#fff; }
+
+.rc-report-area { display:grid; gap:16px; }
+.report-card { background:#fff; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.05); padding:16px; overflow-x:auto; }
+.school-header { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; margin-bottom:10px; border-bottom:2px solid #0f3057; padding-bottom:10px; }
+.school-logo { width:64px; height:64px; object-fit:contain; border:1px solid #dbe2ea; border-radius:8px; background:#fff; padding:5px; }
+.school-text { flex:1; text-align:center; }
+.school-text h2 { margin:0; color:#0f3057; font-size:20px; }
+.school-text p { margin:2px 0; color:#475569; font-size:12px; }
+.student-photo { width:78px; height:92px; object-fit:cover; border:1px solid #cbd5e1; border-radius:6px; background:#fff; }
+.student-photo-placeholder { width:78px; height:92px; border:1px dashed #cbd5e1; border-radius:6px; font-size:9px; color:#64748b; display:flex; align-items:center; justify-content:center; text-align:center; padding:4px; box-sizing:border-box; }
+
+.student-meta { display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:6px; margin:8px 0 6px; font-size:12px; }
+.student-meta div { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:5px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.rc-table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:9px; }
+.rc-table th,.rc-table td { border:1px solid #dbe2ea; padding:2px 1px; text-align:center; white-space:normal; word-break:break-word; }
+.rc-table th { background:#0f3057; color:#fff; font-size:8px; }
+.rc-table .subject-col { text-align:left; min-width:100px; width:100px; font-weight:600; }
+.rc-table .teacher-col { min-width:40px; width:40px; }
+.rc-table .comment-col { text-align:left; min-width:120px; width:120px; }
+.lvl-badge { display:inline; border-radius:0; padding:0; font-size:10px; font-weight:700; background:transparent !important; }
+.lvl-ee1 { color:#15803d; }
+.lvl-ee2 { color:#16a34a; }
+.lvl-me1 { color:#1d4ed8; }
+.lvl-me2 { color:#2563eb; }
+.lvl-ae1 { color:#ca8a04; }
+.lvl-ae2 { color:#d97706; }
+.lvl-be1 { color:#dc2626; }
+.lvl-be2 { color:#b91c1c; }
+.lvl-default { color:#475569; }
+.exam-total-row td { background:#f1f5f9; font-weight:700; }
+
+.positions-wrap { display:grid; grid-template-columns: minmax(260px, 1fr) minmax(220px, 1fr); gap:12px; margin-top:10px; }
+.mini-table { width:100%; border-collapse:collapse; font-size:11px; }
+.mini-table th,.mini-table td { border:1px solid #dbe2ea; padding:4px 6px; text-align:center; }
+.mini-table th { background:#e2e8f0; color:#1e293b; }
+.summary-box { border:1px solid #dbe2ea; border-radius:8px; padding:8px; background:#f8fafc; }
+.summary-box h4 { margin:0 0 6px; font-size:12px; color:#0f3057; }
+.summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px; }
+.pathway-box { margin-top:8px; border:1px solid #dbe2ea; border-radius:8px; padding:8px; background:#ffffff; }
+.pathway-title { margin:0 0 6px; font-size:12px; color:#0f3057; font-weight:700; }
+.pathway-priority { font-size:12px; margin-bottom:6px; }
+.pathway-table { width:100%; border-collapse:collapse; font-size:11px; }
+.pathway-table td { border:1px solid #e2e8f0; padding:4px 6px; }
+.pathway-note { margin-top:6px; font-size:11px; color:#b45309; }
+.pathway-bad { color:#b91c1c; font-weight:700; }
+.pathway-good { color:#166534; font-weight:700; }
+
+.trend-wrap { margin-top:12px; border:1px solid #dbe2ea; border-radius:10px; padding:10px; background:#fff; }
+.trend-wrap h4 { margin:0 0 8px; color:#0f3057; font-size:13px; }
+.trend-svg { width:100%; min-width:520px; height:170px; display:block; }
+.trend-stack { display:grid; gap:12px; }
+.trend-card { border:1px solid #e2e8f0; border-radius:8px; padding:8px; background:#fff; }
+.trend-card h5 { margin:0 0 6px; color:#0f3057; font-size:12px; }
+.term-dates { margin-top:10px; font-size:12px; color:#334155; }
+.remarks { margin-top:8px; font-size:12px; }
+.remarks-line { border-bottom:1px solid #94a3b8; min-height:18px; margin-top:6px; }
+.remarks-approval-row { margin-top:8px; display:grid; grid-template-columns:1fr 180px; gap:10px; align-items:end; }
+.approval-wrap { display:flex; justify-content:flex-end; align-items:flex-end; min-height:60px; }
+.approval-stack { display:flex; flex-direction:column; gap:8px; align-items:flex-end; justify-content:flex-end; }
+.approval-item { text-align:center; min-width:140px; }
+.approval-image { max-width:110px; max-height:50px; object-fit:contain; display:block; margin:0 0 2px auto; }
+.approval-image-stamp { max-width:150px; max-height:80px; }
+.approval-label { font-size:10px; color:#334155; }
+.timestamp-footer { margin-top:8px; border-top:1px solid #cbd5e1; padding-top:4px; font-size:10px; color:#64748b; text-align:right; }
+
+.empty-state { text-align:center; color:#64748b; padding:22px; background:#fff; border-radius:12px; border:1px dashed #cbd5e1; }
+
+@media print {
+  @page { size:A4 portrait; margin:0; }
+  * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  html, body { margin:0 !important; padding:0 !important; }
+  .rc-header, .rc-filter-card, footer { display:none !important; }
+  .sidebar, #sidebar, .topbar, .sidebar-logout, .toggle-btn, .sp-notify-wrap { display:none !important; }
+  .wrapper { display:block !important; }
+  .main { margin:0 !important; padding:0 !important; width:100% !important; }
+  .rc-report-area { gap:0 !important; }
+  .report-card {
+    box-shadow:none;
+    border:1px solid #cbd5e1;
+    margin:0;
+    padding:6mm 6mm 5mm;
+    box-sizing:border-box;
+    width:100%;
+    height:297mm;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    page-break-after:auto;
+    break-after:auto;
+    page-break-inside:avoid;
+    break-inside:avoid-page;
+  }
+  .report-card + .report-card {
+    page-break-before:always;
+    break-before:page;
+  }
+  .rc-table { font-size:7px; width:100%; table-layout:fixed; }
+  .rc-table th,.rc-table td { padding:2px 1px; }
+  .positions-wrap { margin-top:6px; gap:6px; }
+  .mini-table { font-size:9px; }
+  .summary-grid, .term-dates, .remarks { font-size:9px; }
+  .trend-wrap { display:block !important; margin-top:6px; padding:6px; }
+  .trend-wrap h4 { font-size:11px; margin:0 0 4px; }
+  .trend-card { padding:5px; }
+  .trend-card h5 { font-size:10px; margin:0 0 3px; }
+  .trend-svg { min-width:0 !important; height:95px; }
+  .remarks-line { min-height:12px; margin-top:3px; }
+  .school-header { gap:8px; margin-bottom:4px; padding-bottom:4px; }
+  .student-photo, .student-photo-placeholder { width:52px; height:62px; }
+  .school-logo { width:46px; height:46px; padding:3px; }
+  .school-text h2 { font-size:14px; line-height:1.1; }
+  .school-text p { font-size:9px; margin:1px 0; line-height:1.2; }
+  .student-meta { margin:3px 0; gap:3px; font-size:9px; }
+  .student-meta { grid-template-columns:repeat(6, minmax(0, 1fr)); }
+  .student-meta div { padding:3px 5px; }
+  .approval-image { max-width:90px; max-height:38px; }
+  .approval-image-stamp { max-width:120px; max-height:62px; }
+  .approval-item { min-width:110px; }
+  .remarks-approval-row { grid-template-columns:1fr 140px; gap:8px; }
+  .pathway-box { margin-top:6px; padding:6px; }
+  .pathway-table { font-size:10px; }
+  .pathway-table td { padding:3px 4px; }
+  .pathway-note { font-size:9px; margin-top:4px; }
+  .timestamp-footer { margin-top:auto; font-size:9px; padding-top:3px; }
+}
+</style>
+
+<div class="rc-header">
+  <h1>Report Cards</h1>
+  <div class="rc-actions">
+    <button id="generateBtn" class="rc-btn rc-btn-primary">Generate Report Cards</button>
+    <button id="printBtn" class="rc-btn rc-btn-print" disabled>Print</button>
+  </div>
+</div>
+
+<div class="rc-filter-card">
+  <div class="rc-filter-grid">
+    <div>
+      <label>Class</label>
+      <select id="classSelect">
+        <option value="">Select class</option>
+        {% for c in classes %}
+          <option value="{{ c.id }}">{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Term</label>
+      <select id="termSelect">
+        <option value="">Select term</option>
+        {% for t in terms %}
+          <option value="{{ t }}">{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Exam</label>
+      <select id="examSelect">
+        <option value="">Select exam</option>
+        {% for ex in exams %}
+          <option value="{{ ex.id }}" data-term="{{ ex.term }}">{{ ex.title }} - {{ ex.term }} {{ ex.year }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+</div>
+
+<div id="reportArea" class="rc-report-area">
+  <div class="empty-state">Select class, term, and exam, then generate report cards.</div>
+</div>
+
+<script>
+const classSelect = document.getElementById('classSelect');
+const termSelect = document.getElementById('termSelect');
+const examSelect = document.getElementById('examSelect');
+const generateBtn = document.getElementById('generateBtn');
+const printBtn = document.getElementById('printBtn');
+const reportArea = document.getElementById('reportArea');
+let latestPayload = null;
+
+function levelClass(level){
+  const v = String(level || '').toUpperCase();
+  if (v === 'EE2') return 'lvl-ee2';
+  if (v.startsWith('EE')) return 'lvl-ee1';
+  if (v === 'ME2') return 'lvl-me2';
+  if (v.startsWith('ME')) return 'lvl-me1';
+  if (v === 'AE2') return 'lvl-ae2';
+  if (v.startsWith('AE')) return 'lvl-ae1';
+  if (v === 'BE2') return 'lvl-be2';
+  if (v.startsWith('BE')) return 'lvl-be1';
+  return 'lvl-default';
+}
+
+function badge(level){
+  if (!level || level === '-') return '-';
+  return `<span class="lvl-badge ${levelClass(level)}">${level}</span>`;
+}
+
+function fmtDate(isoDate){
+  if (!isoDate) return '-';
+  try {
+    const d = new Date(isoDate);
+    return d.toLocaleDateString();
+  } catch(e){
+    return isoDate;
+  }
+}
+
+function buildOverallTrendSvg(points){
+  if (!points || points.length === 0) {
+    return '<div style="font-size:12px;color:#64748b">No trend history available.</div>';
+  }
+  const width = 880;
+  const height = 170;
+  const left = 42, right = 16, top = 14, bottom = 30;
+  const w = width - left - right;
+  const h = height - top - bottom;
+  const vals = points.map(p => Number(p.value || 0));
+  const minVal = Math.min(...vals, 0);
+  const maxVal = Math.max(...vals, 100);
+  const range = Math.max(maxVal - minVal, 1);
+  const stepX = points.length > 1 ? (w / (points.length - 1)) : 0;
+  const toX = (i) => left + (i * stepX);
+  const toY = (v) => top + (h - ((v - minVal) / range) * h);
+
+  const poly = points.map((p, i) => `${toX(i)},${toY(Number(p.value || 0))}`).join(' ');
+
+  let dots = '';
+  let labels = '';
+  points.forEach((p, i) => {
+    const x = toX(i);
+    const y = toY(Number(p.value || 0));
+    dots += `<circle cx="${x}" cy="${y}" r="3.5" fill="#1d4ed8"></circle>`;
+    labels += `<text x="${x}" y="${height - 8}" font-size="9" text-anchor="middle" fill="#334155">${String(p.label || '').slice(0,18)}</text>`;
+    labels += `<text x="${x}" y="${y - 7}" font-size="9" text-anchor="middle" fill="#0f3057">${p.value}</text>`;
+  });
+
+  let yGrid = '';
+  const gridCount = 4;
+  for (let i=0;i<=gridCount;i++){
+    const gv = minVal + (range * (i / gridCount));
+    const gy = toY(gv);
+    yGrid += `<line x1="${left}" y1="${gy}" x2="${width-right}" y2="${gy}" stroke="#e2e8f0" stroke-width="1"></line>`;
+    yGrid += `<text x="${left-6}" y="${gy+3}" font-size="9" text-anchor="end" fill="#64748b">${gv.toFixed(0)}</text>`;
+  }
+
+  return `
+  <svg class="trend-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">
+    ${yGrid}
+    <line x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}" stroke="#94a3b8" />
+    <line x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}" stroke="#94a3b8" />
+    <polyline fill="none" stroke="#1d4ed8" stroke-width="2.2" points="${poly}"></polyline>
+    ${dots}
+    ${labels}
+  </svg>`;
+}
+
+function renderCard(school, card, meta = {}){
+  const exams = card.exams || [];
+  const rows = card.rows || [];
+  let headerTop = `<th rowspan="2" class="subject-col">SUBJECT</th><th rowspan="2" class="teacher-col">TEACHER</th>`;
+  let headerBottom = '';
+  exams.forEach(ex => {
+    headerTop += `<th>${ex.title}</th><th>LVL</th>`;
+    headerBottom += '';
+  });
+  headerTop += `<th rowspan="2">TERM %</th><th rowspan="2">LVL</th><th rowspan="2" class="comment-col">TEACHER COMMENT</th>`;
+
+  let body = '';
+  rows.forEach(r => {
+    body += `<tr><td class="subject-col">${r.subject}</td><td>${r.teacher}</td>`;
+    (r.exam_cells || []).forEach(c => {
+      body += `<td>${c.score}</td><td>${badge(c.level)}</td>`;
+    });
+    body += `<td>${r.term_pct}</td><td>${badge(r.term_level)}</td><td class="comment-col">${r.teacher_comment || '-'}</td></tr>`;
+  });
+
+  let totals = `<tr class="exam-total-row"><td class="subject-col">EXAM TOTALS</td><td>-</td>`;
+  (card.exam_totals || []).forEach(v => {
+    totals += `<td>${v}</td><td>-</td>`;
+  });
+  totals += `<td>-</td><td>-</td><td class="comment-col">-</td></tr>`;
+
+  let posRows = '';
+  (card.positions?.per_exam || []).forEach(p => {
+    posRows += `<tr><td>${p.exam}</td><td>${p.stream_pos}</td><td>${p.class_pos}</td></tr>`;
+  });
+
+  const generatedAt = meta.generated_at || '-';
+  return `
+  <div class="report-card">
+    <div class="school-header">
+      ${school.logo_url ? `<img class="school-logo" src="${school.logo_url}" alt="${school.name}">` : ''}
+      <div class="school-text">
+        <h2>${school.name || ''}</h2>
+        ${school.motto ? `<p>${school.motto}</p>` : ''}
+        ${school.address ? `<p>${school.address}</p>` : ''}
+        ${(school.phone || school.email) ? `<p>${school.phone ? `Tel: ${school.phone}` : ''}${(school.phone && school.email) ? ' | ' : ''}${school.email ? `Email: ${school.email}` : ''}</p>` : ''}
+      </div>
+      ${card.student.photo_url
+        ? `<img class="student-photo" src="${card.student.photo_url}" alt="${card.student.name || 'Student'}">`
+        : `<div class="student-photo-placeholder">No Photo</div>`
+      }
+    </div>
+
+    <div class="student-meta">
+      <div><strong>ADM NO:</strong> ${card.student.adm || ''}</div>
+      <div><strong>NAME:</strong> ${card.student.name || ''}</div>
+      <div><strong>CLASS:</strong> ${card.student.class || ''}</div>
+      <div><strong>STREAM:</strong> ${card.student.stream || ''}</div>
+      <div><strong>TERM:</strong> ${card.student.term || ''}</div>
+      <div><strong>EXAM:</strong> ${card.student.exam || ''}</div>
+    </div>
+
+    <table class="rc-table">
+      <thead>
+        <tr>${headerTop}</tr>
+      </thead>
+      <tbody>
+        ${body}
+        ${totals}
+      </tbody>
+    </table>
+
+    <div class="positions-wrap">
+      <div>
+        <table class="mini-table">
+          <thead><tr><th>Exam</th><th>Stream Pos</th><th>Class Pos</th></tr></thead>
+          <tbody>${posRows}</tbody>
+        </table>
+        <div class="term-dates">
+          <strong>Closing Date:</strong> ${fmtDate(card.term_dates?.closing_date)}
+          &nbsp;&nbsp;|&nbsp;&nbsp;
+          <strong>Next Opening Date:</strong> ${fmtDate(card.term_dates?.opening_date)}
+        </div>
+      </div>
+      <div class="summary-box">
+        <h4>TERM SUMMARY</h4>
+        <div class="summary-grid">
+          <div><strong>Overall Total</strong></div><div>${card.summary?.overall_total ?? '-'}</div>
+          <div><strong>Average %</strong></div><div>${card.summary?.average_pct ?? '-'}</div>
+          <div><strong>Overall Level</strong></div><div>${badge(card.summary?.overall_level || '-')}</div>
+          <div><strong>Term Stream Pos</strong></div><div>${card.positions?.term_stream || '-'}</div>
+          <div><strong>Term Class Pos</strong></div><div>${card.positions?.term_class || '-'}</div>
+        </div>
+        <div class="pathway-box">
+          <div class="pathway-title">Pathway Prediction</div>
+          <div class="pathway-priority"><strong>Priority:</strong> ${card.pathway?.priority || '-'}</div>
+          <table class="pathway-table">
+            <tbody>
+              ${(card.pathway?.scores || []).map(s => `<tr><td>${s.label}</td><td style="text-align:right"><strong>${s.points}</strong></td><td style="text-align:center">${s.eligible ? '<span class="pathway-good">Eligible</span>' : '<span class="pathway-bad">Not Eligible</span>'}</td></tr>`).join('')}
+            </tbody>
+          </table>
+          <div class="pathway-note">Rule: STEM requires Mathematics at or above ME/ME2. Social Sciences requires English or Kiswahili at or above ME/ME2.</div>
+          ${(Number(card.pathway?.uncategorized_subjects || 0) > 0) ? `<div class="pathway-note">Some subjects are uncategorized (${card.pathway.uncategorized_subjects}). Set category in School Settings > Subjects for best pathway accuracy.</div>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="trend-wrap">
+      <h4>Student Progress Trend History</h4>
+      <div class="trend-stack">
+        <div class="trend-card">
+          <h5>Overall Performance Trend</h5>
+          ${buildOverallTrendSvg(card.trend_points || [])}
+        </div>
+      </div>
+    </div>
+
+    <div class="remarks-approval-row">
+      <div class="remarks">
+        <div><strong>Class Teacher's Remarks:</strong></div>
+        <div class="remarks-line"></div>
+        <div><strong>Principals/ Headteachers comments :</strong></div>
+        <div class="remarks-line"></div>
+      </div>
+
+      <div class="approval-wrap">
+        <div class="approval-stack">
+          ${(school.stamp_url || school.signature_url) ? `
+            ${school.stamp_url ? `
+              <div class="approval-item">
+                <img class="approval-image approval-image-stamp" src="${school.stamp_url}" alt="School stamp">
+              </div>` : ''
+            }
+            ${school.signature_url ? `
+              <div class="approval-item">
+                <img class="approval-image" src="${school.signature_url}" alt="Head signature">
+                <div class="approval-label">Signature</div>
+              </div>` : ''
+            }
+          ` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="timestamp-footer">Generated: ${generatedAt}</div>
+  </div>`;
+}
+
+function updateExamTermSync(){
+  const selected = examSelect.options[examSelect.selectedIndex];
+  if (selected && selected.dataset.term) {
+    termSelect.value = selected.dataset.term;
+  }
+}
+
+examSelect.addEventListener('change', updateExamTermSync);
+
+generateBtn.addEventListener('click', function(){
+  const classId = classSelect.value;
+  const term = termSelect.value;
+  const examId = examSelect.value;
+  if (!classId || !term || !examId){
+    alert('Select class, term and exam.');
+    return;
+  }
+
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Generating...';
+  const params = new URLSearchParams({ class_id: classId, term: term, exam_id: examId });
+  fetch(`{% url 'report_cards_data' %}?${params.toString()}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success){
+        throw new Error(data.error || 'Unable to generate report cards');
+      }
+      latestPayload = data;
+      const school = data.school || {};
+      const cards = data.cards || [];
+      if (!cards.length){
+        reportArea.innerHTML = '<div class="empty-state">No report cards found for this selection.</div>';
+        printBtn.disabled = true;
+        return;
+      }
+      reportArea.innerHTML = cards.map(c => renderCard(school, c, data.meta || {})).join('');
+      printBtn.disabled = false;
+    })
+    .catch(err => {
+      reportArea.innerHTML = `<div class="empty-state">${err.message}</div>`;
+      printBtn.disabled = true;
+    })
+    .finally(() => {
+      generateBtn.disabled = false;
+      generateBtn.textContent = 'Generate Report Cards';
+    });
+});
+
+printBtn.addEventListener('click', function(){
+  if (!latestPayload) return;
+  window.print();
+});
+</script>
+{% endblock %}

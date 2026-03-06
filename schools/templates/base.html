@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    {% load static %}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{% block title %}SkulPlus{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'styles.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+
+    <style>
+    *{box-sizing:border-box}
+    body{font-family:Inter,Arial,Helvetica,sans-serif;margin:0;background:#f4f7fb}
+
+    .badge{padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;color:#fff;display:inline-block}
+    .badge-stem{background:#2563eb}
+    .badge-arts{background:#7c3aed}
+    .badge-social{background:#059669}
+    .badge-core{background:#9ca3af}
+    .badge-warning{background:#f59e0b}
+    .badge-ee{background:#16a34a}
+    .badge-me{background:#2563eb}
+    .badge-ae{background:#f59e0b}
+    .badge-be{background:#dc2626}
+
+    .wrapper{display:flex}
+
+    /* SIDEBAR */
+    .sidebar{
+        width:260px;
+        background:linear-gradient(180deg,#0f3057,#092eaa);
+        color:#fff;
+        min-height:100vh;
+        height:100vh;
+        position:fixed;
+        top:0;
+        left:0;
+        transition:width 0.1s;
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+    }
+
+    .sidebar.collapsed{width:0px}
+
+    .sidebar h2{
+        padding:20px;
+        text-align:center;
+        font-size:18px;
+        white-space:nowrap;
+    }
+
+    .sidebar.collapsed h2 span{display:none}
+
+    .menu{list-style:none;padding:10px 0;margin:0;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
+    .menu li.has-submenu{cursor:pointer}
+    .submenu{list-style:none;margin:6px 0 6px 34px;padding:0;display:none}
+    .menu li.active > .submenu{display:block}
+
+    .menu li a,
+    .menu li button{
+        display:flex;
+        align-items:center;
+        gap:12px;
+        padding:12px 20px;
+        color:#00ffdd;
+        background:none;
+        border:none;
+        text-decoration:none;
+        font-weight:500;
+        transition:0.2s;
+        white-space:nowrap;
+        width:100%;
+        text-align:left;
+    }
+
+    .menu li a i,
+    .menu li button i{
+        width:22px;
+        text-align:center;
+        font-size:16px;
+    }
+
+    .menu li a:hover,
+    .menu li button:hover{
+        background:rgb(255, 213, 0);
+        padding-left:26px;
+    }
+
+    .sidebar.collapsed .menu li a span{display:none}
+    .sidebar.collapsed .menu li a{justify-content:center}
+    .menu .active-link{color:#f59e0b;font-weight:600}
+    .menu li.active-section{color:#f59e0b}
+    .menu li.active-section > i,
+    .menu li.active-section > span{color:#f59e0b}
+
+    .sidebar-logout{margin-top:auto;padding:12px 16px 18px}
+
+    /* MAIN */
+    .main{
+        margin-left:260px;
+        padding:20px 30px;
+        width:100%;
+        transition:margin-left 0.3s;
+    }
+
+    .main.expanded{margin-left:75px}
+
+    /* TOP BAR */
+    .topbar{
+        display:flex;
+        align-items:center;
+        margin-bottom:15px;
+    }
+
+    .toggle-btn{
+        font-size:20px;
+        cursor:pointer;
+        margin-right:10px;
+    }
+
+    @media (max-width:800px){
+        .sidebar{left:-260px;position:fixed}
+        .sidebar.show{left:0}
+        .main{margin-left:0}
+    }
+
+    /* Global popup messages */
+    .sp-notify-wrap{
+        position:fixed;
+        top:14px;
+        right:14px;
+        z-index:99999;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        max-width:min(92vw,460px);
+        pointer-events:none;
+    }
+    .sp-notice{
+        pointer-events:auto;
+        background:#ffffff;
+        border:1px solid #e2e8f0;
+        border-left:5px solid #0f3057;
+        border-radius:10px;
+        box-shadow:0 10px 26px rgba(15,48,87,.18);
+        padding:10px 12px;
+        color:#1f2937;
+        display:flex;
+        align-items:flex-start;
+        gap:10px;
+    }
+    .sp-notice-text{flex:1;font-size:13px;line-height:1.45;white-space:pre-wrap}
+    .sp-notice-close{
+        border:none;
+        background:#f1f5f9;
+        color:#334155;
+        border-radius:6px;
+        width:24px;
+        height:24px;
+        cursor:pointer;
+        font-size:14px;
+        line-height:1;
+        font-weight:700;
+        padding:0;
+    }
+    .sp-type-success{border-left-color:#16a34a}
+    .sp-type-error,.sp-type-danger{border-left-color:#dc2626}
+    .sp-type-warning{border-left-color:#f59e0b}
+    .sp-type-info{border-left-color:#0f3057}
+    </style>
+
+    <div class="wrapper">
+
+      <!-- SIDEBAR (hidden on login/signup pages) -->
+      {% if request.path != '/login/' and request.path != '/signup/' %}
+      <div class="sidebar" id="sidebar">
+        <h2 style="display:flex;align-items:center;gap:8px;justify-content:center">
+          {% if SITE_LOGO_URL %}
+            <img src="{{ SITE_LOGO_URL }}" alt="SkulPlus" style="height:36px;border-radius:6px;background:#fff;padding:4px" />
+          {% else %}
+            <img src="{% static 'images/skulplus_logo.png' %}" alt="SkulPlus" style="height:36px;border-radius:6px;background:#fff;padding:4px" />
+          {% endif %}
+          <span>SkulPlus+</span>
+        </h2>
+        <div style="padding:10px 16px;">
+          {% if request.user.headteacher %}
+            <a href="{% url 'headteacher_dashboard' %}" style="display:block;width:100%;background:#084b6b;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;text-align:center;text-decoration:none"><i class="fas fa-house"></i>&nbsp;&nbsp;Dashboard</a>
+          {% elif request.user.teacher %}
+            <a href="{% url 'teacher_dashboard' %}" style="display:block;width:100%;background:#084b6b;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;text-align:center;text-decoration:none"><i class="fas fa-house"></i>&nbsp;&nbsp;Dashboard</a>
+          {% endif %}
+        </div>
+        <ul class="menu">
+        {% url 'admit_student' as admit_student_url %}
+        {% url 'edit_students' as edit_students_url %}
+        {% url 'class_lists' as class_lists_url %}
+        {% url 'promote_students' as promote_students_url %}
+        {% url 'school_details' as school_details_url %}
+        {% url 'manage_teachers' as manage_teachers_url %}
+        {% url 'subject_allocation' as subject_allocation_url %}
+        {% url 'classes' as classes_url %}
+        {% url 'exams' as exams_url %}
+        {% url 'grading' as grading_url %}
+        {% url 'cbc_comments_report' as cbc_comments_report_url %}
+        {% url 'term_dates' as term_dates_url %}
+        {% url 'subjects' as subjects_url %}
+        {% url 'enter_marks' as enter_marks_url %}
+        {% url 'entered_marks' as entered_marks_url %}
+        {% url 'set_exams' as set_exams_url %}
+        {% url 'merit_lists' as merit_lists_url %}
+        {% url 'subject_analysis' as subject_analysis_url %}
+        {% url 'full_class_analysis' as full_class_analysis_url %}
+        {% url 'report_cards' as report_cards_url %}
+        {% url 'send_reports' as send_reports_url %}
+        {% url 'fee_structure' as fee_structure_url %}
+        {% url 'add_payment' as add_payment_url %}
+        {% url 'balance_report' as balance_report_url %}
+        {% url 'model_reports' as model_reports_url %}
+        {% url 'staff_management' as staff_management_url %}
+        {% url 'payroll_overview' as payroll_overview_url %}
+        {% url 'expenditure' as expenditure_url %}
+        {% url 'new_user' as new_user_url %}
+        {% url 'user_updates' as user_updates_url %}
+
+    <!-- Headteacher Menu Items -->
+    {% if request.user.headteacher %}
+
+    <li class="has-submenu{% if request.path == admit_student_url or request.path == edit_students_url or request.path == class_lists_url or request.path == promote_students_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
+      <i class="fas fa-user-graduate"></i><span>Student Registration</span>
+        <ul class="submenu">
+        <li><button type="button" onclick="event.stopPropagation(); openStudentModal();" class="{% if request.path == admit_student_url %}active-link{% endif %}"><i class="fas fa-user-plus"></i> Admit New</button></li>
+        <li><a href="{{ edit_students_url }}" onclick="event.stopPropagation();" class="{% if request.path == edit_students_url %}active-link{% endif %}"><i class="fas fa-edit"></i> Edit Students</a></li>
+        <li><a href="{{ class_lists_url }}" onclick="event.stopPropagation();" class="{% if request.path == class_lists_url %}active-link{% endif %}"><i class="fas fa-list"></i> Class Lists</a></li>
+        <li><a href="{{ promote_students_url }}" onclick="event.stopPropagation();" class="{% if request.path == promote_students_url %}active-link{% endif %}"><i class="fas fa-level-up-alt"></i> Promote/Demote</a></li>
+      </ul>
+    </li>
+
+    <li class="has-submenu{% if request.path == school_details_url or request.path == manage_teachers_url or request.path == subject_allocation_url or request.path == classes_url or request.path == exams_url or request.path == grading_url or request.path == cbc_comments_report_url or request.path == term_dates_url or request.path == subjects_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
+      <i class="fas fa-school"></i><span>School Settings</span>
+      <ul class="submenu">
+        <li><a href="{{ school_details_url }}" onclick="event.stopPropagation();" class="{% if request.path == school_details_url %}active-link{% endif %}"><i class="fas fa-info-circle"></i> School Details</a></li>
+        <li><a href="{{ manage_teachers_url }}" onclick="event.stopPropagation();" class="{% if request.path == manage_teachers_url %}active-link{% endif %}"><i class="fas fa-chalkboard-teacher"></i> Teachers</a></li>
+        <li><a href="{{ subject_allocation_url }}" onclick="event.stopPropagation();" class="{% if request.path == subject_allocation_url %}active-link{% endif %}"><i class="fas fa-tasks"></i> Subject Allocation</a></li>
+        <li><a href="{{ classes_url }}" onclick="event.stopPropagation();" class="{% if request.path == classes_url %}active-link{% endif %}"><i class="fas fa-door-open"></i> Classes</a></li>
+        <li><a href="{{ exams_url }}" onclick="event.stopPropagation();" class="{% if request.path == exams_url %}active-link{% endif %}"><i class="fas fa-file-alt"></i> Exams</a></li>
+        <li><a href="{{ grading_url }}" onclick="event.stopPropagation();" class="{% if request.path == grading_url %}active-link{% endif %}"><i class="fas fa-chart-line"></i> Grading</a></li>
+        <li><a href="{{ cbc_comments_report_url }}" onclick="event.stopPropagation();" class="{% if request.path == cbc_comments_report_url %}active-link{% endif %}"><i class="fas fa-comment-dots"></i> CBC Comments</a></li>
+        <li><a href="{{ term_dates_url }}" onclick="event.stopPropagation();" class="{% if request.path == term_dates_url %}active-link{% endif %}"><i class="fas fa-calendar"></i> Term Dates</a></li>
+        <li><a href="{{ subjects_url }}" onclick="event.stopPropagation();" class="{% if request.path == subjects_url %}active-link{% endif %}"><i class="fas fa-book"></i> Subjects</a></li>
+      </ul>
+    </li>
+
+    <li class="has-submenu{% if request.path == enter_marks_url or request.path == entered_marks_url or request.path == set_exams_url or request.path == cbc_comments_report_url or request.path == merit_lists_url or request.path == subject_analysis_url or request.path == report_cards_url or request.path == send_reports_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
+      <i class="fas fa-chart-bar"></i><span>Academics</span>
+      <ul class="submenu">
+        <li class="has-submenu{% if request.path == enter_marks_url or request.path == entered_marks_url or request.path == set_exams_url or request.path == cbc_comments_report_url %} active active-section{% endif %}" onclick="toggleMenu(event, this); event.stopPropagation();">
+          <i class="fas fa-pen"></i> Marking
+          <ul class="submenu">
+            <li><a href="{{ enter_marks_url }}" onclick="event.stopPropagation();" class="{% if request.path == enter_marks_url %}active-link{% endif %}"><i class="fas fa-clipboard-check"></i> Exam Marks</a></li>
+            <li><a href="{{ entered_marks_url }}" onclick="event.stopPropagation();" class="{% if request.path == entered_marks_url %}active-link{% endif %}"><i class="fas fa-table-list"></i> Entered Marks</a></li>
+            <li><a href="{{ set_exams_url }}" onclick="event.stopPropagation();" class="{% if request.path == set_exams_url %}active-link{% endif %}"><i class="fas fa-lock"></i> Set Exams</a></li>
+            <li><a href="{{ cbc_comments_report_url }}" onclick="event.stopPropagation();" class="{% if request.path == cbc_comments_report_url %}active-link{% endif %}"><i class="fas fa-list-check"></i> Competency Rubrics</a></li>
+          </ul>
+        </li>
+        <li><a href="{{ merit_lists_url }}" onclick="event.stopPropagation();" class="{% if request.path == merit_lists_url %}active-link{% endif %}"><i class="fas fa-award"></i> Merit Lists</a></li>
+        <li><a href="{{ subject_analysis_url }}" onclick="event.stopPropagation();" class="{% if request.path == subject_analysis_url %}active-link{% endif %}"><i class="fas fa-chart-pie"></i> Subject Analysis</a></li>
+        <li><a href="{{ report_cards_url }}" onclick="event.stopPropagation();" class="{% if request.path == report_cards_url %}active-link{% endif %}"><i class="fas fa-file-pdf"></i> Report Cards</a></li>
+        <li><a href="{{ send_reports_url }}" onclick="event.stopPropagation();" class="{% if request.path == send_reports_url %}active-link{% endif %}"><i class="fas fa-paper-plane"></i> Send Reports</a></li>
+      </ul>
+    </li>
+
+    <li class="has-submenu{% if request.path == fee_structure_url or request.path == add_payment_url or request.path == balance_report_url or request.path == model_reports_url or request.path == staff_management_url or request.path == payroll_overview_url or request.path == expenditure_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
+      <i class="fas fa-coins"></i><span>Finance</span>
+      <ul class="submenu">
+        <li><a href="{{ fee_structure_url }}" onclick="event.stopPropagation();" class="{% if request.path == fee_structure_url %}active-link{% endif %}"><i class="fas fa-table"></i> Fee Structure</a></li>
+        <li><a href="{{ add_payment_url }}" onclick="event.stopPropagation();" class="{% if request.path == add_payment_url %}active-link{% endif %}"><i class="fas fa-money-bill-wave"></i> Fee Payment</a></li>
+        <li><a href="{{ balance_report_url }}" onclick="event.stopPropagation();" class="{% if request.path == balance_report_url %}active-link{% endif %}"><i class="fas fa-balance-scale"></i> Balances</a></li>
+        <li><a href="{{ staff_management_url }}" onclick="event.stopPropagation();" class="{% if request.path == staff_management_url %}active-link{% endif %}"><i class="fas fa-users"></i> Staff</a></li>
+        <li><a href="{{ payroll_overview_url }}" onclick="event.stopPropagation();" class="{% if request.path == payroll_overview_url %}active-link{% endif %}"><i class="fas fa-file-invoice-dollar"></i> Pay Roll</a></li>
+        <li><a href="{{ expenditure_url }}" onclick="event.stopPropagation();" class="{% if request.path == expenditure_url %}active-link{% endif %}"><i class="fas fa-receipt"></i> Expenditure</a></li>
+        <li><a href="{{ model_reports_url }}" onclick="event.stopPropagation();" class="{% if request.path == model_reports_url %}active-link{% endif %}"><i class="fas fa-chart-line"></i> Report</a></li>
+      </ul>
+    </li>
+    <li class="has-submenu{% if request.path == new_user_url or request.path == user_updates_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
+      <i class="fas fa-users-cog"></i><span>User Management</span>
+      <ul class="submenu">
+        <li><a href="{{ new_user_url }}" onclick="event.stopPropagation();" class="{% if request.path == new_user_url %}active-link{% endif %}"><i class="fas fa-user-plus"></i> New User</a></li>
+        <li><a href="{{ user_updates_url }}" onclick="event.stopPropagation();" class="{% if request.path == user_updates_url %}active-link{% endif %}"><i class="fas fa-user-edit"></i> User Updates</a></li>
+      </ul>
+    </li>
+
+    <!-- Teacher Menu Items -->
+    {% elif request.user.teacher %}
+
+    <li><a href="{% url 'class_lists' %}"><i class="fas fa-list"></i><span>Class Lists</span></a></li>
+    <li><a href="{{ enter_marks_url }}" class="{% if request.path == enter_marks_url %}active-link{% endif %}"><i class="fas fa-clipboard-check"></i><span>Marks Entry</span></a></li>
+    {% if request.user.teacher.is_class_teacher %}
+    <li><a href="{{ entered_marks_url }}" class="{% if request.path == entered_marks_url %}active-link{% endif %}"><i class="fas fa-table-list"></i><span>Entered Marks</span></a></li>
+    {% endif %}
+
+    <li class="has-submenu{% if request.path == merit_lists_url or request.path == subject_analysis_url or request.path == full_class_analysis_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
+      <i class="fas fa-chart-bar"></i><span>My Reports</span>
+      <ul class="submenu">
+        {% if request.user.teacher.is_class_teacher %}
+        <li><a href="{{ merit_lists_url }}" onclick="event.stopPropagation();" class="{% if request.path == merit_lists_url %}active-link{% endif %}"><i class="fas fa-award"></i> Merit Lists</a></li>
+        {% endif %}
+        <li><a href="{{ subject_analysis_url }}" onclick="event.stopPropagation();" class="{% if request.path == subject_analysis_url %}active-link{% endif %}"><i class="fas fa-chart-pie"></i> Subject Analysis</a></li>
+        {% if request.user.teacher.is_class_teacher %}
+        <li><a href="{{ full_class_analysis_url }}" onclick="event.stopPropagation();" class="{% if request.path == full_class_analysis_url %}active-link{% endif %}"><i class="fas fa-chart-column"></i> Full Class Analysis</a></li>
+        {% endif %}
+      </ul>
+    </li>
+
+    {% endif %}
+
+        </ul>
+        {% if request.user.is_authenticated %}
+        <div class="sidebar-logout">
+          <form method="post" action="{% url 'logout' %}" style="margin:0">
+            {% csrf_token %}
+            <button type="submit" style="width:100%;background:#e53e3e;color:#fff;padding:10px 12px;border-radius:6px;border:none;cursor:pointer;font-weight:600"><i class="fas fa-sign-out-alt"></i>&nbsp;<span>Logout</span></button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- MAIN -->
+      <div class="main" id="main">
+            <div class="topbar">
+              <i class="fas fa-bars toggle-btn" onclick="toggleSidebar()"></i>
+              {% block header %}{% endblock %}
+              {% if request.user.is_authenticated %}
+              <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+                <form method="post" action="{% url 'logout' %}" style="margin:0">
+                  {% csrf_token %}
+                  <button type="submit" style="background:#fff;border:1px solid #ddd;color:#333;padding:6px 10px;border-radius:6px;font-weight:600;display:inline-flex;align-items:center;gap:8px"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </form>
+              </div>
+              {% endif %}
+        </div>
+
+            {# Server-side messages are shown as popup notifications via JS below #}
+
+            {% block content %}{% endblock %}
+        <footer style="margin-top:20px;color:#666;font-size:13px">&copy; SkulPlus</footer>
+      </div>
+
+    </div>
+
+    <script>
+    function toggleSidebar(){
+      const sidebar = document.getElementById("sidebar");
+      const main = document.getElementById("main");
+
+      if(window.innerWidth <= 800){
+        sidebar.classList.toggle("show");
+      }else{
+        sidebar.classList.toggle("collapsed");
+        main.classList.toggle("expanded");
+      }
+    }
+
+    function toggleMenu(evt, item){
+      if(evt && evt.target && evt.target.closest('a,button')) return;
+      item.classList.toggle('active');
+    }
+    function toggleProfile(el){ el.classList.toggle('active'); }
+    function toggleDarkMode(){ document.body.classList.toggle('dark'); }
+    function openStudentModal(){ window.location.href = '{% url "admit_student" %}'; }
+    </script>
+
+    <script>
+    (function () {
+      function ensureWrap() {
+        let wrap = document.getElementById('sp-notify-wrap');
+        if (!wrap) {
+          wrap = document.createElement('div');
+          wrap.id = 'sp-notify-wrap';
+          wrap.className = 'sp-notify-wrap';
+          document.body.appendChild(wrap);
+        }
+        return wrap;
+      }
+
+      function normalizeType(rawType) {
+        const t = String(rawType || 'info').toLowerCase();
+        if (t.includes('success')) return 'success';
+        if (t.includes('error') || t.includes('danger')) return 'error';
+        if (t.includes('warning')) return 'warning';
+        return 'info';
+      }
+
+      function showNotice(message, options) {
+        const opts = options || {};
+        const type = normalizeType(opts.type);
+        const text = (message == null ? '' : String(message)).trim();
+        if (!text) return;
+
+        const wrap = ensureWrap();
+        const item = document.createElement('div');
+        item.className = `sp-notice sp-type-${type}`;
+        item.setAttribute('role', 'alert');
+
+        const content = document.createElement('div');
+        content.className = 'sp-notice-text';
+        content.textContent = text;
+
+        const close = document.createElement('button');
+        close.className = 'sp-notice-close';
+        close.type = 'button';
+        close.setAttribute('aria-label', 'Close notification');
+        close.textContent = 'x';
+        close.addEventListener('click', function () {
+          item.remove();
+        });
+
+        item.appendChild(content);
+        item.appendChild(close);
+        wrap.appendChild(item);
+      }
+
+      window.SkulPlusNotify = {
+        show: showNotice,
+        success: function (msg) { showNotice(msg, { type: 'success' }); },
+        error: function (msg) { showNotice(msg, { type: 'error' }); },
+        warning: function (msg) { showNotice(msg, { type: 'warning' }); },
+        info: function (msg) { showNotice(msg, { type: 'info' }); },
+      };
+
+      const nativeAlert = window.alert ? window.alert.bind(window) : null;
+      window.SkulPlusNativeAlert = nativeAlert;
+      window.alert = function (msg) {
+        showNotice(msg, { type: 'info' });
+      };
+    })();
+    </script>
+
+    {% if messages %}
+    <script>
+      (function () {
+        if (!window.SkulPlusNotify || typeof window.SkulPlusNotify.show !== 'function') return;
+        {% for message in messages %}
+          window.SkulPlusNotify.show("{{ message|escapejs }}", { type: "{{ message.tags|default:'info'|escapejs }}" });
+        {% endfor %}
+      })();
+    </script>
+    {% endif %}
+
+    <script>
+    (function () {
+      function ensureFrame() {
+        let frame = document.getElementById('global-print-frame');
+        if (!frame) {
+          frame = document.createElement('iframe');
+          frame.id = 'global-print-frame';
+          frame.style.position = 'fixed';
+          frame.style.right = '0';
+          frame.style.bottom = '0';
+          frame.style.width = '0';
+          frame.style.height = '0';
+          frame.style.border = '0';
+          frame.style.visibility = 'hidden';
+          document.body.appendChild(frame);
+        }
+        return frame;
+      }
+
+      function triggerPrint(win) {
+        const run = function () {
+          try {
+            win.focus();
+            win.print();
+          } catch (e) {
+            // Browser may block programmatic print.
+          }
+        };
+        setTimeout(run, 300);
+        setTimeout(run, 1100);
+      }
+
+      window.SkulPlusPrint = {
+        printUrl: function (url) {
+          const frame = ensureFrame();
+          frame.onload = function () {
+            if (frame.contentWindow) triggerPrint(frame.contentWindow);
+          };
+          frame.src = url;
+        },
+        printHtml: function (html) {
+          const frame = ensureFrame();
+          frame.onload = function () {
+            if (frame.contentWindow) triggerPrint(frame.contentWindow);
+          };
+          frame.srcdoc = html;
+        }
+      };
+    })();
+    </script>
+
+  </body>
+</html>
+
+
+
+

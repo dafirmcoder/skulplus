@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,0.05)}
+.table td, .table th{padding:10px;border-bottom:1px solid #eee}
+.badge{padding:4px 8px;border-radius:6px;background:#f3f4f6;color:#111}
+.btn-add{background:linear-gradient(135deg,#10b981,#22c55e);color:#fff;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+</style>
+
+<h2>CBC Comments Report</h2>
+<p>Shows missing CBC competency comments for Lower/Upper Primary.</p>
+
+<div style="margin:10px 0">
+  <form method="post" style="display:inline">
+    {% csrf_token %}
+    <button class="btn-add" type="submit">Seed Missing Comments</button>
+  </form>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <h4 style="margin:0 0 8px">General Comments (No Subject)</h4>
+  <table class="table" style="width:100%">
+    <thead><tr><th>Level</th><th>Performance</th><th>Count</th><th>Missing</th></tr></thead>
+    <tbody>
+      {% for row in summary %}
+        <tr>
+          <td>{{ row.level }}</td>
+          <td>{{ row.performance_level }}</td>
+          <td>{{ row.general_count }}</td>
+          <td>{% if row.general_missing %}<span class="badge">{{ row.general_missing }}</span>{% else %}0{% endif %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h4 style="margin:0 0 8px">Subject-specific Missing Comments</h4>
+  <table class="table" style="width:100%">
+    <thead><tr><th>Level</th><th>Subject</th><th>Performance</th><th>Missing</th></tr></thead>
+    <tbody>
+      {% for row in subject_missing %}
+        <tr>
+          <td>{{ row.level }}</td>
+          <td>{{ row.subject }}</td>
+          <td>{{ row.performance_level }}</td>
+          <td><span class="badge">{{ row.missing }}</span></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" style="text-align:center;color:#888">No missing subject comments</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

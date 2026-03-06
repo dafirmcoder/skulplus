@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .um-wrap { display:grid; gap:14px; }
+  .um-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:14px; }
+  .um-head { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .um-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+  .um-label { font-size:12px; color:#4b5563; margin-bottom:4px; display:block; }
+  .um-input, .um-select { width:100%; padding:9px; border:1px solid #d1d5db; border-radius:7px; }
+  .um-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:4px; }
+  .btn { border:none; border-radius:7px; padding:10px 13px; font-weight:600; cursor:pointer; }
+  .btn-primary { background:#0f3057; color:#fff; }
+  .btn-soft { background:#fff; color:#1f2937; border:1px solid #d1d5db; }
+  .muted { color:#6b7280; font-size:13px; }
+  .table-wrap { overflow:auto; }
+  .table { width:100%; border-collapse:collapse; min-width:720px; }
+  .table th,.table td { border-bottom:1px solid #f3f4f6; padding:9px 8px; text-align:left; font-size:13px; }
+  .table th { background:#f9fafb; color:#111827; }
+</style>
+
+<div class="um-wrap">
+  <section class="um-card">
+    <div class="um-head">
+      <h2 style="margin:0;color:#0f3057;">Add New User (From Records)</h2>
+      <div class="muted">School: {{ school.name }}</div>
+    </div>
+
+    <form id="new-user-form" class="um-grid" style="margin-top:10px;">
+      <div>
+        <label class="um-label">User Type</label>
+        <select class="um-select" name="user_type" id="user-type" required>
+          <option value="teacher" selected>Teacher</option>
+          <option value="staff">Staff</option>
+        </select>
+      </div>
+      <div id="teacher-select-wrap">
+        <label class="um-label">Teacher Record</label>
+        <select class="um-select" name="teacher_id" id="teacher-id">
+          <option value="">Select teacher</option>
+          {% for t in teacher_records %}
+            <option value="{{ t.id }}" data-first-name="{{ t.first_name }}" data-last-name="{{ t.last_name }}" data-email="{{ t.email }}">{{ t.name }}{% if t.email %} - {{ t.email }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div id="staff-select-wrap" style="display:none;">
+        <label class="um-label">Staff Record</label>
+        <select class="um-select" name="staff_id" id="staff-id">
+          <option value="">Select staff</option>
+          {% for s in staff_records %}
+            <option value="{{ s.id }}" data-full-name="{{ s.name }}" data-email="{{ s.email }}" data-phone="{{ s.phone }}">{{ s.name }}{% if s.email %} - {{ s.email }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="um-label">First Name</label>
+        <input class="um-input" name="first_name" required />
+      </div>
+      <div>
+        <label class="um-label">Last Name</label>
+        <input class="um-input" name="last_name" required />
+      </div>
+      <div>
+        <label class="um-label">Email (optional)</label>
+        <input class="um-input" type="email" name="email" placeholder="auto-generated if empty" />
+      </div>
+      <div>
+        <label class="um-label">Phone Number</label>
+        <input class="um-input" name="phone" placeholder="used for account recovery later" />
+      </div>
+      <div>
+        <label class="um-label">Password</label>
+        <input class="um-input" type="password" name="password" minlength="6" required />
+      </div>
+      <div>
+        <label class="um-label">
+          <input type="checkbox" id="is-class-teacher" name="is_class_teacher" />
+          Is Class Teacher
+        </label>
+      </div>
+      <div id="class-wrap" style="display:none;">
+        <label class="um-label">Class</label>
+        <select class="um-select" name="class_teacher_for" id="class-select">
+          <option value="">Select class</option>
+          {% for c in classes %}
+            <option value="{{ c.id }}">{{ c.name }} {% if c.section %}{{ c.section }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div id="stream-wrap" style="display:none;">
+        <label class="um-label">Stream</label>
+        <select class="um-select" name="class_teacher_stream" id="stream-select">
+          <option value="">All streams</option>
+        </select>
+      </div>
+    </form>
+    <div class="um-actions">
+      <button class="btn btn-soft" type="button" id="reset-btn">Reset</button>
+      <button class="btn btn-primary" type="button" id="create-btn">Create User</button>
+    </div>
+  </section>
+
+  <section class="um-card">
+    <h3 style="margin:0 0 8px;color:#0f3057;">Recently Added Teachers</h3>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Class Teacher</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in teachers %}
+          <tr>
+            <td>{{ t.user.get_full_name }}</td>
+            <td>{{ t.user.email }}</td>
+            <td>{% if t.is_class_teacher %}Yes{% else %}No{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="muted">No teachers yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
+
+const form = document.getElementById('new-user-form');
+const createBtn = document.getElementById('create-btn');
+const resetBtn = document.getElementById('reset-btn');
+const isClassTeacher = document.getElementById('is-class-teacher');
+const classWrap = document.getElementById('class-wrap');
+const streamWrap = document.getElementById('stream-wrap');
+const classSelect = document.getElementById('class-select');
+const streamSelect = document.getElementById('stream-select');
+const userType = document.getElementById('user-type');
+const teacherSelectWrap = document.getElementById('teacher-select-wrap');
+const teacherId = document.getElementById('teacher-id');
+const staffSelectWrap = document.getElementById('staff-select-wrap');
+const staffId = document.getElementById('staff-id');
+const firstNameInput = form.elements['first_name'];
+const lastNameInput = form.elements['last_name'];
+const emailInput = form.elements['email'];
+const phoneInput = form.elements['phone'];
+
+function splitFullName(name){
+  const v = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!v.length) return { first:'', last:'' };
+  if (v.length === 1) return { first:v[0], last:'' };
+  return { first:v[0], last:v.slice(1).join(' ') };
+}
+
+function fillFromTeacherSelection(){
+  const opt = teacherId.options[teacherId.selectedIndex];
+  if (!opt || !teacherId.value) return;
+  firstNameInput.value = opt.dataset.firstName || '';
+  lastNameInput.value = opt.dataset.lastName || '';
+  emailInput.value = opt.dataset.email || '';
+}
+
+function fillFromStaffSelection(){
+  const opt = staffId.options[staffId.selectedIndex];
+  if (!opt || !staffId.value) return;
+  const split = splitFullName(opt.dataset.fullName || '');
+  firstNameInput.value = split.first;
+  lastNameInput.value = split.last;
+  emailInput.value = opt.dataset.email || '';
+  phoneInput.value = opt.dataset.phone || '';
+}
+
+function syncUserTypeUi(){
+  const isTeacher = userType.value === 'teacher';
+  teacherSelectWrap.style.display = isTeacher ? 'block' : 'none';
+  staffSelectWrap.style.display = isTeacher ? 'none' : 'block';
+  if (isTeacher) {
+    staffId.value = '';
+  } else {
+    teacherId.value = '';
+  }
+  if (!isTeacher) {
+    isClassTeacher.checked = false;
+    classWrap.style.display = 'none';
+    streamWrap.style.display = 'none';
+    classSelect.value = '';
+    streamSelect.innerHTML = '<option value="">All streams</option>';
+  }
+}
+
+userType.addEventListener('change', syncUserTypeUi);
+teacherId.addEventListener('change', fillFromTeacherSelection);
+staffId.addEventListener('change', fillFromStaffSelection);
+
+isClassTeacher.addEventListener('change', () => {
+  if (userType.value !== 'teacher') return;
+  const on = isClassTeacher.checked;
+  classWrap.style.display = on ? 'block' : 'none';
+  streamWrap.style.display = on ? 'block' : 'none';
+  if (!on) {
+    classSelect.value = '';
+    streamSelect.innerHTML = '<option value="">All streams</option>';
+  }
+});
+
+classSelect.addEventListener('change', async () => {
+  streamSelect.innerHTML = '<option value="">All streams</option>';
+  const classId = classSelect.value;
+  if (!classId) return;
+  try {
+    const resp = await fetch(`/school/load-streams-for-class/?class_id=${classId}`, {
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const data = await resp.json();
+    (data.streams || []).forEach(s => streamSelect.add(new Option(s.name, s.id)));
+  } catch (e) {
+    console.error(e);
+  }
+});
+
+resetBtn.addEventListener('click', () => {
+  form.reset();
+  classWrap.style.display = 'none';
+  streamWrap.style.display = 'none';
+  teacherSelectWrap.style.display = 'block';
+  staffSelectWrap.style.display = 'none';
+  teacherId.value = '';
+  staffId.value = '';
+  streamSelect.innerHTML = '<option value="">All streams</option>';
+});
+
+createBtn.addEventListener('click', async () => {
+  const payload = Object.fromEntries(new FormData(form));
+  if (payload.user_type === 'teacher' && !payload.teacher_id) {
+    alert('Select a teacher record.');
+    return;
+  }
+  if (payload.user_type === 'staff' && !payload.staff_id) {
+    alert('Select a staff record.');
+    return;
+  }
+  if (!payload.first_name || !payload.last_name || !payload.password) {
+    alert('First name, last name and password are required.');
+    return;
+  }
+  payload.is_class_teacher = payload.user_type === 'teacher' ? !!payload.is_class_teacher : false;
+  try {
+    const resp = await fetch(window.location.pathname, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to create user.');
+    alert(`User created.\nLogin: ${data.user.email}\nPassword: (the one entered).`);
+    window.location.reload();
+  } catch (e) {
+    alert(e.message || 'Network error.');
+  }
+});
+
+syncUserTypeUi();
+</script>
+{% endblock %}

@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<!-- CSRF token for JS fetch POST requests -->
+<form id="csrfTokenForm" style="display:none">{% csrf_token %}</form>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+body{font-family:Poppins, sans-serif;background:#f4f7fb}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,0.05)}
+.filters{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:15px}
+.filters select,.filters input{padding:8px 10px;border-radius:6px;border:1px solid #ccc}
+button{padding:8px 14px;border:none;border-radius:6px;font-weight:600;cursor:pointer}
+.btn-load{background:#0f3057;color:#fff}
+.btn-save{background:#16a34a;color:#fff}
+.btn-publish{background:#f59e0b;color:#fff;display:none}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}
+th{background:#f9fafb}
+input.score{width:80px;padding:5px;text-align:center}
+.locked input{background:#eee;pointer-events:none}
+.status-badge{padding:4px 10px;border-radius:20px;font-size:12px;margin-left:10px}
+.draft{background:#e0f2fe;color:#0369a1}
+.published{background:#fef3c7;color:#92400e}
+</style>
+
+<div class="card">
+  <h2>Enter Marks <span id="statusBadge" class="status-badge draft">Draft</span></h2>
+
+  <div class="filters">
+    <select id="term">
+      {% for t in terms %}<option value="{{ t }}" {% if selected_term == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select>
+
+    <select id="exam">
+      {% for e in exams %}<option value="{{ e.id }}" {% if selected_exam_id == e.id|stringformat:'s' %}selected{% endif %}>{{ e.title }}</option>{% endfor %}
+    </select>
+
+    <select id="class">
+      {% for c in classes %}<option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+
+    <select id="stream" disabled>
+      <option value="">All Streams</option>
+    </select>
+
+    <select id="subject">
+      {% for s in subjects %}
+        <option value="{{ s.id }}" {% if selected_subject_id == s.id|stringformat:'s' %}selected{% endif %}>
+          {% if allow_pathways and s.education_level and s.education_level.name == 'Senior' %}
+            {{ s.name }} [{{ s.pathway.code|default:"CORE" }}]
+          {% else %}
+            {{ s.name }}
+          {% endif %}
+        </option>
+      {% endfor %}
+    </select>
+
+    <input type="number" id="outOf" value="{{ selected_out_of|default:'100' }}" min="1" />
+    <button class="btn-load" id="loadStudents">Load Students</button>
+  </div>
+
+  <table id="marksTable" style="display:none">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Admission</th>
+        <th>Score</th>
+        <th id="levelHeader" style="display:none">Level</th>
+        <th id="pointsHeader" style="display:none">Points</th>
+        <th>Suggested Comments</th>
+        <th>Remark</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div style="margin-top:15px">
+    <button class="btn-save" id="saveMarks" style="display:none">Save</button>
+    <button class="btn-publish" id="publishMarks">Publish</button>
+  </div>
+</div>
+
+<script>
+let marksheetId = null;
+let currentStatus = 'draft';
+let canEditAfterPublish = "{{ request.user.is_superuser|yesno:'true,false' }}" === 'true' || "{{ request.user.headteacher|yesno:'true,false' }}" === 'true';
+const term = document.getElementById('term');
+const exam = document.getElementById('exam');
+const classSelect = document.getElementById('class');
+const stream = document.getElementById('stream');
+const subject = document.getElementById('subject');
+const outOf = document.getElementById('outOf');
+const saveButton = document.getElementById('saveMarks');
+const publishButton = document.getElementById('publishMarks');
+const loadStudentsButton = document.getElementById('loadStudents');
+const preselectedSubjectId = "{{ selected_subject_id|default:'' }}";
+const preselectedStreamId = "{{ selected_stream_id|default:'' }}";
+
+function setSaveMode(){
+  saveButton.textContent = 'Save';
+  saveButton.dataset.action = 'save';
+  saveButton.classList.add('btn-save');
+  saveButton.classList.remove('btn-publish');
+}
+
+function setPublishMode(){
+  saveButton.textContent = 'Publish';
+  saveButton.dataset.action = 'publish';
+  saveButton.classList.add('btn-publish');
+  saveButton.classList.remove('btn-save');
+}
+
+function getCookie(name){
+  const v=document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+  if(v) return v.pop();
+  // Fallback: try to get from hidden input (for JS-only POST)
+  const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+  return input ? input.value : '';
+}
+
+function updateStatusUI(){
+  const badge = document.getElementById('statusBadge');
+
+  if(currentStatus === 'published'){
+    badge.textContent = 'Published';
+    badge.className = 'status-badge published';
+
+    if(!canEditAfterPublish){
+      document.querySelectorAll('.score').forEach(i=>i.disabled=true);
+    }
+  } else {
+    badge.textContent = 'Draft';
+    badge.className = 'status-badge draft';
+    document.querySelectorAll('.score').forEach(i=>i.disabled=false);
+  }
+}
+
+async function loadClassStreamsAndSubjects(classId, selectedSubjectId, selectedStreamId){
+  const streamSelect = stream;
+  streamSelect.innerHTML = '<option value="">All Streams</option>';
+  subject.innerHTML = '<option value="">Select Subject</option>';
+  if(!classId) {
+    streamSelect.disabled = true;
+    subject.disabled = true;
+    return false;
+  }
+  // Load streams
+  try {
+    const subjectId = subject && subject.value ? `&subject_id=${encodeURIComponent(subject.value)}` : '';
+    const resp = await fetch(`/school/load-streams-for-class/?class_id=${classId}${subjectId}`, {
+      method: 'GET',
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const data = await resp.json();
+    if(data.streams && data.streams.length > 0){
+      data.streams.forEach(stream => {
+        const option = document.createElement('option');
+        option.value = stream.id;
+        option.text = stream.name;
+        streamSelect.appendChild(option);
+      });
+      streamSelect.disabled = false;
+      if(selectedStreamId){
+        streamSelect.value = String(selectedStreamId);
+      }
+    } else {
+      streamSelect.disabled = true;
+    }
+  } catch(err){
+    streamSelect.disabled = true;
+  }
+  // Load subjects
+  try {
+    const resp = await fetch(`/school/load-subjects-for-class/?class_id=${classId}`, {
+      method: 'GET',
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const data = await resp.json();
+    if(data.subjects && data.subjects.length > 0){
+      data.subjects.forEach(s => {
+        const option = document.createElement('option');
+        option.value = s.id;
+        option.text = s.name + (s.pathway_code ? ` [${s.pathway_code}]` : '');
+        subject.appendChild(option);
+      });
+      subject.disabled = false;
+      if(selectedSubjectId){
+        subject.value = String(selectedSubjectId);
+      }
+    } else {
+      subject.disabled = true;
+    }
+  } catch(err){
+    subject.disabled = true;
+  }
+  return true;
+}
+
+// Load streams when class changes
+classSelect.addEventListener('change', async function(){
+  await loadClassStreamsAndSubjects(this.value, null, null);
+});
+
+subject.addEventListener('change', async function(){
+  if(!(classSelect && classSelect.value)) return;
+  await loadClassStreamsAndSubjects(classSelect.value, subject.value || null, stream.value || null);
+});
+
+// Load streams on page load if a class is already selected
+document.addEventListener('DOMContentLoaded', function() {
+  if(!(classSelect && classSelect.value)) return;
+  loadClassStreamsAndSubjects(classSelect.value, preselectedSubjectId, preselectedStreamId).then(() => {
+    if (preselectedSubjectId && subject.value && term.value && exam.value && classSelect.value) {
+      loadStudentsButton.click();
+    }
+  });
+});
+
+loadStudentsButton.addEventListener('click', function(){
+  const params = new URLSearchParams({
+    term: term.value,
+    exam_id: exam.value,
+    class_id: classSelect.value,
+    stream_id: stream.value,
+    subject_id: subject.value,
+    out_of: outOf.value
+  });
+
+  fetch("{% url 'load_marks_students' %}?"+params)
+  .then(r=>{
+    if(!r.ok){
+      return r.json()
+        .then(err => {
+          throw new Error(err.error || `Load failed (${r.status})`);
+        })
+        .catch(() => {
+          throw new Error(`Load failed (${r.status})`);
+        });
+    }
+    return r.json();
+  })
+  .then(data=>{
+    if(data.error){
+      alert(data.error);
+      return;
+    }
+
+    const tbody = document.querySelector("#marksTable tbody");
+    tbody.innerHTML='';
+    marksheetId = data.marksheet_id || null;
+    if(!marksheetId){
+      alert("Could not load marksheet for the selected filters.");
+      return;
+    }
+    currentStatus = data.status || 'draft';
+    
+    // Load the out_of value if it exists
+    if(data.out_of){
+      outOf.value = data.out_of;
+    }
+
+    const showLevels = data.show_levels === true;
+    document.getElementById('levelHeader').style.display = showLevels ? 'table-cell' : 'none';
+    document.getElementById('pointsHeader').style.display = showLevels ? 'table-cell' : 'none';
+
+    (data.students || []).forEach((s,i)=>{
+      const suggestions = (s.suggested_comments || []).map(c => `<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join('');
+      const suggested = s.suggested_comment || '';
+      tbody.innerHTML += `
+        <tr>
+          <td>${i+1}</td>
+          <td>${s.name}</td>
+          <td>${s.admission}</td>
+          <td>
+            <input type="number"
+                   class="score"
+                   data-id="${s.student_id}"
+                   data-adm="${s.admission}"
+                   value="${s.score ?? ''}"
+                   min="0"
+                   max="${outOf.value}">
+          </td>
+          <td class="level-col" style="display:${showLevels ? 'table-cell' : 'none'}">${s.level || ''}</td>
+          <td class="points-col" style="display:${showLevels ? 'table-cell' : 'none'}">${s.points ?? ''}</td>
+          <td>
+            <select class="suggested-comment" data-id="${s.student_id}">
+              <option value="">${suggested ? 'Suggested: ' + suggested : 'Select suggestion'}</option>
+              ${suggestions}
+            </select>
+          </td>
+          <td>
+            <textarea class="remark" data-id="${s.student_id}" data-manual="${s.comment_manual ? 'true' : 'false'}" rows="2" style="width:100%">${s.comment_text || ''}</textarea>
+          </td>
+        </tr>`;
+    });
+
+    if(data.students && data.students.length){
+      document.getElementById('marksTable').style.display='table';
+      document.getElementById('saveMarks').style.display='inline-block';
+    } else {
+      document.getElementById('marksTable').style.display='none';
+      document.getElementById('saveMarks').style.display='none';
+      alert('No students allocated to this subject for the selected class.');
+    }
+
+    publishButton.style.display = 'none';
+    if(currentStatus === 'published') {
+      setSaveMode();
+    } else {
+      setPublishMode();
+    }
+
+    updateStatusUI();
+    bindSuggestionHandlers();
+    bindScoreHandlers();
+  })
+  .catch(err => {
+    console.error('Load students error:', err);
+    alert(err.message || 'Failed to load students. Please try again.');
+  });
+});
+
+function publishMarks(){
+  if(!marksheetId) return;
+  if(!confirm("Publish marks? Editing will be locked for teachers.")) return;
+
+  fetch(`/school/publish-marks/${marksheetId}/`, {
+    method:'POST',
+    headers:{'X-CSRFToken':getCookie('csrftoken')}
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    if(d.success){
+      currentStatus='published';
+      updateStatusUI();
+      alert("Marks published successfully");
+    } else alert(d.error || "Publish failed");
+  });
+}
+
+saveButton.onclick = function(){
+  if(saveButton.dataset.action === 'publish'){
+    publishMarks();
+    return;
+  }
+  if(!marksheetId) return alert("Load students first");
+
+  const remarks = {};
+  document.querySelectorAll('.remark').forEach(r => { remarks[r.dataset.id] = r.value; });
+
+  const marks = Array.from(document.querySelectorAll('.score')).map(i=>({
+    student_id: i.dataset.id,
+    score: i.value || null,
+    comment_text: remarks[i.dataset.id] || '',
+    comment_manual: (document.querySelector(`.remark[data-id="${i.dataset.id}"]`)?.dataset.manual === 'true')
+  }));
+
+  fetch("{% url 'save_marks' %}", {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'X-CSRFToken':getCookie('csrftoken')
+    },
+    body: JSON.stringify({marksheet_id:marksheetId, marks:marks, out_of:outOf.value})
+  })
+  .then(async r=>{
+    if(!r.ok){
+      const text = await r.text();
+      throw new Error(text || `Save failed (${r.status})`);
+    }
+    return r.json();
+  })
+  .then(d=>{
+    if(d.success){
+      alert("Marks saved as draft");
+      currentStatus = 'draft';
+      updateStatusUI();
+      setPublishMode();
+      document.getElementById('loadStudents').click();
+    } else alert(d.error || "Error saving");
+  })
+  .catch(err => {
+    console.error('Save marks error:', err);
+    alert(`Save failed: ${err.message || 'Unknown error'}`);
+  });
+};
+
+function bindSuggestionHandlers(){
+  document.querySelectorAll('.suggested-comment').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const studentId = sel.dataset.id;
+      const remark = document.querySelector(`.remark[data-id="${studentId}"]`);
+      if (remark && sel.value) {
+        remark.value = sel.value;
+        remark.dataset.manual = 'true';
+      }
+    });
+  });
+}
+
+async function fetchSuggestedComments(studentId, scoreValue){
+  const classId = classSelect.value;
+  const subjectId = subject.value;
+  const termVal = term.value;
+  const outOfVal = outOf.value;
+
+  if(!classId || !subjectId || !termVal || !outOfVal || scoreValue === '' || scoreValue === null){
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    class_id: classId,
+    subject_id: subjectId,
+    student_id: studentId,
+    score: scoreValue,
+    out_of: outOfVal,
+    term: termVal,
+  });
+
+  const resp = await fetch(`{% url 'get_suggested_comments' %}?${params.toString()}`);
+  if(!resp.ok) return null;
+  return await resp.json();
+}
+
+function bindScoreHandlers(){
+  document.querySelectorAll('.score').forEach(input => {
+    input.addEventListener('input', () => {
+      if(input.dataset.timer){
+        clearTimeout(Number(input.dataset.timer));
+      }
+      const row = input.closest('tr');
+      const sel = row ? row.querySelector('.suggested-comment') : null;
+      if(sel){
+        sel.innerHTML = '<option value="">Updating suggestions...</option>';
+        sel.disabled = true;
+      }
+      const timer = setTimeout(async () => {
+      const studentId = input.dataset.id;
+      const scoreValue = input.value;
+      if(scoreValue === '' || scoreValue === null){
+        if(sel){
+          sel.innerHTML = '<option value="">Select suggestion</option>';
+          sel.disabled = false;
+        }
+        return;
+      }
+      const reqId = String(Number(input.dataset.reqId || 0) + 1);
+      input.dataset.reqId = reqId;
+      const response = await fetchSuggestedComments(studentId, input.value);
+      if(!response){
+        if(sel){
+          sel.innerHTML = '<option value="">Select suggestion</option>';
+          sel.disabled = false;
+        }
+        return;
+      }
+      if(input.dataset.reqId !== reqId) return;
+
+      const remark = document.querySelector(`.remark[data-id="${studentId}"]`);
+      if(!sel) return;
+
+      const comments = response.comments || [];
+      const suggested = response.suggested || '';
+
+      sel.disabled = false;
+
+      if(!suggested && comments.length === 0){
+        sel.innerHTML = '<option value="">No suggestions available</option>';
+      } else {
+        sel.innerHTML = `<option value="">${suggested ? 'Suggested: ' + suggested : 'Select suggestion'}</option>`;
+        comments.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          sel.appendChild(opt);
+        });
+      }
+
+      const levelCell = row ? row.querySelector('.level-col') : null;
+      const pointsCell = row ? row.querySelector('.points-col') : null;
+      if(levelCell && typeof response.level === 'string'){
+        levelCell.textContent = response.level || '';
+      }
+      if(pointsCell){
+        pointsCell.textContent = response.points ?? '';
+      }
+
+      if(remark){
+        const isManual = remark.dataset.manual === 'true';
+        if(!isManual && suggested){
+          remark.value = suggested;
+        }
+      }
+
+      }, 250);
+      input.dataset.timer = String(timer);
+    });
+  });
+}
+
+publishButton.onclick = publishMarks;
+
+document.addEventListener('input', function(e){
+  if(e.target.classList.contains('score')){
+    let max = parseInt(outOf.value);
+    if(parseInt(e.target.value) > max) e.target.value = max;
+  }
+  if(e.target.classList.contains('remark')){
+    e.target.dataset.manual = 'true';
+  }
+  if(e.target.classList.contains('score') || e.target.classList.contains('remark')){
+    if(currentStatus === 'published') {
+      setSaveMode();
+    } else if(currentStatus === 'draft') {
+      setPublishMode();
+    }
+  }
+});
+</script>
+
+{% endblock %}

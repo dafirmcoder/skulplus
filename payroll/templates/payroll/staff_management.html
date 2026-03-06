@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+
+{% block title %}Staff Management{% endblock %}
+
+{% block header %}
+<h2 style="margin:0">Staff Management</h2>
+{% endblock %}
+
+{% block content %}
+<style>
+  .grid { display:grid; grid-template-columns: 1fr; gap:14px; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; margin-bottom:14px; }
+  .stat { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:12px; }
+  .label { font-size:12px; color:#0f3057; }
+  .value { font-size:24px; font-weight:700; color:#0f3057; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .fields .full { grid-column:1 / -1; }
+  .fields label { display:block; font-size:12px; color:#374151; margin-bottom:4px; }
+  .fields input, .fields select { width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px; }
+  .btn { border:none; background:#0f3057; color:#fff; padding:10px 14px; border-radius:6px; cursor:pointer; transition:background-color .18s ease, transform .08s ease, box-shadow .18s ease; }
+  .btn:hover { background:#0f3057; box-shadow:0 8px 18px rgba(15,48,87,.2); }
+  .btn:active { background:#f59e0b; transform:translateY(1px) scale(.98); box-shadow:none; }
+  .btn:focus-visible { background:#16a34a; outline:2px solid #16a34a; outline-offset:2px; }
+  .btn-link { display:inline-block; border:1px solid #0f3057; background:#fff; color:#0f3057; padding:6px 10px; border-radius:6px; text-decoration:none; cursor:pointer; transition:background-color .18s ease, color .18s ease, border-color .18s ease, transform .08s ease; }
+  .btn-link:hover { background:#0f3057; color:#fff; border-color:#0f3057; }
+  .btn-link:active { background:#f59e0b; color:#fff; border-color:#f59e0b; transform:translateY(1px) scale(.98); }
+  .btn-link:focus-visible { background:#16a34a; color:#fff; border-color:#16a34a; outline:2px solid #16a34a; outline-offset:2px; }
+  .btn-danger { border-color:#f59e0b; color:#f59e0b; }
+  .btn-danger:hover { background:#f59e0b; color:#fff; border-color:#f59e0b; }
+  .btn-danger:focus-visible { background:#16a34a; color:#fff; border-color:#16a34a; }
+  .table-row-clickable { cursor:pointer; }
+  .table-row-clickable:hover { background:#f8fafc; }
+  .table-row-selected { background:#eef6ff; }
+  .table-wrap { overflow:auto; }
+  table { width:100%; border-collapse:collapse; min-width:760px; }
+  th, td { border-bottom:1px solid #f3f4f6; padding:8px; font-size:13px; text-align:left; vertical-align:top; }
+  th { background:#f9fafb; color:#111827; }
+  .right { text-align:right; }
+  .muted { color:#6b7280; }
+  @media (max-width: 980px) {
+    .grid { grid-template-columns:1fr; }
+    .fields { grid-template-columns:1fr; }
+    .btn { width:100%; }
+  }
+</style>
+
+<div class="stats">
+  <div class="stat"><div class="label">Staff Members</div><div class="value">{{ staff_count }}</div></div>
+</div>
+
+<div class="grid">
+  <section class="card">
+    <h3 style="margin-top:0;color:#0f3057;">
+      {% if selected_staff %}Edit Staff{% else %}Add Staff (Independent From Teachers){% endif %}
+    </h3>
+    <form method="post" class="fields">
+      {% csrf_token %}
+      {% if selected_staff %}
+      <input type="hidden" name="action" value="update_staff" />
+      <input type="hidden" name="staff_id" value="{{ selected_staff.id }}" />
+      {% else %}
+      <input type="hidden" name="action" value="add_staff" />
+      {% endif %}
+
+      <div class="full">
+        <label>Full Name</label>
+        {{ staff_form.full_name }}
+      </div>
+      <div>
+        <label>Role/Department</label>
+        {{ staff_form.role }}
+      </div>
+      <div>
+        <label>Employee Number</label>
+        {{ staff_form.employee_number }}
+      </div>
+      <div>
+        <label>National ID</label>
+        {{ staff_form.national_id }}
+      </div>
+      <div>
+        <label>Phone</label>
+        {{ staff_form.phone }}
+      </div>
+      <div>
+        <label>Email</label>
+        {{ staff_form.email }}
+      </div>
+      <div>
+        <label>KRA PIN</label>
+        {{ staff_form.kra_pin }}
+      </div>
+      <div>
+        <label>NSSF Number</label>
+        {{ staff_form.nssf_number }}
+      </div>
+      <div>
+        <label>NHIF/SHIF Number</label>
+        {{ staff_form.nhif_number }}
+      </div>
+      <div>
+        <label>Employment Type</label>
+        {{ staff_form.employment_type }}
+      </div>
+      <div>
+        <label>Employment Date</label>
+        {{ staff_form.employment_date }}
+      </div>
+      <div>
+        <label>Basic Salary</label>
+        {{ staff_form.basic_salary }}
+      </div>
+      <div>
+        <label>Also A Teacher</label>
+        {{ staff_form.is_teacher }}
+      </div>
+      <div>
+        <label>Bank Name</label>
+        {{ staff_form.bank_name }}
+      </div>
+      <div>
+        <label>Bank Account Number</label>
+        {{ staff_form.bank_account_number }}
+      </div>
+      <div>
+        <label>Active</label>
+        {{ staff_form.is_active }}
+      </div>
+
+      <div class="full">
+        <button type="submit" class="btn">{% if selected_staff %}Update Staff{% else %}Save Staff{% endif %}</button>
+        {% if selected_staff %}
+        <a href="{% url 'staff_management' %}" class="btn-link" style="margin-left:8px;">Cancel Edit</a>
+        {% endif %}
+      </div>
+    </form>
+  </section>
+</div>
+
+<div style="margin-top:14px;">
+  <section class="card table-wrap">
+    <h3 style="margin-top:0;color:#111827;">Staff List</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Role</th>
+          <th>KRA PIN</th>
+          <th>NSSF</th>
+          <th>NHIF/SHIF</th>
+          <th>Teacher</th>
+          <th class="right">Basic Salary</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in staff_list %}
+        <tr class="table-row-clickable {% if selected_staff and selected_staff.id == s.id %}table-row-selected{% endif %}" onclick="window.location='{% url 'staff_management' %}?edit={{ s.id }}'">
+          <td>{{ s.full_name }}</td>
+          <td>{{ s.role }}</td>
+          <td>{{ s.kra_pin }}</td>
+          <td>{{ s.nssf_number }}</td>
+          <td>{{ s.nhif_number|default:'-' }}</td>
+          <td>{% if s.is_teacher %}Yes{% else %}No{% endif %}</td>
+          <td class="right">{{ s.basic_salary }}</td>
+          <td>{% if s.is_active %}Active{% else %}Inactive{% endif %}</td>
+          <td>
+            <a href="{% url 'staff_management' %}?edit={{ s.id }}" class="btn-link" onclick="event.stopPropagation();">Edit</a>
+            <form method="post" action="{% url 'delete_staff' s.id %}" style="display:inline;" onsubmit="event.stopPropagation(); return confirm('Delete {{ s.full_name }}? This cannot be undone.');">
+              {% csrf_token %}
+              <button type="submit" class="btn-link btn-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="9" class="muted">No staff records found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}
