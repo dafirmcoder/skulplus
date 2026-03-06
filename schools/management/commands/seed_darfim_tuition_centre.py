@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from schools.cbe import ensure_cbe_learning_areas
 from schools.models import (
     ClassRoom,
     EducationLevel,
@@ -28,17 +29,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         User = get_user_model()
         current_year = date.today().year
-
-        subjects_seed = [
-            ("ENG", "English", "Eng"),
-            ("KIS", "Kiswahili", "Kis"),
-            ("MATH", "Mathematics", "Math"),
-            ("SCI", "Science & Technology", "Sci"),
-            ("SST", "Social Studies", "Soc"),
-            ("RE", "Religious Education", "RE"),
-            ("ART", "Creative Arts", "Art"),
-            ("LIFE", "Life Skills", "Life"),
-        ]
 
         with transaction.atomic():
             school, _ = School.objects.get_or_create(
@@ -80,23 +70,11 @@ class Command(BaseCommand):
             lower_primary, _ = EducationLevel.objects.get_or_create(name="Lower Primary")
             upper_primary, _ = EducationLevel.objects.get_or_create(name="Upper Primary")
 
-            subjects: list[Subject] = []
-            for code, name, short in subjects_seed:
-                sub, _ = Subject.objects.get_or_create(
-                    school=school,
-                    code=code,
-                    education_level=lower_primary,
-                    defaults={"name": name, "short_name": short},
-                )
-                subjects.append(sub)
-
-                sub_up, _ = Subject.objects.get_or_create(
-                    school=school,
-                    code=code,
-                    education_level=upper_primary,
-                    defaults={"name": name, "short_name": short},
-                )
-                subjects.append(sub_up)
+            ensure_cbe_learning_areas(school)
+            subjects = list(
+                Subject.objects.filter(school=school)
+                .select_related("education_level")
+            )
 
             classrooms: list[ClassRoom] = []
             for grade in range(1, 7):
@@ -120,7 +98,7 @@ class Command(BaseCommand):
                     )
 
             teachers: list[Teacher] = []
-            for i in range(1, 11):
+            for i in range(1, 7):
                 email = f"teacher{i}@darfimtuition.co.ke"
                 u, created = User.objects.get_or_create(
                     username=email,
@@ -173,7 +151,7 @@ class Command(BaseCommand):
                     s for s in subjects
                     if getattr(getattr(s, "education_level", None), "name", "") == class_level
                 ]
-                for n in range(1, 21):
+                for n in range(1, 7):
                     stream = streams[(n - 1) % len(streams)] if streams else None
                     admission = f"DTC{classroom.name.replace('Grade ', '')}{n:03d}"
                     student, was_created = Student.objects.get_or_create(

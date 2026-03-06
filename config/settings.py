@@ -31,17 +31,26 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').strip().lower() == 'true'
 
-allowed_hosts_raw = os.environ.get('ALLOWED_HOSTS', '*')
+allowed_hosts_raw = os.environ.get(
+    'ALLOWED_HOSTS',
+    'skulplus.up.railway.app,localhost,127.0.0.1'
+)
 ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_raw.split(',') if h.strip()]
 
 render_hostname = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
 if render_hostname and render_hostname not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(render_hostname)
 
-csrf_trusted_origins_raw = os.environ.get('CSRF_TRUSTED_ORIGINS', '').strip()
+csrf_trusted_origins_raw = os.environ.get(
+    'CSRF_TRUSTED_ORIGINS',
+    'https://skulplus.up.railway.app,http://127.0.0.1,http://localhost,https://*.railway.app',
+).strip()
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in csrf_trusted_origins_raw.split(',') if origin.strip()
 ]
+
+CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', str(not DEBUG)).strip().lower() == 'true'
+SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', str(not DEBUG)).strip().lower() == 'true'
 
 
 # Application definition
