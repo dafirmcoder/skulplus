@@ -172,7 +172,7 @@ from schools.models import Student, Teacher
 from finance.models import FeePayment as Payment, FeeStructure
 from payroll.models import Staff
 from schools.models import (
-    School, ClassRoom, StreamClassTeacher, TeacherAssignment, Exam, TermDate, MarkSheet, Announcement, Stream, Subject, PromotionLog, EducationLevel, SubjectAllocation
+    School, ClassRoom, StreamClassTeacher, TeacherAssignment, Exam, TermDate, MarkSheet, Announcement, Stream, Subject, PromotionLog, EducationLevel, SubjectAllocation, HeadTeacher
 )
 from schools.models import StudentMark
 from schools.forms import StudentForm, AnnouncementForm, ClassRoomForm
@@ -196,6 +196,17 @@ def post_login_redirect(request):
         return redirect('headteacher_dashboard')
     if hasattr(request.user, 'teacher'):
         return redirect('teacher_dashboard')
+    # Backward-compat fallback for legacy accounts tied to school email.
+    school = School.objects.filter(email__iexact=request.user.username).first()
+    if school:
+        HeadTeacher.objects.get_or_create(
+            user=request.user,
+            defaults={
+                'school': school,
+                'full_name': request.user.get_full_name(),
+            },
+        )
+        return redirect('headteacher_dashboard')
     if request.user.is_superuser:
         return redirect('headteacher_dashboard')
     if request.user.is_staff:
@@ -204,6 +215,7 @@ def post_login_redirect(request):
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone
+from django.db import transaction, IntegrityError
 from django.db.models import Sum, Avg, Count, Value, IntegerField, Max, Q
 from django.http import HttpResponseForbidden, JsonResponse
 import json
@@ -1974,18 +1986,8 @@ def login_view(request):
             signup_form = SchoolRegistrationForm(request.POST)
             if signup_form.is_valid():
                 User = get_user_model()
-                # Create School with full details
-                school = School.objects.create(
-                    name=signup_form.cleaned_data['school_name'],
-                    school_type=signup_form.cleaned_data['school_type'],
-                    school_category=signup_form.cleaned_data.get('school_category', 'PRIMARY'),
-                    address=signup_form.cleaned_data.get('address', ''),
-                    phone=signup_form.cleaned_data.get('phone', ''),
-                    email=signup_form.cleaned_data.get('school_email', ''),
-                )
-
-                # Create User (headteacher)
-                head_email = signup_form.cleaned_data['head_email']
+                head_email = signup_form.cleaned_data['head_email'].strip().lower()
+                school_email = signup_form.cleaned_data['school_email'].strip().lower()
                 head_full_name = signup_form.cleaned_data['head_full_name']
                 head_password = signup_form.cleaned_data['head_password']
                 first_name = ''
@@ -1996,20 +1998,50 @@ def login_view(request):
                 else:
                     first_name = head_full_name
 
-                user = User.objects.create_user(username=head_email, email=head_email, password=head_password,
-                                                first_name=first_name, last_name=last_name)
+                try:
+                    with transaction.atomic():
+                        school = School.objects.create(
+                            name=signup_form.cleaned_data['school_name'],
+                            school_type=signup_form.cleaned_data['school_type'],
+                            school_category=signup_form.cleaned_data.get('school_category', 'PRIMARY'),
+                            address=signup_form.cleaned_data.get('address', ''),
+                            phone=signup_form.cleaned_data.get('phone', ''),
+                            email=school_email,
+                        )
 
-                # Create HeadTeacher profile with phone if provided
-                HeadTeacher.objects.create(
-                    user=user,
-                    school=school,
-                    full_name=head_full_name,
-                    phone=signup_form.cleaned_data.get('head_phone', ''),
-                )
+                        # Headteacher account logs in with school email.
+                        headteacher_user = User.objects.create_user(
+                            username=school_email,
+                            email=school_email,
+                            password=head_password,
+                            first_name=first_name,
+                            last_name=last_name,
+                        )
+                        HeadTeacher.objects.create(
+                            user=headteacher_user,
+                            school=school,
+                            full_name=head_full_name,
+                            phone=signup_form.cleaned_data.get('head_phone', ''),
+                        )
 
-                # Log them in and redirect
-                login(request, user)
-                return redirect('headteacher_dashboard')
+                        # Teacher account logs in with provided headteacher personal email.
+                        teacher_user = User.objects.create_user(
+                            username=head_email,
+                            email=head_email,
+                            password=head_password,
+                            first_name=first_name,
+                            last_name=last_name,
+                        )
+                        Teacher.objects.create(
+                            user=teacher_user,
+                            school=school,
+                            is_class_teacher=False,
+                        )
+                except IntegrityError:
+                    signup_form.add_error(None, 'Unable to create account due to a duplicate record. Use different school/headteacher emails.')
+                else:
+                    login(request, headteacher_user)
+                    return redirect('headteacher_dashboard')
 
     return render(request, 'registration/login.html', {
         'form': login_form,
@@ -2023,17 +2055,8 @@ def signup(request):
         form = SchoolRegistrationForm(request.POST)
         if form.is_valid():
             User = get_user_model()
-            # Create School
-            school = School.objects.create(
-                name=form.cleaned_data['school_name'],
-                school_type=form.cleaned_data['school_type'],
-                school_category=form.cleaned_data.get('school_category', 'PRIMARY'),
-                address=form.cleaned_data.get('address', ''),
-                phone=form.cleaned_data.get('phone', ''),
-                email=form.cleaned_data.get('school_email', ''),
-            )
-            # Create User
-            head_email = form.cleaned_data['head_email']
+            head_email = form.cleaned_data['head_email'].strip().lower()
+            school_email = form.cleaned_data['school_email'].strip().lower()
             head_full_name = form.cleaned_data['head_full_name']
             head_password = form.cleaned_data['head_password']
             first_name = ''
@@ -2044,16 +2067,47 @@ def signup(request):
             else:
                 first_name = head_full_name
 
-            user = User.objects.create_user(username=head_email, email=head_email, password=head_password,
-                                            first_name=first_name, last_name=last_name)
-
-            # Create HeadTeacher
-            HeadTeacher.objects.create(user=user, school=school)
-
-            # Log in and redirect to headteacher dashboard
-            login(request, user)
-            messages.success(request, 'School and Headteacher account created. Welcome!')
-            return redirect('headteacher_dashboard')
+            try:
+                with transaction.atomic():
+                    school = School.objects.create(
+                        name=form.cleaned_data['school_name'],
+                        school_type=form.cleaned_data['school_type'],
+                        school_category=form.cleaned_data.get('school_category', 'PRIMARY'),
+                        address=form.cleaned_data.get('address', ''),
+                        phone=form.cleaned_data.get('phone', ''),
+                        email=school_email,
+                    )
+                    headteacher_user = User.objects.create_user(
+                        username=school_email,
+                        email=school_email,
+                        password=head_password,
+                        first_name=first_name,
+                        last_name=last_name,
+                    )
+                    HeadTeacher.objects.create(
+                        user=headteacher_user,
+                        school=school,
+                        full_name=head_full_name,
+                        phone=form.cleaned_data.get('head_phone', ''),
+                    )
+                    teacher_user = User.objects.create_user(
+                        username=head_email,
+                        email=head_email,
+                        password=head_password,
+                        first_name=first_name,
+                        last_name=last_name,
+                    )
+                    Teacher.objects.create(
+                        user=teacher_user,
+                        school=school,
+                        is_class_teacher=False,
+                    )
+            except IntegrityError:
+                form.add_error(None, 'Unable to create account due to a duplicate record. Use different school/headteacher emails.')
+            else:
+                login(request, headteacher_user)
+                messages.success(request, 'School and Headteacher account created. Welcome!')
+                return redirect('headteacher_dashboard')
     else:
         form = SchoolRegistrationForm()
     return render(request, 'registration/signup.html', {'form': form})

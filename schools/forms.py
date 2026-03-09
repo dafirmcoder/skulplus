@@ -18,7 +18,7 @@ class SchoolRegistrationForm(forms.Form):
     school_category = forms.ChoiceField(choices=School.SCHOOL_CATEGORY_CHOICES, label='School Category')
     address = forms.CharField(widget=forms.Textarea, required=False)
     phone = forms.CharField(max_length=50, required=False)
-    school_email = forms.EmailField(required=False)
+    school_email = forms.EmailField(required=True)
 
     # Headteacher fields
     head_full_name = forms.CharField(max_length=255, label='Headteacher Full Name')
@@ -26,12 +26,38 @@ class SchoolRegistrationForm(forms.Form):
     head_password = forms.CharField(widget=forms.PasswordInput, label='Password')
     head_phone = forms.CharField(max_length=50, required=False)
 
-    def clean_head_email(self):
-        email = self.cleaned_data.get('head_email')
+    def clean_school_name(self):
+        name = (self.cleaned_data.get('school_name') or '').strip()
+        if School.objects.filter(name__iexact=name).exists():
+            raise forms.ValidationError('A school with that name already exists.')
+        return name
+
+    def clean_school_email(self):
+        email = (self.cleaned_data.get('school_email') or '').strip().lower()
+        if School.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError('A school with that email already exists.')
         User = get_user_model()
-        if User.objects.filter(username=email).exists():
+        if User.objects.filter(username__iexact=email).exists():
+            raise forms.ValidationError('That school email is already used by another account.')
+        return email
+
+    def clean_head_email(self):
+        email = (self.cleaned_data.get('head_email') or '').strip().lower()
+        User = get_user_model()
+        if User.objects.filter(username__iexact=email).exists():
             raise forms.ValidationError('A user with that email already exists.')
         return email
+
+    def clean(self):
+        cleaned_data = super().clean()
+        school_email = (cleaned_data.get('school_email') or '').strip().lower()
+        head_email = (cleaned_data.get('head_email') or '').strip().lower()
+        if school_email and head_email and school_email == head_email:
+            raise forms.ValidationError(
+                'School email and headteacher email must be different. '
+                'School email logs into headteacher dashboard; headteacher email logs into teacher dashboard.'
+            )
+        return cleaned_data
 
 
 class SchoolSignupForm(forms.Form):
