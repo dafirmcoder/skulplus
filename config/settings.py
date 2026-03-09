@@ -107,6 +107,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 # site logo context (exposes SITE_LOGO_URL, SITE_FAVICON_URL)
                 'schools.context_processors.site_logo',
+                'schools.context_processors.user_access_flags',
             ],
         },
     },

@@ -192,7 +192,9 @@
           <span>SkulPlus+</span>
         </h2>
         <div style="padding:10px 16px;">
-          {% if request.user.headteacher %}
+          {% if ACCESS_CAN_FINANCE and not ACCESS_CAN_STUDENTS and not ACCESS_CAN_TEACHERS and not ACCESS_CAN_ACADEMICS %}
+            <a href="{% url 'bursar_dashboard' %}" style="display:block;width:100%;background:#084b6b;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;text-align:center;text-decoration:none"><i class="fas fa-house"></i>&nbsp;&nbsp;Dashboard</a>
+          {% elif ACCESS_CAN_STUDENTS or ACCESS_CAN_TEACHERS or ACCESS_CAN_ACADEMICS %}
             <a href="{% url 'headteacher_dashboard' %}" style="display:block;width:100%;background:#084b6b;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;text-align:center;text-decoration:none"><i class="fas fa-house"></i>&nbsp;&nbsp;Dashboard</a>
           {% elif request.user.teacher %}
             <a href="{% url 'teacher_dashboard' %}" style="display:block;width:100%;background:#084b6b;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;text-align:center;text-decoration:none"><i class="fas fa-house"></i>&nbsp;&nbsp;Dashboard</a>
@@ -230,9 +232,10 @@
         {% url 'new_user' as new_user_url %}
         {% url 'user_updates' as user_updates_url %}
 
-    <!-- Headteacher Menu Items -->
-    {% if request.user.headteacher %}
+    <!-- Role-based Menu Items -->
+    {% if ACCESS_CAN_STUDENTS or ACCESS_CAN_TEACHERS or ACCESS_CAN_ACADEMICS or ACCESS_CAN_FINANCE %}
 
+    {% if ACCESS_CAN_STUDENTS %}
     <li class="has-submenu{% if request.path == admit_student_url or request.path == edit_students_url or request.path == class_lists_url or request.path == promote_students_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
       <i class="fas fa-user-graduate"></i><span>Student Registration</span>
         <ul class="submenu">
@@ -242,7 +245,9 @@
         <li><a href="{{ promote_students_url }}" onclick="event.stopPropagation();" class="{% if request.path == promote_students_url %}active-link{% endif %}"><i class="fas fa-level-up-alt"></i> Promote/Demote</a></li>
       </ul>
     </li>
+    {% endif %}
 
+    {% if ACCESS_CAN_TEACHERS or ACCESS_CAN_FULL_DASHBOARD %}
     <li class="has-submenu{% if request.path == school_details_url or request.path == manage_teachers_url or request.path == subject_allocation_url or request.path == classes_url or request.path == exams_url or request.path == grading_url or request.path == cbc_comments_report_url or request.path == term_dates_url or request.path == subjects_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
       <i class="fas fa-school"></i><span>School Settings</span>
       <ul class="submenu">
@@ -257,7 +262,9 @@
         <li><a href="{{ subjects_url }}" onclick="event.stopPropagation();" class="{% if request.path == subjects_url %}active-link{% endif %}"><i class="fas fa-book"></i> Subjects</a></li>
       </ul>
     </li>
+    {% endif %}
 
+    {% if ACCESS_CAN_ACADEMICS %}
     <li class="has-submenu{% if request.path == enter_marks_url or request.path == entered_marks_url or request.path == set_exams_url or request.path == cbc_comments_report_url or request.path == merit_lists_url or request.path == subject_analysis_url or request.path == report_cards_url or request.path == send_reports_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
       <i class="fas fa-chart-bar"></i><span>Academics</span>
       <ul class="submenu">
@@ -276,19 +283,26 @@
         <li><a href="{{ send_reports_url }}" onclick="event.stopPropagation();" class="{% if request.path == send_reports_url %}active-link{% endif %}"><i class="fas fa-paper-plane"></i> Send Reports</a></li>
       </ul>
     </li>
+    {% endif %}
 
+    {% if ACCESS_CAN_FINANCE %}
     <li class="has-submenu{% if request.path == fee_structure_url or request.path == add_payment_url or request.path == balance_report_url or request.path == model_reports_url or request.path == staff_management_url or request.path == payroll_overview_url or request.path == expenditure_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
       <i class="fas fa-coins"></i><span>Finance</span>
       <ul class="submenu">
         <li><a href="{{ fee_structure_url }}" onclick="event.stopPropagation();" class="{% if request.path == fee_structure_url %}active-link{% endif %}"><i class="fas fa-table"></i> Fee Structure</a></li>
         <li><a href="{{ add_payment_url }}" onclick="event.stopPropagation();" class="{% if request.path == add_payment_url %}active-link{% endif %}"><i class="fas fa-money-bill-wave"></i> Fee Payment</a></li>
         <li><a href="{{ balance_report_url }}" onclick="event.stopPropagation();" class="{% if request.path == balance_report_url %}active-link{% endif %}"><i class="fas fa-balance-scale"></i> Balances</a></li>
+        {% if ACCESS_CAN_FULL_DASHBOARD %}
         <li><a href="{{ staff_management_url }}" onclick="event.stopPropagation();" class="{% if request.path == staff_management_url %}active-link{% endif %}"><i class="fas fa-users"></i> Staff</a></li>
         <li><a href="{{ payroll_overview_url }}" onclick="event.stopPropagation();" class="{% if request.path == payroll_overview_url %}active-link{% endif %}"><i class="fas fa-file-invoice-dollar"></i> Pay Roll</a></li>
+        {% endif %}
         <li><a href="{{ expenditure_url }}" onclick="event.stopPropagation();" class="{% if request.path == expenditure_url %}active-link{% endif %}"><i class="fas fa-receipt"></i> Expenditure</a></li>
         <li><a href="{{ model_reports_url }}" onclick="event.stopPropagation();" class="{% if request.path == model_reports_url %}active-link{% endif %}"><i class="fas fa-chart-line"></i> Report</a></li>
       </ul>
     </li>
+    {% endif %}
+
+    {% if ACCESS_CAN_FULL_DASHBOARD %}
     <li class="has-submenu{% if request.path == new_user_url or request.path == user_updates_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
       <i class="fas fa-users-cog"></i><span>User Management</span>
       <ul class="submenu">
@@ -296,6 +310,7 @@
         <li><a href="{{ user_updates_url }}" onclick="event.stopPropagation();" class="{% if request.path == user_updates_url %}active-link{% endif %}"><i class="fas fa-user-edit"></i> User Updates</a></li>
       </ul>
     </li>
+    {% endif %}
 
     <!-- Teacher Menu Items -->
     {% elif request.user.teacher %}

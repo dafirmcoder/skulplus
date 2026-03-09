@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .bd-wrap { display:grid; gap:16px; }
+  .bd-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; }
+  .bd-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+  .bd-link {
+    display:block; text-decoration:none; background:#f8fbff; border:1px solid #cfe3ff; color:#0f3057;
+    border-radius:10px; padding:14px; font-weight:600;
+  }
+  .bd-link small { display:block; color:#4b5563; font-weight:500; margin-top:6px; }
+</style>
+
+<div class="bd-wrap">
+  <section class="bd-card">
+    <h2 style="margin:0;color:#0f3057;">Bursar Dashboard</h2>
+    <p style="margin:8px 0 0;color:#4b5563;">Finance-only access for {{ school.name }}.</p>
+  </section>
+
+  <section class="bd-card">
+    <div class="bd-grid">
+      <a class="bd-link" href="{% url 'fee_structure' %}">
+        Fee Structure
+        <small>Manage vote heads and billing setup.</small>
+      </a>
+      <a class="bd-link" href="{% url 'add_payment' %}">
+        Fee Payment
+        <small>Capture payments, allocations, and receipts.</small>
+      </a>
+      <a class="bd-link" href="{% url 'balance_report' %}">
+        Balance Report
+        <small>View outstanding balances by class/student.</small>
+      </a>
+      <a class="bd-link" href="{% url 'expenditure' %}">
+        Expenditure
+        <small>Record and review school spending.</small>
+      </a>
+      <a class="bd-link" href="{% url 'model_reports' %}">
+        Finance Reports
+        <small>Generate model and summary reports.</small>
+      </a>
+    </div>
+  </section>
+</div>
+{% endblock %}

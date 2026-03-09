@@ -172,7 +172,7 @@ from schools.models import Student, Teacher
 from finance.models import FeePayment as Payment, FeeStructure
 from payroll.models import Staff
 from schools.models import (
-    School, ClassRoom, StreamClassTeacher, TeacherAssignment, Exam, TermDate, MarkSheet, Announcement, Stream, Subject, PromotionLog, EducationLevel, SubjectAllocation, HeadTeacher
+    School, ClassRoom, StreamClassTeacher, TeacherAssignment, Exam, TermDate, MarkSheet, Announcement, Stream, Subject, PromotionLog, EducationLevel, SubjectAllocation, HeadTeacher, SchoolUserAccess
 )
 from schools.models import StudentMark
 from schools.forms import StudentForm, AnnouncementForm, ClassRoomForm
@@ -188,6 +188,13 @@ from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login
 from django.urls import reverse
+from .access import (
+    get_user_role as resolve_user_role,
+    get_user_school as resolve_user_school,
+    has_full_headteacher_access,
+    user_has_permission,
+    user_has_any_permission,
+)
 
 def post_login_redirect(request):
     """Role-aware post-login redirect."""
@@ -209,6 +216,12 @@ def post_login_redirect(request):
         )
         return redirect('headteacher_dashboard')
     if request.user.is_superuser:
+        return redirect('headteacher_dashboard')
+    school = resolve_user_school(request.user)
+    role = resolve_user_role(request.user, school)
+    if role == SchoolUserAccess.ROLE_ACCOUNTS:
+        return redirect('bursar_dashboard')
+    if role in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_SECRETARY, SchoolUserAccess.ROLE_DEPUTY):
         return redirect('headteacher_dashboard')
     if request.user.is_staff:
         return redirect('admin:index')
@@ -232,6 +245,17 @@ def _build_login_form(request, data=None):
 
 def signup_modal_redirect(request):
     return redirect(f"{reverse('landing')}?auth=signup")
+
+
+def _require_school_permission(request, *permissions):
+    school = resolve_user_school(request.user)
+    if not school:
+        return None, HttpResponseForbidden('No school is linked to this account.')
+    if request.user.is_superuser:
+        return school, None
+    if permissions and not user_has_any_permission(request.user, school, permissions):
+        return None, HttpResponseForbidden('Access denied for your role.')
+    return school, None
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone
@@ -1182,13 +1206,7 @@ def delete_exam(request, pk):
         return JsonResponse({'success': False, 'error': 'Exam not found'})
 
 def get_user_school(user):
-    if hasattr(user, 'headteacher'):
-        return user.headteacher.school
-    if hasattr(user, 'teacher'):
-        return user.teacher.school
-    if getattr(user, 'is_superuser', False):
-        return School.objects.first()
-    return None
+    return resolve_user_school(user)
 
 
 def get_students_with_balances(school):
@@ -1211,12 +1229,9 @@ def get_students_with_balances(school):
 
 @login_required
 def headteacher_dashboard(request):
-    if not hasattr(request.user, 'headteacher') and not request.user.is_superuser:
-        return HttpResponseForbidden("Access denied")
-
-    school = get_user_school(request.user)
-    if not school:
-        return HttpResponseForbidden("No school is linked to this account.")
+    school, denied = _require_school_permission(request, 'students', 'teachers', 'academics')
+    if denied:
+        return denied
     debtors = get_students_with_balances(school)
 
     students_count = Student.objects.filter(school=school).count()
@@ -1254,13 +1269,20 @@ def headteacher_dashboard(request):
     return render(request, 'schools/headteacher_dashboard.html', context)
 
 
+@login_required
+def bursar_dashboard(request):
+    school, denied = _require_school_permission(request, 'finance')
+    if denied:
+        return denied
+    return render(request, 'schools/bursar_dashboard.html', {'school': school})
+
+
 
 @login_required
 def manage_teachers(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = request.user.headteacher.school
+    school, denied = _require_school_permission(request, 'teachers')
+    if denied:
+        return denied
     teachers = Teacher.objects.filter(school=school)
 
     # support AJAX creation of teacher user + Teacher record
@@ -1419,9 +1441,9 @@ def manage_teachers(request):
 @login_required
 @require_POST
 def edit_teacher(request, pk):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'teachers')
+    if denied:
+        return denied
     teacher = get_object_or_404(Teacher, pk=pk, school=school)
     try:
         try:
@@ -1499,9 +1521,9 @@ def edit_teacher(request, pk):
 @login_required
 @require_POST
 def delete_teacher(request, pk):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'teachers')
+    if denied:
+        return denied
     teacher = get_object_or_404(Teacher, pk=pk, school=school)
     try:
         user = teacher.user
@@ -1513,10 +1535,9 @@ def delete_teacher(request, pk):
 
 @login_required
 def allocate_teacher(request, teacher_id):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'teachers')
+    if denied:
+        return denied
     try:
         teacher = Teacher.objects.get(id=teacher_id, school=school)
     except Teacher.DoesNotExist:
@@ -1663,10 +1684,9 @@ def allocate_teacher(request, teacher_id):
 
 @login_required
 def delete_teacher_assignment(request, assignment_id):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'teachers')
+    if denied:
+        return denied
     
     try:
         assignment = TeacherAssignment.objects.select_related('teacher').get(id=assignment_id, teacher__school=school)
@@ -1786,10 +1806,9 @@ def load_streams_for_class(request):
 
 @login_required
 def admit_student(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = request.user.headteacher.school
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     # Determine if request is AJAX early (used for both GET and POST handling)
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
@@ -1873,10 +1892,9 @@ def admit_student(request):
 @login_required
 def admit_student_new(request):
     """Full page admit form (navigates like classes)."""
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = request.user.headteacher.school
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
     if request.method == 'POST':
@@ -1937,10 +1955,9 @@ def admit_student_new(request):
 
 @login_required
 def post_announcement(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = request.user.headteacher.school
+    school, denied = _require_school_permission(request, 'academics')
+    if denied:
+        return denied
 
     if request.method == "POST":
         form = AnnouncementForm(request.POST)
@@ -2129,10 +2146,9 @@ def signup(request):
 # ------------------ Placeholder pages for sidebar ------------------
 @login_required
 def edit_students(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     students = Student.objects.filter(school=school).select_related(
         'classroom__level', 'stream'
     ).select_related('studentpathway__pathway').order_by('last_name', 'first_name')
@@ -2151,10 +2167,9 @@ def edit_students(request):
 
 @login_required
 def edit_student(request, student_id):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     if not school:
         return HttpResponseForbidden()
     try:
@@ -2282,10 +2297,9 @@ def edit_student(request, student_id):
 
 @login_required
 def view_student(request, student_id):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     try:
         student = Student.objects.get(id=student_id, school=school)
     except Student.DoesNotExist:
@@ -2318,7 +2332,8 @@ def class_lists(request):
     is_headteacher = hasattr(request.user, 'headteacher')
     is_superuser = request.user.is_superuser
     is_teacher = hasattr(request.user, 'teacher')
-    if not (is_headteacher or is_superuser or is_teacher):
+    can_students = user_has_permission(request.user, school, 'students')
+    if not (is_headteacher or is_superuser or is_teacher or can_students):
         return HttpResponseForbidden()
 
     ensure_cbe_learning_areas(school)
@@ -2359,10 +2374,9 @@ def class_lists(request):
 
 @login_required
 def promote_students(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     classes = ClassRoom.objects.filter(school=school).order_by('name')
     return render(request, 'schools/promote_students.html', {'classes': classes})
 
@@ -2374,10 +2388,9 @@ def move_students(request):
 
     Expects JSON body: { "student_ids": [1,2,3], "target_class_id": 5 }
     """
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     try:
         data = json.loads(request.body)
     except Exception:
@@ -2421,10 +2434,9 @@ def get_adjacent_class(request):
 
     Query params: class_id, direction=prev|next (default prev)
     """
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     class_id = request.GET.get('class_id')
     direction = request.GET.get('direction', 'prev')
     if not class_id:
@@ -2455,9 +2467,9 @@ def get_adjacent_class(request):
 @require_http_methods(["POST"])
 def promote_to_next(request):
     """Promote given students to the next class (based on ordering). If no next class, return that info."""
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     try:
         data = json.loads(request.body)
     except Exception:
@@ -2504,9 +2516,9 @@ def promote_to_next(request):
 @login_required
 @require_http_methods(["POST"])
 def graduate_students(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     try:
         data = json.loads(request.body)
     except Exception:
@@ -2528,9 +2540,9 @@ def graduate_students(request):
 @login_required
 @require_http_methods(["POST"])
 def undo_promotion(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     try:
         data = json.loads(request.body)
     except Exception:
@@ -2556,9 +2568,9 @@ def undo_promotion(request):
 @login_required
 @require_GET
 def promotion_logs(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     student_id = request.GET.get('student_id')
     qs = PromotionLog.objects.select_related('student', 'from_class', 'to_class', 'performed_by')
     if student_id:
@@ -2590,7 +2602,8 @@ def enter_marks(request):
     user = request.user
     is_headteacher = hasattr(user, 'headteacher')
     is_superuser = user.is_superuser
-    if is_headteacher or is_superuser:
+    has_academics_role = user_has_permission(user, school, 'academics')
+    if is_headteacher or is_superuser or has_academics_role:
         classes_qs = ClassRoom.objects.filter(school=school)
         subjects_qs = Subject.objects.filter(school=school).select_related('pathway', 'education_level')
     elif hasattr(user, 'teacher'):
@@ -3655,10 +3668,9 @@ def export_classes_pdf(request):
 
 @login_required
 def students_page(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = request.user.headteacher.school
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     students = Student.objects.filter(school=school).select_related(
         'classroom__level', 'stream'
     ).select_related('studentpathway__pathway').order_by('last_name', 'first_name')
@@ -3680,10 +3692,9 @@ def students_page(request):
 
 @login_required
 def admit_student_ajax(request):
-    if not hasattr(request.user, 'headteacher'):
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
         return JsonResponse({'error': 'Access denied'}, status=403)
-
-    school = request.user.headteacher.school
 
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request'}, status=400)
@@ -3739,10 +3750,9 @@ def delete_class(request, class_id):
 
 @login_required
 def delete_student(request, student_id):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'students')
+    if denied:
+        return denied
     try:
         student = Student.objects.get(id=student_id, school=school)
     except Student.DoesNotExist:
@@ -4071,7 +4081,8 @@ def merit_lists(request):
     is_headteacher = hasattr(request.user, 'headteacher')
     is_superuser = request.user.is_superuser
     is_teacher = hasattr(request.user, 'teacher')
-    if not (is_headteacher or is_superuser or is_teacher):
+    has_academics_role = user_has_permission(request.user, school, 'academics')
+    if not (is_headteacher or is_superuser or is_teacher or has_academics_role):
         return HttpResponseForbidden()
     if is_teacher and not request.user.teacher.is_class_teacher:
         return HttpResponseForbidden('Merit lists are available to class teachers only.')
@@ -5537,7 +5548,8 @@ def _analysis_page(request, default_scope='class'):
     is_headteacher = hasattr(request.user, 'headteacher')
     is_superuser = request.user.is_superuser
     is_teacher = hasattr(request.user, 'teacher')
-    if not (is_headteacher or is_superuser or is_teacher):
+    has_academics_role = user_has_permission(request.user, school, 'academics')
+    if not (is_headteacher or is_superuser or is_teacher or has_academics_role):
         return HttpResponseForbidden()
 
     analysis_scope = (request.GET.get('scope') or default_scope or 'class').strip().lower()
@@ -6569,9 +6581,9 @@ def whole_school_subject_stream_analysis(request):
 
 @login_required
 def report_cards(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'academics')
+    if denied:
+        return denied
     context = {
         'school': school,
         'classes': ClassRoom.objects.filter(school=school).order_by('order', 'name'),
@@ -6584,10 +6596,9 @@ def report_cards(request):
 @login_required
 @require_GET
 def report_cards_data(request):
-    if not hasattr(request.user, 'headteacher'):
-        return HttpResponseForbidden()
-
-    school = get_user_school(request.user)
+    school, denied = _require_school_permission(request, 'academics')
+    if denied:
+        return denied
     class_id = request.GET.get('class_id')
     exam_id = request.GET.get('exam_id')
     term = (request.GET.get('term') or '').strip()
@@ -7212,7 +7223,10 @@ def report_cards_data(request):
 
 @login_required
 def send_reports(request):
-    return render(request, 'schools/send_reports.html', {})
+    school, denied = _require_school_permission(request, 'academics')
+    if denied:
+        return denied
+    return render(request, 'schools/send_reports.html', {'school': school})
 
 
 def _slugify_name_for_username(value: str) -> str:
@@ -7335,10 +7349,9 @@ def _split_full_name(value: str):
 
 @login_required
 def new_user(request):
-    if not hasattr(request.user, 'headteacher'):
+    school = resolve_user_school(request.user)
+    if not school or not has_full_headteacher_access(request.user, school):
         return HttpResponseForbidden()
-
-    school = request.user.headteacher.school
     teachers = Teacher.objects.filter(school=school).select_related('user').order_by('user__first_name', 'user__last_name')
     staff_qs = Staff.objects.filter(school=school).order_by('full_name')
     classes_qs = ClassRoom.objects.filter(school=school)
@@ -7525,10 +7538,9 @@ def new_user(request):
 
 @login_required
 def user_updates(request):
-    if not hasattr(request.user, 'headteacher'):
+    school = resolve_user_school(request.user)
+    if not school or not has_full_headteacher_access(request.user, school):
         return HttpResponseForbidden()
-
-    school = request.user.headteacher.school
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     classes = ClassRoom.objects.filter(school=school).order_by('name')
     teachers = list(Teacher.objects.filter(school=school).select_related('user'))
@@ -7573,6 +7585,7 @@ def user_updates(request):
         is_active = bool(data.get('is_active', True))
         role_teacher = bool(data.get('is_teacher'))
         role_staff = bool(data.get('is_staff'))
+        access_role = (data.get('access_role') or '').strip().upper()
         is_class_teacher = bool(data.get('is_class_teacher'))
         class_teacher_for = data.get('class_teacher_for')
         class_teacher_stream = data.get('class_teacher_stream')
@@ -7630,6 +7643,24 @@ def user_updates(request):
                     is_teacher=role_teacher,
                     staff_id=(cast(Any, staff_match).id if staff_match else None),
                 )
+            role_obj = SchoolUserAccess.objects.filter(user=user).first()
+            if access_role in dict(SchoolUserAccess.ROLE_CHOICES):
+                if role_obj is None:
+                    SchoolUserAccess.objects.create(
+                        school=school,
+                        user=user,
+                        role=access_role,
+                        is_active=True,
+                        granted_by=request.user,
+                    )
+                else:
+                    role_obj.school = school
+                    role_obj.role = access_role
+                    role_obj.is_active = True
+                    role_obj.granted_by = request.user
+                    role_obj.save()
+            elif role_obj and role_obj.school_id == cast(Any, school).id:
+                role_obj.delete()
         except Exception as exc:
             return JsonResponse({'success': False, 'error': str(exc)}, status=500)
 
@@ -7642,6 +7673,7 @@ def user_updates(request):
                 'is_active': user.is_active,
                 'is_teacher': role_teacher,
                 'is_staff': role_staff,
+                'access_role': access_role,
             }
         })
 
@@ -7665,6 +7697,7 @@ def user_updates(request):
         email_key = (user.email or '').strip().lower()
         teacher = teachers_by_user_id.get(cast(Any, user).id)
         staff = staff_by_email.get(email_key)
+        access_role = SchoolUserAccess.objects.filter(user=user, school=school, is_active=True).values_list('role', flat=True).first() or ''
 
         class_teacher_for = ''
         class_teacher_stream = ''
@@ -7693,12 +7726,14 @@ def user_updates(request):
             'class_teacher_stream': class_teacher_stream,
             'class_teacher_for_id': class_teacher_for_id,
             'class_teacher_stream_id': class_teacher_stream_id,
+            'access_role': access_role,
         })
 
     return render(request, 'schools/user_updates.html', {
         'school': school,
         'classes': classes,
         'users_with_meta': user_rows,
+        'access_role_choices': SchoolUserAccess.ROLE_CHOICES,
     })
 
 def get_filtered_students(school, class_id, subject_id=None):
@@ -7730,7 +7765,8 @@ def entered_marks(request):
     is_headteacher = hasattr(request.user, 'headteacher')
     is_superuser = request.user.is_superuser
     is_teacher = hasattr(request.user, 'teacher')
-    if not (is_headteacher or is_superuser or is_teacher):
+    has_academics_role = user_has_permission(request.user, school, 'academics')
+    if not (is_headteacher or is_superuser or is_teacher or has_academics_role):
         return HttpResponseForbidden()
 
     term = (request.GET.get('term') or '').strip()
@@ -7934,11 +7970,9 @@ def entered_marks(request):
 
 @login_required
 def set_exams(request):
-    if not hasattr(request.user, 'headteacher') and not request.user.is_superuser:
-        return HttpResponseForbidden()
-    school = get_user_school(request.user)
-    if not school:
-        return HttpResponseForbidden()
+    school, denied = _require_school_permission(request, 'academics')
+    if denied:
+        return denied
 
     exams = Exam.objects.filter(school=school).order_by('-year', 'term', 'start_date', 'title')
     return render(request, 'schools/set_exams.html', {
@@ -7950,11 +7984,9 @@ def set_exams(request):
 @login_required
 @require_POST
 def toggle_exam_lock(request, exam_id):
-    if not hasattr(request.user, 'headteacher') and not request.user.is_superuser:
-        return HttpResponseForbidden()
-    school = get_user_school(request.user)
-    if not school:
-        return HttpResponseForbidden()
+    school, denied = _require_school_permission(request, 'academics')
+    if denied:
+        return denied
 
     exam = get_object_or_404(Exam, id=exam_id, school=school)
     exam_any = cast(Any, exam)

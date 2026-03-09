@@ -162,6 +162,33 @@ class HeadTeacher(models.Model):
         return f"{self.full_name} - {self.school.name}"
 
 
+class SchoolUserAccess(models.Model):
+    ROLE_DEAN = 'DEAN'
+    ROLE_SECRETARY = 'SECRETARY'
+    ROLE_ACCOUNTS = 'ACCOUNTS'
+    ROLE_DEPUTY = 'DEPUTY'
+    ROLE_CHOICES = (
+        (ROLE_DEAN, 'Dean'),
+        (ROLE_SECRETARY, 'Secretary'),
+        (ROLE_ACCOUNTS, 'Accounts (Bursar)'),
+        (ROLE_DEPUTY, 'Deputy'),
+    )
+
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='user_access_roles')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='school_access_role')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    is_active = models.BooleanField(default=True)
+    granted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='granted_school_roles')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'School User Access Role'
+        verbose_name_plural = 'School User Access Roles'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.role} ({self.school.name})"
+
+
 # 🏫 CLASSROOM MODEL
 class ClassRoom(models.Model):
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='classes')

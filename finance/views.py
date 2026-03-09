@@ -19,14 +19,16 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from schools.models import ClassRoom, Student, TermDate
+from schools.access import get_user_school, user_has_permission
 from .forms import ExpenditureForm
 from .models import Expenditure, FeePayment, FeePaymentAllocation, FeeStructure
 from .sms import send_fee_reminder
 
 
 def _headteacher_school(request):
-    if hasattr(request.user, 'headteacher'):
-        return request.user.headteacher.school
+    school = get_user_school(request.user)
+    if school and (request.user.is_superuser or user_has_permission(request.user, school, 'finance')):
+        return school
     return None
 
 

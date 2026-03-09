@@ -36,6 +36,7 @@
             <th>Name</th>
             <th>Email</th>
             <th>Phone</th>
+            <th>Access Role</th>
             <th>Teacher</th>
             <th>Staff</th>
             <th>Class Teacher</th>
@@ -49,6 +50,7 @@
             <td>{{ item.user.get_full_name }}</td>
             <td>{{ item.user.email }}</td>
             <td>{{ item.phone|default:'-' }}</td>
+            <td>{{ item.access_role|default:'-' }}</td>
             <td>{% if item.is_teacher %}✓{% else %}-{% endif %}</td>
             <td>{% if item.is_staff %}✓{% else %}-{% endif %}</td>
             <td>
@@ -76,6 +78,7 @@
                 data-is-active="{% if item.user.is_active %}1{% else %}0{% endif %}"
                 data-role-teacher="{% if item.is_teacher %}1{% else %}0{% endif %}"
                 data-role-staff="{% if item.is_staff %}1{% else %}0{% endif %}"
+                data-access-role="{{ item.access_role }}"
                 data-is-class="{% if item.teacher and item.teacher.is_class_teacher %}1{% else %}0{% endif %}"
                 data-class-id="{{ item.class_teacher_for_id }}"
                 data-stream-id="{{ item.class_teacher_stream_id }}"
@@ -86,7 +89,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="8" style="color:#6b7280;">No users found.</td></tr>
+          <tr><td colspan="9" style="color:#6b7280;">No users found.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -129,6 +132,15 @@
         <label class="label"><input type="checkbox" name="is_staff" id="is-staff" /> Staff</label>
       </div>
       <div>
+        <label class="label">Access Role</label>
+        <select class="select" name="access_role" id="access-role">
+          <option value="">No extra role</option>
+          {% for code,label in access_role_choices %}
+            <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
         <label class="label"><input type="checkbox" name="is_class_teacher" id="is-class-teacher" /> Is Class Teacher</label>
       </div>
       <div id="class-wrap" style="display:none;">
@@ -168,6 +180,7 @@ const passwordInput = document.getElementById('password');
 const isActive = document.getElementById('is-active');
 const isTeacher = document.getElementById('is-teacher');
 const isStaff = document.getElementById('is-staff');
+const accessRole = document.getElementById('access-role');
 const isClassTeacher = document.getElementById('is-class-teacher');
 const classWrap = document.getElementById('class-wrap');
 const streamWrap = document.getElementById('stream-wrap');
@@ -234,6 +247,7 @@ document.querySelectorAll('.open-edit').forEach(btn => {
     isActive.checked = btn.dataset.isActive === '1';
     isTeacher.checked = btn.dataset.roleTeacher === '1';
     isStaff.checked = btn.dataset.roleStaff === '1';
+    accessRole.value = btn.dataset.accessRole || '';
     isClassTeacher.checked = btn.dataset.isClass === '1';
     syncTeacherUi();
 

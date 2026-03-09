@@ -10,6 +10,7 @@ from .models import SiteConfig
 from .models import Exam
 from .models import SubjectAllocation
 from .models import TeacherAssignment
+from .models import SchoolUserAccess
 def get_user_school(user):
     if hasattr(user, 'headteacher'):
         return user.headteacher.school
@@ -273,5 +274,11 @@ class SiteConfigAdmin(admin.ModelAdmin):
         return request.user.is_superuser
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
+
+
+@admin.register(SchoolUserAccess)
+class SchoolUserAccessAdmin(admin.ModelAdmin):
+    list_display = ('user', 'school', 'role', 'is_active', 'updated_at')
+    list_filter = ('school', 'role', 'is_active')
 
 

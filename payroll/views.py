@@ -19,14 +19,16 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from schools.models import Teacher
+from schools.access import get_user_school, has_full_headteacher_access
 
 from .forms import PayrollRecordForm, StaffForm
 from .models import PayrollAllowance, PayrollOtherDeduction, PayrollRecord, Staff
 
 
 def _headteacher_school(request):
-    if hasattr(request.user, 'headteacher'):
-        return request.user.headteacher.school
+    school = get_user_school(request.user)
+    if school and (request.user.is_superuser or has_full_headteacher_access(request.user, school)):
+        return school
     return None
 
 
