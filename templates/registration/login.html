@@ -96,6 +96,11 @@
                 {{ signup_form.school_type }}
                 {% for err in signup_form.school_type.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
             </div>
+            <div class="input-box" id="cambridge-grading-wrap">
+                {{ signup_form.cambridge_grading_system.label_tag }}
+                {{ signup_form.cambridge_grading_system }}
+                {% for err in signup_form.cambridge_grading_system.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+            </div>
             <div class="input-box">
                 {{ signup_form.school_category.label_tag }}
                 {{ signup_form.school_category }}
@@ -165,5 +170,19 @@
     </div>
 
 </div>
+
+<script>
+(function(){
+  const schoolType = document.getElementById('id_school_type');
+  const wrap = document.getElementById('cambridge-grading-wrap');
+  if (!schoolType || !wrap) return;
+  const sync = () => {
+    const isCambridge = (schoolType.value || '').toUpperCase() === 'CAMBRIDGE';
+    wrap.style.display = isCambridge ? '' : 'none';
+  };
+  schoolType.addEventListener('change', sync);
+  sync();
+})();
+</script>
 
 {% endblock %}

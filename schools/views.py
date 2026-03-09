@@ -727,6 +727,103 @@ def calculate_points(grade):
     return GRADE_POINTS.get(grade, 0)
 
 
+CAMBRIDGE_9_1_BANDS = [
+    (90, 100, '9', 9),
+    (80, 89.99, '8', 8),
+    (70, 79.99, '7', 7),
+    (60, 69.99, '6', 6),
+    (50, 59.99, '5', 5),
+    (40, 49.99, '4', 4),
+    (30, 39.99, '3', 3),
+    (20, 29.99, '2', 2),
+    (0, 19.99, '1', 1),
+]
+
+CAMBRIDGE_A_G_BANDS = [
+    (80, 100, 'A', 7),
+    (70, 79.99, 'B', 6),
+    (60, 69.99, 'C', 5),
+    (50, 59.99, 'D', 4),
+    (40, 49.99, 'E', 3),
+    (30, 39.99, 'F', 2),
+    (0, 29.99, 'G', 1),
+]
+
+CAMBRIDGE_COMMENT_BANK = {
+    '9': 'Outstanding mastery of the subject. Keep stretching with advanced tasks.',
+    '8': 'Excellent performance with strong understanding and consistent effort.',
+    '7': 'Very good performance. Continue refining depth and accuracy.',
+    '6': 'Good performance with clear progress. Build consistency for higher bands.',
+    '5': 'Satisfactory performance. More targeted practice will raise attainment.',
+    '4': 'Basic pass achieved. Focus on core gaps to strengthen understanding.',
+    '3': 'Below expected level. Regular guided practice is needed.',
+    '2': 'Significant support needed. Focus on fundamentals and stepwise improvement.',
+    '1': 'Very low attainment currently. Intensive support and practice required.',
+    'A': 'Excellent standard attained. Maintain this high-quality performance.',
+    'B': 'Strong performance with good command of key concepts.',
+    'C': 'Credit-level performance. Continue focused practice to improve.',
+    'D': 'Developing pass. Work on weaker areas to secure stronger outcomes.',
+    'E': 'Borderline pass. Consistent revision and support are required.',
+    'F': 'Limited attainment. Urgent reinforcement and guided practice needed.',
+    'G': 'Very weak attainment. Immediate intervention is required.',
+}
+
+
+def _default_cambridge_bands(school) -> list[tuple[float, float, str, int]]:
+    scheme = getattr(school, 'cambridge_grading_system', 'CAMB_9_1')
+    if scheme == 'CAMB_A_G':
+        return CAMBRIDGE_A_G_BANDS
+    return CAMBRIDGE_9_1_BANDS
+
+
+def _normalize_pct(score: Any, out_of: Any) -> float:
+    try:
+        score_val = float(score or 0)
+        out_val = float(out_of or 0)
+        if out_val <= 0:
+            return 0.0
+        return round((score_val / out_val) * 100, 4)
+    except Exception:
+        return 0.0
+
+
+def _parse_exam_weights_param(raw_weights: str | None, exam_ids: list[int]) -> dict[int, float]:
+    weights: dict[int, float] = {int(eid): 1.0 for eid in exam_ids}
+    if not raw_weights:
+        return weights
+    try:
+        payload = json.loads(raw_weights)
+    except Exception:
+        return weights
+    if not isinstance(payload, dict):
+        return weights
+    for key, value in payload.items():
+        try:
+            exam_id = int(key)
+            if exam_id not in weights:
+                continue
+            weight = float(value)
+            if weight > 0:
+                weights[exam_id] = weight
+        except Exception:
+            continue
+    return weights
+
+
+def _weighted_mean(pairs: list[tuple[float, float]]) -> float | None:
+    if not pairs:
+        return None
+    total_weight = sum(float(w or 0) for _v, w in pairs if float(w or 0) > 0)
+    if total_weight <= 0:
+        return None
+    weighted_total = sum(float(v or 0) * float(w or 0) for v, w in pairs if float(w or 0) > 0)
+    return round(weighted_total / total_weight, 2)
+
+
+def _cambridge_comment_for_level(level: str) -> str:
+    return CAMBRIDGE_COMMENT_BANK.get(str(level or '').upper(), 'Steady progress noted. Keep practicing consistently.')
+
+
 def resolve_cbe_level(school, class_level_name):
     if not school:
         return class_level_name
@@ -2013,7 +2110,9 @@ def login_view(request):
                         school = School.objects.create(
                             name=signup_form.cleaned_data['school_name'],
                             school_type=signup_form.cleaned_data['school_type'],
+                            system_type=('CBE' if signup_form.cleaned_data['school_type'] == 'CBE' else '844'),
                             school_category=signup_form.cleaned_data.get('school_category', 'PRIMARY'),
+                            cambridge_grading_system=signup_form.cleaned_data.get('cambridge_grading_system') or 'CAMB_9_1',
                             address=signup_form.cleaned_data.get('address', ''),
                             phone=signup_form.cleaned_data.get('phone', ''),
                             email=school_email,
@@ -2083,7 +2182,9 @@ def signup(request):
                     school = School.objects.create(
                         name=form.cleaned_data['school_name'],
                         school_type=form.cleaned_data['school_type'],
+                        system_type=('CBE' if form.cleaned_data['school_type'] == 'CBE' else '844'),
                         school_category=form.cleaned_data.get('school_category', 'PRIMARY'),
+                        cambridge_grading_system=form.cleaned_data.get('cambridge_grading_system') or 'CAMB_9_1',
                         address=form.cleaned_data.get('address', ''),
                         phone=form.cleaned_data.get('phone', ''),
                         email=school_email,
@@ -3754,8 +3855,11 @@ def grading(request):
         return HttpResponseForbidden()
 
     school = get_user_school(request.user)
+    if not school:
+        return HttpResponseForbidden()
     read_only = False
-    show_junior_section = bool(school and school.allows_level('Junior'))
+    is_cambridge = getattr(school, 'school_type', '') == 'CAMBRIDGE'
+    show_junior_section = bool((not is_cambridge) and school and school.allows_level('Junior'))
 
     section_prefixes = {
         'LOWER_PRIMARY': 'L',
@@ -3792,6 +3896,8 @@ def grading(request):
             grade = (data.get('grade') or '').strip()
             points = int(data.get('points') or 0)
             section = (data.get('section') or 'GENERAL').strip()
+            if is_cambridge:
+                section = 'GENERAL'
             if min_score < 0 or max_score < 0 or max_score < min_score:
                 raise ValueError('Invalid score range')
             if not grade:
@@ -3822,28 +3928,39 @@ def grading(request):
             return redirect('grading')
 
     # Seed section scales from fixed defaults if missing, so each section is editable in-place.
-    default_section_bands = {
-        'LOWER_PRIMARY': LOWER_PRIMARY_LEVEL_BANDS,
-        'UPPER_PRIMARY': UPPER_PRIMARY_LEVEL_BANDS,
-    }
-    if show_junior_section:
-        default_section_bands['JUNIOR'] = JUNIOR_LEVEL_BANDS
-
-    for section_key, bands in default_section_bands.items():
-        section_prefix = section_prefixes.get(section_key, '')
-        exists = GradeScale.objects.filter(school=school, grade__startswith=section_prefix).exists()
-        if not exists:
-            for min_score, max_score, level, _points in bands:
-                packed_grade = pack_grade(section_key, level)
-                if len(packed_grade) > 5:
-                    continue
+    if is_cambridge:
+        if not GradeScale.objects.filter(school=school).exists():
+            for min_score, max_score, grade_label, points in _default_cambridge_bands(school):
                 GradeScale.objects.create(
                     school=school,
                     min_score=float(min_score),
                     max_score=float(max_score),
-                    grade=packed_grade,
-                    points=int(_points),
+                    grade=str(grade_label),
+                    points=int(points),
                 )
+    else:
+        default_section_bands = {
+            'LOWER_PRIMARY': LOWER_PRIMARY_LEVEL_BANDS,
+            'UPPER_PRIMARY': UPPER_PRIMARY_LEVEL_BANDS,
+        }
+        if show_junior_section:
+            default_section_bands['JUNIOR'] = JUNIOR_LEVEL_BANDS
+
+        for section_key, bands in default_section_bands.items():
+            section_prefix = section_prefixes.get(section_key, '')
+            exists = GradeScale.objects.filter(school=school, grade__startswith=section_prefix).exists()
+            if not exists:
+                for min_score, max_score, level, _points in bands:
+                    packed_grade = pack_grade(section_key, level)
+                    if len(packed_grade) > 5:
+                        continue
+                    GradeScale.objects.create(
+                        school=school,
+                        min_score=float(min_score),
+                        max_score=float(max_score),
+                        grade=packed_grade,
+                        points=int(_points),
+                    )
 
     raw_scales = GradeScale.objects.filter(school=school).order_by('-min_score')
     sectioned_scales = {
@@ -3873,6 +3990,8 @@ def grading(request):
         'junior_bands': JUNIOR_LEVEL_BANDS,
         'lower_primary_bands': LOWER_PRIMARY_LEVEL_BANDS,
         'upper_primary_bands': UPPER_PRIMARY_LEVEL_BANDS,
+        'is_cambridge': is_cambridge,
+        'cambridge_scheme': getattr(school, 'cambridge_grading_system', 'CAMB_9_1'),
     })
 
 
@@ -3899,7 +4018,7 @@ def edit_grade_scale(request, pk):
     if not hasattr(request.user, 'headteacher'):
         return HttpResponseForbidden()
     school = get_user_school(request.user)
-    if school and school.school_category == 'PRIMARY':
+    if school and school.school_type != 'CAMBRIDGE' and school.school_category == 'PRIMARY':
         return JsonResponse({'success': False, 'error': 'Grade scales are read-only for Lower/Upper Primary.'})
     try:
         gs = get_object_or_404(GradeScale, pk=pk, school=school)
@@ -3915,6 +4034,8 @@ def edit_grade_scale(request, pk):
         grade = (data.get('grade') or '').strip()
         points = int(data.get('points') or 0)
         section = (data.get('section') or 'GENERAL').strip()
+        if school and school.school_type == 'CAMBRIDGE':
+            section = 'GENERAL'
         if min_score < 0 or max_score < 0 or max_score < min_score:
             return JsonResponse({'success': False, 'error': 'Invalid score range'})
         if not grade:
@@ -3945,7 +4066,7 @@ def delete_grade_scale(request, pk):
     if not hasattr(request.user, 'headteacher'):
         return HttpResponseForbidden()
     school = get_user_school(request.user)
-    if school and school.school_category == 'PRIMARY':
+    if school and school.school_type != 'CAMBRIDGE' and school.school_category == 'PRIMARY':
         return JsonResponse({'success': False, 'error': 'Grade scales are read-only for Lower/Upper Primary.'})
     try:
         gs = get_object_or_404(GradeScale, pk=pk, school=school)
@@ -5573,7 +5694,8 @@ def _split_section_from_grade(raw_grade: str) -> tuple[str, str]:
 
 
 def _build_grade_resolver_for_class(school: School, classroom: ClassRoom, resolved_level: str | None):
-    selected_section = _grading_section_for_classroom(classroom, resolved_level)
+    is_cambridge = getattr(school, 'school_type', '') == 'CAMBRIDGE'
+    selected_section = 'GENERAL' if is_cambridge else _grading_section_for_classroom(classroom, resolved_level)
     all_grade_bands = list(
         GradeScale.objects.filter(school=school).order_by('-min_score').values('min_score', 'max_score', 'grade', 'points')
     )
@@ -5632,6 +5754,7 @@ def subject_analysis_data(request):
     class_id = request.GET.get('class_id')
     exam_id = request.GET.get('exam_id')
     term = (request.GET.get('term') or '').strip()
+    raw_exam_weights = request.GET.get('exam_weights')
     analysis_scope = (request.GET.get('scope') or 'class').strip().lower()
     if analysis_scope not in {'class', 'subject'}:
         analysis_scope = 'class'
@@ -5700,11 +5823,21 @@ def subject_analysis_data(request):
         marks_qs = StudentMark.objects.filter(
             marksheet__in=mark_sheets,
             score__isnull=False,
-        ).values('student_id').annotate(
-            avg_score=Avg('score')
-        )
+        ).values('student_id', 'score', 'marksheet__out_of')
 
-        student_ids = [row['student_id'] for row in marks_qs]
+        student_pct_map: dict[int, list[float]] = defaultdict(list)
+        for row in marks_qs:
+            sid = row.get('student_id')
+            if sid is None:
+                continue
+            pct = _normalize_pct(row.get('score'), row.get('marksheet__out_of'))
+            student_pct_map[int(sid)].append(pct)
+
+        student_avg_scores = {
+            sid: round(sum(vals) / len(vals), 2)
+            for sid, vals in student_pct_map.items() if vals
+        }
+        student_ids = list(student_avg_scores.keys())
         students_map = {
             cast(Any, s).id: s for s in Student.objects.filter(
                 id__in=student_ids,
@@ -5718,13 +5851,12 @@ def subject_analysis_data(request):
         if include_no_stream:
             stream_scores['no_stream'] = []
         
-        for row in marks_qs:
-            student = students_map.get(row['student_id'])
+        for sid, score in student_avg_scores.items():
+            student = students_map.get(sid)
             if not student:
                 continue
             student_any = cast(Any, student)
             stream_key = str(student_any.stream_id) if student_any.stream_id else 'no_stream'
-            score = float(row['avg_score'] or 0)
             grade = resolve_grade(score)
             if grade != '--' and stream_key in distribution:
                 distribution[stream_key][grade] += 1
@@ -5737,6 +5869,7 @@ def subject_analysis_data(request):
             'term': term_filter or exam.term,
             'distribution': distribution,
             'stream_scores': stream_scores,
+            'student_scores': student_avg_scores,
         }
 
     def compute_metrics(stream_scores):
@@ -5816,21 +5949,48 @@ def subject_analysis_data(request):
         })
 
     exams = Exam.objects.filter(school=school, term=term).order_by('-year', 'title')
+    exam_ids_for_term = [cast(Any, ex).id for ex in exams]
+    exam_weights = _parse_exam_weights_param(raw_exam_weights, exam_ids_for_term)
     results = []
     for exam in exams:
         payload = compute_exam_distribution(exam, term)
         if payload:
+            payload['weight'] = float(exam_weights.get(cast(Any, exam).id, 1.0))
             results.append(payload)
 
-    # Calculate metrics from all exams combined
+    # Calculate weighted metrics from all exams combined (per student)
+    student_weighted_scores: dict[int, dict[str, float]] = defaultdict(lambda: {'sum': 0.0, 'weight': 0.0})
+    for result in results:
+        weight = float(result.get('weight') or 1.0)
+        for sid, score in (result.get('student_scores') or {}).items():
+            sid_int = int(sid)
+            student_weighted_scores[sid_int]['sum'] += float(score) * weight
+            student_weighted_scores[sid_int]['weight'] += weight
+
+    students_map = {
+        cast(Any, s).id: s for s in Student.objects.filter(
+            id__in=list(student_weighted_scores.keys()),
+            school=school,
+            classroom=classroom
+        ).select_related('stream')
+    }
+
     combined_scores = {str(s['id']): [] for s in streams}
     if include_no_stream:
         combined_scores['no_stream'] = []
-    
-    for result in results:
-        for stream_key, scores in result.get('stream_scores', {}).items():
-            if stream_key in combined_scores:
-                combined_scores[stream_key].extend(scores)
+
+    for sid, acc in student_weighted_scores.items():
+        total_weight = float(acc.get('weight') or 0.0)
+        if total_weight <= 0:
+            continue
+        avg_score = round(float(acc.get('sum') or 0.0) / total_weight, 2)
+        student = students_map.get(sid)
+        if not student:
+            continue
+        student_any = cast(Any, student)
+        stream_key = str(student_any.stream_id) if student_any.stream_id else 'no_stream'
+        if stream_key in combined_scores:
+            combined_scores[stream_key].append(avg_score)
     
     metrics = compute_metrics(combined_scores) if results else {}
 
@@ -5846,6 +6006,7 @@ def subject_analysis_data(request):
         'is_primary': is_primary,
         'metrics': metrics,
         'data': results,
+        'exam_weights': exam_weights,
     })
 
 
@@ -6061,11 +6222,18 @@ def whole_school_subject_stream_analysis(request):
     class_id = request.GET.get("class_id")
     exam_id = request.GET.get("exam_id")
     term = request.GET.get("term")
+    raw_exam_weights = request.GET.get("exam_weights")
     compare_exam_id = request.GET.get("compare_exam_id")
     split_by_stream = request.GET.get("split_by_stream") == "true"
+    show_ranking_param = request.GET.get("show_ranking")
     analysis_scope = (request.GET.get('scope') or 'class').strip().lower()
     if analysis_scope not in {'class', 'subject'}:
         analysis_scope = 'class'
+    is_cambridge = getattr(school_any, 'school_type', '') == 'CAMBRIDGE'
+    if show_ranking_param is None:
+        show_ranking = (not is_cambridge) or bool(getattr(school_any, 'cambridge_show_ranking', False))
+    else:
+        show_ranking = str(show_ranking_param).strip().lower() in {'1', 'true', 'yes', 'on'}
 
     if not class_id:
         return JsonResponse({"success": False, "error": "Please select a class."}, status=400)
@@ -6109,6 +6277,18 @@ def whole_school_subject_stream_analysis(request):
     if teacher_scope_subject_ids is not None:
         results = results.filter(marksheet__subject_id__in=teacher_scope_subject_ids)
 
+    exam_ids_for_weights: list[int] = []
+    if exam_id:
+        try:
+            exam_ids_for_weights = [int(exam_id)]
+        except Exception:
+            exam_ids_for_weights = []
+    elif term:
+        exam_ids_for_weights = list(
+            Exam.objects.filter(school=school, term=term).values_list('id', flat=True)
+        )
+    exam_weights = _parse_exam_weights_param(raw_exam_weights, exam_ids_for_weights)
+
     resolve_grade_points, grades_list = _build_grade_resolver_for_class(school, classroom, resolved_level)
 
     data_by_stream = defaultdict(list)
@@ -6119,12 +6299,17 @@ def whole_school_subject_stream_analysis(request):
         stream_name = r.student.stream.name if (split_by_stream and r.student.stream) else "All Streams"
         subject_name = r.marksheet.subject.name if r.marksheet.subject else "N/A"
 
+        marksheet_any = cast(Any, r.marksheet)
+        exam_pk = int(getattr(marksheet_any, 'exam_id', 0) or 0)
+        exam_weight = float(exam_weights.get(exam_pk, 1.0))
+        pct_score = _normalize_pct(cast(Any, r).score, getattr(marksheet_any, 'out_of', 100))
         data_by_stream[stream_name].append({
             "subject": subject_name,
-            "mark": r.score
+            "mark": pct_score,
+            "weight": exam_weight,
         })
 
-        grade, _pts = resolve_grade_points(float(cast(Any, r).score))
+        grade, _pts = resolve_grade_points(pct_score)
         if grade in grades_list:
             subject_grade_distribution[subject_name][stream_name][grade] += 1
             subject_grade_totals[subject_name][grade] += 1
@@ -6145,41 +6330,44 @@ def whole_school_subject_stream_analysis(request):
     stream_outputs = []
 
     for stream_name, records in data_by_stream.items():
-        subject_marks = defaultdict(list)
+        subject_marks: dict[str, list[tuple[float, float]]] = defaultdict(list)
 
         for rec in records:
-            subject_marks[rec["subject"]].append(rec["mark"])
+            subject_marks[rec["subject"]].append((float(rec["mark"] or 0), float(rec.get("weight") or 1.0)))
 
         stream_means = {}
         stream_levels = {}
         performance = {}
 
-        all_stream_marks = []
+        all_stream_marks: list[tuple[float, float]] = []
 
         for subject in subjects:
             marks = subject_marks.get(subject, [])
             if not marks:
                 continue
 
-            mean_mark = round(sum(marks) / len(marks), 2)
+            weighted = _weighted_mean(marks)
+            mean_mark = round(float(weighted if weighted is not None else 0.0), 2)
             stream_means[subject] = mean_mark
             stream_levels[subject] = resolve_grade_points(mean_mark)[0]
 
             class_subject_totals[subject].extend(marks)
             all_stream_marks.extend(marks)
 
+            raw_scores = [m[0] for m in marks]
             performance[subject] = {
                 "mean": mean_mark,
                 "grade": resolve_grade_points(mean_mark)[0],
-                "highest": max(marks),
-                "lowest": min(marks),
-                "entries": len(marks),
+                "highest": max(raw_scores) if raw_scores else 0,
+                "lowest": min(raw_scores) if raw_scores else 0,
+                "entries": len(raw_scores),
                 "pass_rate": round(
-                    (len([m for m in marks if m >= 50]) / len(marks)) * 100, 1
+                    (len([m for m in raw_scores if m >= 50]) / len(raw_scores)) * 100, 1
                 )
             }
 
-        class_mean = round(sum(all_stream_marks) / len(all_stream_marks), 2) if all_stream_marks else ""
+        class_mean_calc = _weighted_mean(all_stream_marks)
+        class_mean = round(float(class_mean_calc), 2) if class_mean_calc is not None else ""
 
         stream_outputs.append({
             "stream_name": stream_name,
@@ -6195,12 +6383,14 @@ def whole_school_subject_stream_analysis(request):
     overall_marks = []
 
     for subject, marks in class_subject_totals.items():
-        mean_mark = round(sum(marks) / len(marks), 2)
+        weighted = _weighted_mean(marks)
+        mean_mark = round(float(weighted if weighted is not None else 0.0), 2)
         class_subject_means[subject] = mean_mark
         class_subject_levels[subject] = resolve_grade_points(mean_mark)[0]
         overall_marks.extend(marks)
 
-    overall_class_mean = round(sum(overall_marks) / len(overall_marks), 2) if overall_marks else ""
+    overall_weighted = _weighted_mean(overall_marks)
+    overall_class_mean = round(float(overall_weighted), 2) if overall_weighted is not None else ""
 
     subject_grade_distribution_dict = {
         subject: {stream: dict(counts) for stream, counts in streams.items()}
@@ -6238,7 +6428,8 @@ def whole_school_subject_stream_analysis(request):
             prev_subject_marks = defaultdict(list)
             for r in prev_results:
                 subject_name = r.marksheet.subject.name if r.marksheet.subject else "N/A"
-                prev_subject_marks[subject_name].append(r.score)
+                prev_pct = _normalize_pct(cast(Any, r).score, getattr(cast(Any, r).marksheet, 'out_of', 100))
+                prev_subject_marks[subject_name].append(prev_pct)
 
             for subject in subjects:
                 marks = prev_subject_marks.get(subject, [])
@@ -6253,9 +6444,9 @@ def whole_school_subject_stream_analysis(request):
                 s = r.student
                 s_any = cast(Any, s)
                 entry = cast(dict[str, Any], prev_student_scores[s_any.id])
-                score_val = float(cast(Any, r).score)
+                score_val = _normalize_pct(cast(Any, r).score, getattr(cast(Any, r).marksheet, 'out_of', 100))
                 entry["total"] = float(entry["total"]) + score_val
-                entry["count"] = int(entry["count"]) + 1
+                entry["count"] = float(entry["count"]) + 1.0
                 entry["stream"] = s_any.stream.name if s_any.stream else "No Stream"
 
             prev_stream_points = defaultdict(list)
@@ -6263,8 +6454,8 @@ def whole_school_subject_stream_analysis(request):
             for entry in prev_student_scores.values():
                 if entry["count"] == 0:
                     continue
-                count_val = int(entry["count"] or 0)
-                if count_val == 0:
+                count_val = float(entry["count"] or 0)
+                if count_val <= 0:
                     continue
                 avg_score = float(entry["total"] or 0) / count_val
                 grade, points = resolve_grade_points(avg_score)
@@ -6286,9 +6477,12 @@ def whole_school_subject_stream_analysis(request):
         s = r.student
         s_any = cast(Any, s)
         entry = cast(dict[str, Any], student_scores[s_any.id])
-        score_val = float(cast(Any, r).score)
-        entry["total"] = float(entry["total"]) + score_val
-        entry["count"] = int(entry["count"]) + 1
+        marksheet_any = cast(Any, r).marksheet
+        exam_pk = int(getattr(marksheet_any, 'exam_id', 0) or 0)
+        exam_weight = float(exam_weights.get(exam_pk, 1.0))
+        score_val = _normalize_pct(cast(Any, r).score, getattr(marksheet_any, 'out_of', 100))
+        entry["total"] = float(entry["total"]) + (score_val * exam_weight)
+        entry["count"] = float(entry["count"]) + exam_weight
         entry["stream"] = s_any.stream.name if s_any.stream else "No Stream"
 
     stream_grade_distribution = defaultdict(lambda: {g: 0 for g in grades_list})
@@ -6298,11 +6492,9 @@ def whole_school_subject_stream_analysis(request):
     overall_points = []
 
     for entry in student_scores.values():
-        if entry["count"] == 0:
+        if float(entry["count"] or 0) <= 0:
             continue
-        count_val = int(entry["count"] or 0)
-        if count_val == 0:
-            continue
+        count_val = float(entry["count"] or 0)
         avg_score = float(entry["total"] or 0) / count_val
         overall_avg_marks.append(avg_score)
         stream_name = entry["stream"]
@@ -6384,15 +6576,16 @@ def whole_school_subject_stream_analysis(request):
                 pathway = subject.pathway if subject else None
                 if not pathway:
                     continue
-                grade, points = resolve_grade_points(float(cast(Any, r).score))
+                score_pct = _normalize_pct(cast(Any, r).score, getattr(cast(Any, r).marksheet, 'out_of', 100))
+                grade, points = resolve_grade_points(score_pct)
                 if points is None:
                     points = 0
                 r_any = cast(Any, r)
                 pathway_student_points[pathway.name][r_any.student_id] += points
                 student_total_points[r_any.student_id] += points
-                student_total_marks[r_any.student_id] += float(r_any.score)
+                student_total_marks[r_any.student_id] += score_pct
                 student_subject_counts[r_any.student_id] += 1
-                pathway_subject_marks[pathway.name][subject.name].append(float(r_any.score))
+                pathway_subject_marks[pathway.name][subject.name].append(score_pct)
 
             pathway_stats = []
             best_pathway = None
@@ -6469,11 +6662,9 @@ def whole_school_subject_stream_analysis(request):
     top_students_overall = []
     student_rows = []
     for student_id, entry in student_scores.items():
-        if entry["count"] == 0:
+        if float(entry["count"] or 0) <= 0:
             continue
-        count_val = int(entry["count"] or 0)
-        if count_val == 0:
-            continue
+        count_val = float(entry["count"] or 0)
         avg_score = float(entry["total"] or 0) / count_val
         student = Student.objects.filter(id=student_id).first()
         if not student:
@@ -6505,8 +6696,8 @@ def whole_school_subject_stream_analysis(request):
             "admission_number": row["admission_number"],
             "name": row["name"],
             "stream": row["stream"],
-            "stream_rank": stream_ranks.get((row["stream"], row["admission_number"])),
-            "overall_rank": overall_ranks.get(row["admission_number"]),
+            "stream_rank": stream_ranks.get((row["stream"], row["admission_number"])) if show_ranking else None,
+            "overall_rank": overall_ranks.get(row["admission_number"]) if show_ranking else None,
             "mean_marks": row["avg_score"],
             "total_marks": row["total_marks"],
             "mean_points": None if is_primary else resolve_grade_points(row["avg_score"])[1],
@@ -6540,7 +6731,9 @@ def whole_school_subject_stream_analysis(request):
 
     return JsonResponse({
         "mode": "normal",
-        "classes": classes_output
+        "classes": classes_output,
+        "exam_weights": exam_weights,
+        "show_ranking": show_ranking,
     })
 
 
@@ -6567,6 +6760,8 @@ def report_cards_data(request):
     class_id = request.GET.get('class_id')
     exam_id = request.GET.get('exam_id')
     term = (request.GET.get('term') or '').strip()
+    raw_exam_weights = request.GET.get('exam_weights')
+    show_ranking_param = request.GET.get('show_ranking')
     if not class_id or not exam_id:
         return JsonResponse({'success': False, 'error': 'Please select class and exam.'}, status=400)
 
@@ -6629,6 +6824,13 @@ def report_cards_data(request):
     )
     exam_ids = [cast(Any, e).id for e in exams_in_term]
     exam_index = {eid: idx for idx, eid in enumerate(exam_ids)}
+    exam_weights = _parse_exam_weights_param(raw_exam_weights, exam_ids)
+    is_cambridge = getattr(school, 'school_type', '') == 'CAMBRIDGE'
+    default_cambridge_ranking = bool(getattr(school, 'cambridge_show_ranking', False))
+    if show_ranking_param is None:
+        show_ranking = (not is_cambridge) or default_cambridge_ranking
+    else:
+        show_ranking = str(show_ranking_param).strip().lower() in {'1', 'true', 'yes', 'on'}
 
     pathway_labels = {
         'STEM': 'STEM',
@@ -6791,7 +6993,7 @@ def report_cards_data(request):
         subj = cast(Any, ms.subject)
         out_of = float(ms.out_of or 0)
         score = float(sm_any.score or 0)
-        pct = round((score / out_of) * 100, 1) if out_of > 0 else 0.0
+        pct = round(_normalize_pct(score, out_of), 1)
         lvl, _pts = resolve_grade_points(pct)
         key = (sm_any.student_id, ex.id, subj.id)
         mark_map[key] = {
@@ -6867,10 +7069,15 @@ def report_cards_data(request):
     # Term overall ranking per student
     term_avg_by_student: dict[int, float] = {}
     for sid in student_ids:
-        vals = []
+        exam_pairs: list[tuple[float, float]] = []
         for ex_id in exam_ids:
-            vals.extend(exam_pct_by_student.get((sid, ex_id), []))
-        term_avg_by_student[sid] = round(sum(vals) / len(vals), 2) if vals else -1
+            vals = exam_pct_by_student.get((sid, ex_id), [])
+            if not vals:
+                continue
+            exam_avg = round(sum(vals) / len(vals), 2)
+            exam_pairs.append((exam_avg, float(exam_weights.get(ex_id, 1.0))))
+        weighted_term_avg = _weighted_mean(exam_pairs)
+        term_avg_by_student[sid] = weighted_term_avg if weighted_term_avg is not None else -1
 
     term_sorted = sorted([(sid, v) for sid, v in term_avg_by_student.items() if v >= 0], key=lambda t: t[1], reverse=True)
     class_term_rank: dict[int, int] = {}
@@ -6983,7 +7190,7 @@ def report_cards_data(request):
                 'term_level': '-',
                 'teacher_comment': '-',
             }
-            subj_exam_pcts = []
+            subj_exam_pcts: list[tuple[float, float]] = []
             for ex in exams_in_term:
                 ex_id = cast(Any, ex).id
                 rec = mark_map.get((sid, ex_id, subj_id))
@@ -6992,7 +7199,7 @@ def report_cards_data(request):
                         'score': rec['score'],
                         'level': rec['level'],
                     })
-                    subj_exam_pcts.append(float(rec['pct']))
+                    subj_exam_pcts.append((float(rec['pct']), float(exam_weights.get(ex_id, 1.0))))
                     idx = exam_index[ex_id]
                     exam_totals[idx] += float(rec['score'])
                 else:
@@ -7004,7 +7211,10 @@ def report_cards_data(request):
                 item['teacher_comment'] = selected_exam_comment or '-'
 
             if subj_exam_pcts:
-                term_pct = round(sum(subj_exam_pcts) / len(subj_exam_pcts), 1)
+                weighted_term_pct = _weighted_mean(subj_exam_pcts)
+                if weighted_term_pct is None:
+                    weighted_term_pct = 0.0
+                term_pct = round(float(weighted_term_pct), 1)
                 lvl, pts = resolve_grade_points(term_pct)
                 item['term_pct'] = term_pct
                 item['term_level'] = lvl
@@ -7073,9 +7283,9 @@ def report_cards_data(request):
         per_exam_positions = []
         for ex in exams_in_term:
             ex_id = cast(Any, ex).id
-            s_rank = stream_rank_by_exam.get((sid, ex_id))
-            c_rank = class_rank_by_exam.get((sid, ex_id))
-            s_size = stream_size_by_student.get(sid, 0)
+            s_rank = stream_rank_by_exam.get((sid, ex_id)) if show_ranking else None
+            c_rank = class_rank_by_exam.get((sid, ex_id)) if show_ranking else None
+            s_size = stream_size_by_student.get(sid, 0) if show_ranking else 0
             per_exam_positions.append({
                 'exam': cast(Any, ex).title,
                 'stream_pos': (f"{s_rank} of {s_size}" if s_rank else "-"),
@@ -7133,9 +7343,9 @@ def report_cards_data(request):
                 'per_exam': per_exam_positions,
                 'term_stream': (
                     f"{stream_term_rank.get(sid)} of {stream_term_sizes.get(student_stream_id.get(sid), 0)}"
-                    if stream_term_rank.get(sid) else "-"
+                    if show_ranking and stream_term_rank.get(sid) else "-"
                 ),
-                'term_class': (f"{class_term_rank.get(sid)} of {class_size}" if class_term_rank.get(sid) else "-"),
+                'term_class': (f"{class_term_rank.get(sid)} of {class_size}" if show_ranking and class_term_rank.get(sid) else "-"),
             },
             'summary': {
                 'overall_total': overall_total,
@@ -7181,6 +7391,8 @@ def report_cards_data(request):
             'count': len(cards),
             'generated_at': generated_at_display,
             'timezone': timezone.get_current_timezone_name(),
+            'show_ranking': show_ranking,
+            'exam_weights': exam_weights,
         },
         'cards': cards,
     })
@@ -8080,6 +8292,9 @@ def load_marks_students(request):
     )
 
     classroom = ClassRoom.objects.filter(id=class_id, school=school).select_related('level').first()
+    if not classroom:
+        return JsonResponse({'comments': [], 'suggested': '', 'performance_level': '', 'level': '', 'points': None}, status=400)
+
     class_level = classroom.level.name if classroom and classroom.level else None
     resolved_level = resolve_cbe_level(school, class_level)
     if resolved_level not in ('Lower Primary', 'Upper Primary') and classroom and classroom.name:
@@ -8089,6 +8304,8 @@ def load_marks_students(request):
     is_primary_level = resolved_level in ('Lower Primary', 'Upper Primary')
     is_junior_level = school.system_type == 'CBE' and resolved_level == 'Junior'
     is_cbe_level = is_primary_level or is_junior_level
+    is_cambridge_school = getattr(school, 'school_type', '') == 'CAMBRIDGE'
+    resolve_grade_points, _grade_list = _build_grade_resolver_for_class(school, classroom, resolved_level)
     subject_obj = Subject.objects.filter(id=subject_id, school=school).first() if subject_id else None
 
     comment_cache = {}
@@ -8121,6 +8338,16 @@ def load_marks_students(request):
                     student=s,
                     term=term,
                 )
+        elif is_cambridge_school and score_value is not None:
+            try:
+                percentage = (float(score_value) / float(marksheet.out_of or out_of_value)) * 100
+            except Exception:
+                percentage = None
+            if percentage is not None:
+                level_label, _pts = resolve_grade_points(percentage)
+                performance_level = level_label
+                suggested_comment = _cambridge_comment_for_level(level_label)
+                suggested_comments = [suggested_comment]
         data.append({
             'student_id': cast(Any, s).id,
             'name': f"{s.first_name} {s.last_name}",
@@ -8258,6 +8485,8 @@ def save_marks(request):
                 resolved_level = band
         is_primary = resolved_level in ('Lower Primary', 'Upper Primary')
         is_junior = school_any.system_type == 'CBE' and resolved_level == 'Junior'
+        is_cambridge = getattr(school_any, 'school_type', '') == 'CAMBRIDGE'
+        resolve_grade_points, _grade_list = _build_grade_resolver_for_class(school, classroom, resolved_level)
 
         if marksheet.status == 'published' and not (is_headteacher or request.user.is_superuser):
             return JsonResponse({'success': False, 'error': 'Marks already published'})
@@ -8285,6 +8514,8 @@ def save_marks(request):
             if is_junior and percentage is not None:
                 level = get_junior_level(percentage)
                 points = get_junior_points(level)
+            if is_cambridge and percentage is not None:
+                level, points = resolve_grade_points(percentage)
 
             comment_text = (m.get('comment_text', '') or '').strip()
             comment_manual = bool(m.get('comment_manual'))
@@ -8296,6 +8527,8 @@ def save_marks(request):
                     subject_obj,
                     performance_level,
                 )
+            elif not comment_manual and percentage is not None and is_cambridge:
+                comment_text = _cambridge_comment_for_level(level)
 
             StudentMark.objects.update_or_create(
                 marksheet=marksheet,

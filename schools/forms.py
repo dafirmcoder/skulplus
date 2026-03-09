@@ -15,6 +15,11 @@ class SchoolRegistrationForm(forms.Form):
     # School fields
     school_name = forms.CharField(max_length=255, label='School Name')
     school_type = forms.ChoiceField(choices=(('CAMBRIDGE', 'Cambridge'), ('CBE', 'CBE')))
+    cambridge_grading_system = forms.ChoiceField(
+        choices=School.CAMBRIDGE_GRADING_CHOICES,
+        label='Cambridge Grading',
+        required=False,
+    )
     school_category = forms.ChoiceField(choices=School.SCHOOL_CATEGORY_CHOICES, label='School Category')
     address = forms.CharField(widget=forms.Textarea, required=False)
     phone = forms.CharField(max_length=50, required=False)
@@ -50,6 +55,9 @@ class SchoolRegistrationForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        school_type = (cleaned_data.get('school_type') or '').strip().upper()
+        if school_type != 'CAMBRIDGE':
+            cleaned_data['cambridge_grading_system'] = 'CAMB_9_1'
         school_email = (cleaned_data.get('school_email') or '').strip().lower()
         head_email = (cleaned_data.get('head_email') or '').strip().lower()
         if school_email and head_email and school_email == head_email:
@@ -64,6 +72,11 @@ class SchoolSignupForm(forms.Form):
     # School
     school_name = forms.CharField(max_length=255)
     school_type = forms.ChoiceField(choices=[('CAMBRIDGE', 'Cambridge'), ('CBE', 'CBE')])
+    cambridge_grading_system = forms.ChoiceField(
+        choices=School.CAMBRIDGE_GRADING_CHOICES,
+        label='Cambridge Grading',
+        required=False,
+    )
     school_category = forms.ChoiceField(choices=School.SCHOOL_CATEGORY_CHOICES, label='School Category')
     school_email = forms.EmailField()
     phone = forms.CharField(max_length=50)
@@ -218,12 +231,26 @@ class SubjectForm(forms.ModelForm):
 class SchoolDetailsForm(forms.ModelForm):
     class Meta:
         model = School
-        fields = ['name', 'motto', 'school_category', 'address', 'phone', 'email', 'logo', 'stamp', 'head_signature']
+        fields = [
+            'name',
+            'motto',
+            'school_category',
+            'cambridge_grading_system',
+            'cambridge_show_ranking',
+            'address',
+            'phone',
+            'email',
+            'logo',
+            'stamp',
+            'head_signature',
+        ]
 
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'motto': forms.TextInput(attrs={'class': 'form-control'}),
             'school_category': forms.Select(attrs={'class': 'form-control'}),
+            'cambridge_grading_system': forms.Select(attrs={'class': 'form-control'}),
+            'cambridge_show_ranking': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),

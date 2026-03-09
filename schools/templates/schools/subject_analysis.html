@@ -69,6 +69,8 @@ th{background:#0f3057;color:white}
         {% endfor %}
     </select>
 
+    <div id="weightWrap" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px"></div>
+
     <label><input type="checkbox" id="splitByStream" checked> Split by Stream</label>
 
     <button class="btn btn-primary" onclick="loadAnalysis()">Run Analysis</button>
@@ -137,6 +139,11 @@ function loadAnalysis(){
     const term = document.getElementById('termSelect').value;
     const compareExamId = document.getElementById('compareExamSelect').value;
     const splitByStream = document.getElementById('splitByStream').checked;
+    const examWeights = {};
+    document.querySelectorAll('#weightWrap input[data-exam-id]').forEach(inp => {
+        const w = parseFloat(inp.value || '1');
+        examWeights[inp.dataset.examId] = (Number.isFinite(w) && w > 0) ? w : 1;
+    });
 
     if(!classId){
         alert("Select class");
@@ -155,6 +162,7 @@ function loadAnalysis(){
     if(compareExamId) params.append("compare_exam_id", compareExamId);
     if(splitByStream) params.append("split_by_stream", "true");
     params.append("scope", analysisScope);
+    params.append("exam_weights", JSON.stringify(examWeights));
 
     fetch(`{% url 'whole_school_subject_stream_analysis' %}?${params.toString()}`)
     .then(r=>r.json())
@@ -185,6 +193,25 @@ function loadAnalysis(){
         alert('Error: ' + err.message);
     });
 }
+
+function rebuildWeightInputs(){
+    const term = document.getElementById('termSelect').value;
+    const wrap = document.getElementById('weightWrap');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    if (!term) return;
+    const examSelect = document.getElementById('examSelect');
+    const options = Array.from(examSelect.options).filter(o => o.value && o.textContent.includes(`- ${term}`));
+    options.forEach(opt => {
+        const div = document.createElement('div');
+        div.innerHTML = `<label style="display:block;font-size:12px;color:#64748b;margin-bottom:4px">${opt.textContent}</label>
+            <input type="number" min="0.01" step="0.01" value="1" data-exam-id="${opt.value}" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:7px">`;
+        wrap.appendChild(div);
+    });
+}
+
+document.getElementById('termSelect').addEventListener('change', rebuildWeightInputs);
+rebuildWeightInputs();
 
 function renderClassSummary(container, cls){
     const card = document.createElement('div');

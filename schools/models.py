@@ -34,6 +34,16 @@ class School(models.Model):
         default='PRIMARY'
     )
     school_type = models.CharField(max_length=20, choices=SCHOOL_TYPES)
+    CAMBRIDGE_GRADING_CHOICES = (
+        ('CAMB_9_1', 'Cambridge 9-1'),
+        ('CAMB_A_G', 'Cambridge A-G'),
+    )
+    cambridge_grading_system = models.CharField(
+        max_length=20,
+        choices=CAMBRIDGE_GRADING_CHOICES,
+        default='CAMB_9_1',
+    )
+    cambridge_show_ranking = models.BooleanField(default=False)
     address = models.TextField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
@@ -74,6 +84,9 @@ class School(models.Model):
 
     def allows_pathways(self) -> bool:
         return self.system_type == 'CBE' and self.school_category == 'SENIOR'
+
+    def is_cambridge(self) -> bool:
+        return self.school_type == 'CAMBRIDGE'
 
 
 # 📘 SUBJECTS PER SCHOOL

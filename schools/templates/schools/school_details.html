@@ -20,6 +20,14 @@
           {{ form.school_category }}
         </div>
         <div style="margin-bottom:8px">
+          <label><strong>Cambridge Grading</strong></label>
+          {{ form.cambridge_grading_system }}
+        </div>
+        <div style="margin-bottom:8px">
+          <label><strong>Cambridge Show Ranking</strong></label><br>
+          {{ form.cambridge_show_ranking }}
+        </div>
+        <div style="margin-bottom:8px">
           <label><strong>Address</strong></label>
           {{ form.address }}
         </div>
@@ -81,6 +89,8 @@
       <p><strong>Motto:</strong> {{ school.motto }}</p>
       <p><strong>Type:</strong> {{ school.school_type }}</p>
       <p><strong>Category:</strong> {{ school.get_school_category_display }}</p>
+      <p><strong>Cambridge Grading:</strong> {{ school.get_cambridge_grading_system_display }}</p>
+      <p><strong>Cambridge Ranking:</strong> {% if school.cambridge_show_ranking %}Enabled{% else %}Disabled{% endif %}</p>
       <p><strong>Address:</strong> {{ school.address }}</p>
       <p><strong>Phone:</strong> {{ school.phone }}</p>
       <p><strong>Email:</strong> {{ school.email }}</p>

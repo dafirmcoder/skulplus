@@ -12,10 +12,35 @@
 
 <h2>Grade Scales</h2>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-	<p>Define grade ranges per section.</p>
+	<p>{% if is_cambridge %}Define Cambridge grade ranges for your selected scheme.{% else %}Define grade ranges per section.{% endif %}</p>
 </div>
 
 <div class="card">
+	{% if is_cambridge %}
+	<h4 style="margin:0 0 8px;display:flex;justify-content:space-between;align-items:center">
+		<span>Cambridge Grading ({% if cambridge_scheme == 'CAMB_A_G' %}A-G{% else %}9-1{% endif %})</span>
+		<button class="btn-add" onclick="openScaleModal('GENERAL')"><i class="fas fa-plus"></i> Add</button>
+	</h4>
+	<table class="table" style="width:100%;margin-bottom:16px">
+		<thead><tr><th>Grade</th><th>Min</th><th>Max</th><th>Points</th><th>Actions</th></tr></thead>
+		<tbody>
+			{% for s in sectioned_scales.GENERAL %}
+				<tr>
+					<td>{{ s.grade }}</td>
+					<td>{{ s.min_score }}</td>
+					<td>{{ s.max_score }}</td>
+					<td>{{ s.points }}</td>
+					<td>
+						<button class="edit-btn" data-id="{{ s.id }}" data-section="{{ s.section }}" data-grade="{{ s.grade }}" data-min="{{ s.min_score }}" data-max="{{ s.max_score }}" data-points="{{ s.points }}">Edit</button>
+						<button class="del-btn" data-id="{{ s.id }}">Delete</button>
+					</td>
+				</tr>
+			{% empty %}
+				<tr><td colspan="5" style="text-align:center;color:#888">No scales configured</td></tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% else %}
 	<h4 style="margin:0 0 8px;display:flex;justify-content:space-between;align-items:center">
 		<span>Lower Primary (Grades 1-3)</span>
 		<button class="btn-add" onclick="openScaleModal('LOWER_PRIMARY')"><i class="fas fa-plus"></i> Add</button>
@@ -89,6 +114,7 @@
 			</tbody>
 		</table>
 	{% endif %}
+	{% endif %}
 </div>
 
 <div id="scaleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center">
@@ -99,10 +125,14 @@
 			<div style="margin-bottom:8px">
 				<label>Section</label>
 				<select id="g_section" name="section" style="width:100%;padding:8px;border:1px solid #eee;border-radius:6px">
+					{% if is_cambridge %}
+					<option value="GENERAL">General</option>
+					{% else %}
 					<option value="LOWER_PRIMARY">Lower Primary</option>
 					<option value="UPPER_PRIMARY">Upper Primary</option>
 					{% if show_junior_section %}
 					<option value="JUNIOR">Junior Secondary</option>
+					{% endif %}
 					{% endif %}
 				</select>
 			</div>

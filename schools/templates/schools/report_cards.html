@@ -178,7 +178,16 @@
         {% endfor %}
       </select>
     </div>
+    <div>
+      <label>Show Ranking</label>
+      <div style="padding-top:10px">
+        <label style="font-size:13px;color:#334155">
+          <input type="checkbox" id="showRanking" checked> Show ranking (optional for Cambridge)
+        </label>
+      </div>
+    </div>
   </div>
+  <div id="weightWrap" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px"></div>
 </div>
 
 <div id="reportArea" class="rc-report-area">
@@ -189,6 +198,8 @@
 const classSelect = document.getElementById('classSelect');
 const termSelect = document.getElementById('termSelect');
 const examSelect = document.getElementById('examSelect');
+const showRankingInput = document.getElementById('showRanking');
+const weightWrap = document.getElementById('weightWrap');
 const generateBtn = document.getElementById('generateBtn');
 const printBtn = document.getElementById('printBtn');
 const reportArea = document.getElementById('reportArea');
@@ -417,10 +428,25 @@ function updateExamTermSync(){
   const selected = examSelect.options[examSelect.selectedIndex];
   if (selected && selected.dataset.term) {
     termSelect.value = selected.dataset.term;
+    rebuildWeightInputs();
   }
 }
 
 examSelect.addEventListener('change', updateExamTermSync);
+termSelect.addEventListener('change', rebuildWeightInputs);
+
+function rebuildWeightInputs(){
+  const term = termSelect.value;
+  weightWrap.innerHTML = '';
+  if (!term) return;
+  const options = Array.from(examSelect.options).filter(o => o.value && o.dataset.term === term);
+  options.forEach(opt => {
+    const item = document.createElement('div');
+    item.innerHTML = `<label style="display:block;font-size:12px;color:#64748b;margin-bottom:4px">${opt.textContent}</label>
+      <input type="number" min="0.01" step="0.01" value="1" data-exam-id="${opt.value}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px">`;
+    weightWrap.appendChild(item);
+  });
+}
 
 generateBtn.addEventListener('click', function(){
   const classId = classSelect.value;
@@ -433,7 +459,18 @@ generateBtn.addEventListener('click', function(){
 
   generateBtn.disabled = true;
   generateBtn.textContent = 'Generating...';
-  const params = new URLSearchParams({ class_id: classId, term: term, exam_id: examId });
+  const examWeights = {};
+  weightWrap.querySelectorAll('input[data-exam-id]').forEach(inp => {
+    const w = parseFloat(inp.value || '1');
+    examWeights[inp.dataset.examId] = (Number.isFinite(w) && w > 0) ? w : 1;
+  });
+  const params = new URLSearchParams({
+    class_id: classId,
+    term: term,
+    exam_id: examId,
+    show_ranking: showRankingInput.checked ? '1' : '0',
+    exam_weights: JSON.stringify(examWeights),
+  });
   fetch(`{% url 'report_cards_data' %}?${params.toString()}`)
     .then(r => r.json())
     .then(data => {
@@ -465,5 +502,7 @@ printBtn.addEventListener('click', function(){
   if (!latestPayload) return;
   window.print();
 });
+
+rebuildWeightInputs();
 </script>
 {% endblock %}
