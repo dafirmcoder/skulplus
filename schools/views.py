@@ -187,6 +187,7 @@ from django.shortcuts import get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login
+from django.urls import reverse
 
 def post_login_redirect(request):
     """Role-aware post-login redirect."""
@@ -212,6 +213,25 @@ def post_login_redirect(request):
     if request.user.is_staff:
         return redirect('admin:index')
     return redirect('landing')
+
+
+def _build_login_form(request, data=None):
+    form = AuthenticationForm(request, data=data)
+    form.fields['username'].label = 'Email'
+    form.fields['username'].widget.attrs.update({
+        'placeholder': 'Email',
+        'autocomplete': 'email',
+        'inputmode': 'email',
+    })
+    form.fields['password'].widget.attrs.update({
+        'placeholder': 'Password',
+        'autocomplete': 'current-password',
+    })
+    return form
+
+
+def signup_modal_redirect(request):
+    return redirect(f"{reverse('landing')}?auth=signup")
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone
@@ -1942,6 +1962,15 @@ def landing(request):
     Note: role-based redirects happen after login via `post_login_redirect`.
     """
     context = {'user': request.user} if request.user.is_authenticated else {}
+    if not request.user.is_authenticated:
+        open_auth_modal = (request.GET.get('auth') or '').strip().lower()
+        if open_auth_modal not in ('login', 'signup'):
+            open_auth_modal = ''
+        context.update({
+            'form': _build_login_form(request),
+            'signup_form': SchoolRegistrationForm(),
+            'open_auth_modal': open_auth_modal,
+        })
     return render(request, 'landing.html', context)
 
 
@@ -1949,34 +1978,17 @@ def landing(request):
 @csrf_protect
 def login_view(request):
     """Combined login + signup view handling both actions in one template."""
-    login_form = AuthenticationForm()
-    login_form.fields['username'].label = 'Email'
-    login_form.fields['username'].widget.attrs.update({
-        'placeholder': 'Email',
-        'autocomplete': 'email',
-        'inputmode': 'email',
-    })
-    login_form.fields['password'].widget.attrs.update({
-        'placeholder': 'Password',
-        'autocomplete': 'current-password',
-    })
+    login_form = _build_login_form(request)
     signup_form = SchoolRegistrationForm()
+
+    if request.method == 'GET':
+        return redirect(f"{reverse('landing')}?auth=login")
 
     if request.method == 'POST':
         form_type = request.POST.get('form_type')
 
         if form_type == 'login':
-            login_form = AuthenticationForm(request, data=request.POST)
-            login_form.fields['username'].label = 'Email'
-            login_form.fields['username'].widget.attrs.update({
-                'placeholder': 'Email',
-                'autocomplete': 'email',
-                'inputmode': 'email',
-            })
-            login_form.fields['password'].widget.attrs.update({
-                'placeholder': 'Password',
-                'autocomplete': 'current-password',
-            })
+            login_form = _build_login_form(request, data=request.POST)
             if login_form.is_valid():
                 user = login_form.get_user()
                 login(request, user)
@@ -2043,9 +2055,10 @@ def login_view(request):
                     login(request, headteacher_user)
                     return redirect('headteacher_dashboard')
 
-    return render(request, 'registration/login.html', {
+    return render(request, 'landing.html', {
         'form': login_form,
         'signup_form': signup_form,
+        'open_auth_modal': 'signup' if request.POST.get('form_type') == 'signup' else 'login',
     })
 
 

@@ -16,11 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.views.generic.base import RedirectView
 
 from finance.views import add_payment, add_payment_meta, send_fee_reminders
 from schools import views as schools_views
-from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -34,7 +32,7 @@ urlpatterns = [
     path('school/', include('schools.urls')),
     # Landing/home page
     path('login/', schools_views.login_view, name='login'),
-    path('signup/', RedirectView.as_view(pattern_name='login', permanent=False), name='signup'),
+    path('signup/', schools_views.signup_modal_redirect, name='signup'),
     path('post-login/', schools_views.post_login_redirect, name='post_login'),
     path('', schools_views.landing, name='landing'),
 
