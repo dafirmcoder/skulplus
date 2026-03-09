@@ -128,6 +128,15 @@
 
 <script>
 function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
+async function readApiResponse(resp){
+  const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+  if (contentType.includes('application/json')) {
+    return await resp.json();
+  }
+  const text = await resp.text();
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  throw new Error(`Server returned non-JSON response (${resp.status}). ${clean.slice(0, 220)}`);
+}
 
 const form = document.getElementById('new-user-form');
 const createBtn = document.getElementById('create-btn');
@@ -256,7 +265,7 @@ createBtn.addEventListener('click', async () => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await resp.json();
+    const data = await readApiResponse(resp);
     if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to create user.');
     alert(`User created.\nLogin: ${data.user.email}\nPassword: (the one entered).`);
     window.location.reload();

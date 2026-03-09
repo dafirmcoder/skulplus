@@ -168,6 +168,15 @@
 
 <script>
 function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
+async function readApiResponse(resp){
+  const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+  if (contentType.includes('application/json')) {
+    return await resp.json();
+  }
+  const text = await resp.text();
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  throw new Error(`Server returned non-JSON response (${resp.status}). ${clean.slice(0, 220)}`);
+}
 
 const modal = document.getElementById('edit-modal');
 const form = document.getElementById('edit-form');
@@ -282,7 +291,7 @@ saveBtn.addEventListener('click', async () => {
       },
       body: JSON.stringify(payload)
     });
-    const data = await resp.json();
+    const data = await readApiResponse(resp);
     if (!resp.ok || !data.success) throw new Error(data.error || 'Update failed.');
     window.location.reload();
   } catch (e) {
@@ -303,7 +312,7 @@ document.querySelectorAll('.delete-user').forEach(btn => {
         },
         body: JSON.stringify({ action: 'delete', user_id: btn.dataset.userId })
       });
-      const data = await resp.json();
+      const data = await readApiResponse(resp);
       if (!resp.ok || !data.success) throw new Error(data.error || 'Delete failed.');
       window.location.reload();
     } catch (e) {
