@@ -224,9 +224,16 @@ body::before {
 
 /* MOBILE */
 @media (max-width: 900px) {
+  body {
+    padding: 16px 0;
+  }
+
   .container {
     width: 100%;
-    padding: 20px;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 14px;
+    min-height: 0;
   }
 
   .container::before { display: none; }
@@ -241,9 +248,45 @@ body::before {
     pointer-events: auto !important;
   }
 
-  .form-box { padding: 30px 25px; }
+  .form-box { padding: 22px 16px; border-radius: 12px; }
 
   .form-box.register form { grid-template-columns: 1fr; }
 
+  .input-box input,
+  .input-box select,
+  .input-box textarea,
+  .btn,
+  .switch-link {
+    font-size: 16px;
+  }
+
+  .switch-action {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .switch-link {
+    width: 100%;
+  }
+
   .btn { grid-column: span 1; }
+}
+
+@media (max-width: 520px) {
+  .form-box h1 {
+    font-size: 20px;
+  }
+
+  .form-box p {
+    margin-bottom: 14px;
+  }
+
+  .input-box.has-icon input {
+    padding-left: 38px;
+  }
+
+  .password-field input {
+    padding-right: 44px;
+  }
 }

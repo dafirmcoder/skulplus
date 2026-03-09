@@ -133,6 +133,48 @@
         .main{margin-left:0}
     }
 
+    /* Mobile form safety */
+    @media (max-width:800px){
+      .main{
+        padding:12px 10px;
+      }
+      .topbar{
+        flex-wrap:wrap;
+        gap:8px;
+      }
+      .topbar > div{
+        margin-left:0 !important;
+      }
+      form{
+        max-width:100%;
+      }
+      input, select, textarea, button{
+        max-width:100%;
+      }
+      .modal{
+        width:calc(100vw - 20px) !important;
+        max-width:calc(100vw - 20px) !important;
+        max-height:calc(100vh - 20px);
+        overflow:auto;
+      }
+      .modal-actions,
+      .actions,
+      .um-actions{
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+      }
+      .modal-actions button,
+      .actions button,
+      .um-actions button{
+        flex:1 1 140px;
+      }
+      .grid,
+      .um-grid{
+        grid-template-columns:1fr !important;
+      }
+    }
+
     /* Global popup messages */
     .sp-notify-wrap{
         position:fixed;
