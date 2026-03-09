@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function(){
         return;
       }
       
-      fetch(`/load-streams-for-class/?class_id=${classId}`, {
+      fetch(`/school/load-streams-for-class/?class_id=${classId}`, {
         method: 'GET',
         headers: {'X-Requested-With': 'XMLHttpRequest'}
       })
@@ -108,7 +108,12 @@ document.addEventListener('DOMContentLoaded', function(){
         const ct = res.headers.get('content-type')||'';
         if (ct.includes('application/json')){
           const data = await res.json();
-          if (data.success){ window.location.href = '{% url "admit_student" %}'; }
+          if (data.success){
+            if (data.student && data.student.parent_username && data.student.parent_password) {
+              alert(`Parent account created.\nUsername: ${data.student.parent_username}\nPassword: ${data.student.parent_password}`);
+            }
+            window.location.href = '{% url "admit_student" %}';
+          }
         } else { window.location.href = '{% url "admit_student" %}'; }
       } else {
         try{ const d = await res.json(); if (d && d.errors) { displayFormErrors(d.errors); return; } } catch(e){}
@@ -119,6 +124,18 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 
 function displayFormErrors(errors){ const gen=document.getElementById('admit-form-errors'); gen.innerHTML=''; for(const k in errors){ const msgs=errors[k]; const div=document.createElement('div'); div.className='error'; div.textContent = Array.isArray(msgs)?msgs.join('; '):msgs; gen.appendChild(div); } }
+
+function setupParentCredentialPreview(){
+  const admission = document.querySelector('[name="admission_number"]');
+  const firstName = document.querySelector('[name="first_name"]');
+  const pwd = document.querySelector('[name="parent_login_password"]');
+  if (!admission || !firstName || !pwd) return;
+  const sync = () => { pwd.value = `${(admission.value || '').trim()}${(firstName.value || '').trim()}`; };
+  admission.addEventListener('input', sync);
+  firstName.addEventListener('input', sync);
+  sync();
+}
+document.addEventListener('DOMContentLoaded', setupParentCredentialPreview);
 </script>
 
 {% endblock %}

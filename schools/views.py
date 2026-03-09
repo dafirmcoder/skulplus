@@ -1814,24 +1814,17 @@ def admit_student(request):
 
     if request.method == "POST":
         # include files (photo) when binding form
-        form = StudentForm(request.POST, request.FILES)
-        # restrict classroom choices to this headteacher's school
-        try:
-            if 'classroom' in form.fields:
-                cast(Any, form.fields['classroom']).queryset = ClassRoom.objects.filter(school=school)
-            if 'stream' in form.fields:
-                # Load streams for the classroom (if selected in form data)
-                classroom_id = request.POST.get('classroom')
-                if classroom_id:
-                    cast(Any, form.fields['stream']).queryset = Stream.objects.filter(classroom_id=classroom_id)
-                else:
-                    cast(Any, form.fields['stream']).queryset = Stream.objects.all()
-        except Exception:
-            pass
+        form = StudentForm(request.POST, request.FILES, school=school)
         if form.is_valid():
             student = form.save(commit=False)
             student.school = school
             student.save()
+            parent_username, parent_password, parent_error = _sync_parent_account_for_student(student)
+            if parent_error:
+                if is_ajax:
+                    return JsonResponse({'success': False, 'errors': {'parent_phone': [parent_error]}}, status=400)
+                form.add_error('parent_phone', parent_error)
+                return render(request, 'schools/admit_student.html', {'form': form, 'students': Student.objects.filter(school=school).order_by('last_name', 'first_name'), 'classes': ClassRoom.objects.filter(school=school)})
 
             # If AJAX, return JSON with new student info for client-side insertion
             if is_ajax:
@@ -1852,11 +1845,15 @@ def admit_student(request):
                     'stream': str(student.stream) if student.stream else '',
                     'parent_name': getattr(student, 'parent_name', '') or '',
                     'parent_phone': getattr(student, 'parent_phone', '') or '',
+                    'parent_username': parent_username,
+                    'parent_password': parent_password,
                     'photo_url': photo_url,
                 }
                 return JsonResponse({'success': True, 'student': student_data})
 
             # non-AJAX POST: redirect back to admit page so the list refreshes
+            if parent_username and parent_password:
+                messages.success(request, f'Parent account created. Username: {parent_username} | Password: {parent_password}')
             return redirect('admit_student')
         else:
             # form invalid
@@ -1865,14 +1862,7 @@ def admit_student(request):
                 return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
     else:
-        form = StudentForm()
-        try:
-            if 'classroom' in form.fields:
-                cast(Any, form.fields['classroom']).queryset = ClassRoom.objects.filter(school=school)
-            if 'stream' in form.fields:
-                cast(Any, form.fields['stream']).queryset = Stream.objects.all()
-        except Exception:
-            pass
+        form = StudentForm(school=school)
 
     # If this is an AJAX GET request, return just the form partial (for modal)
     if is_ajax and request.method == 'GET':
@@ -1898,24 +1888,18 @@ def admit_student_new(request):
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
     if request.method == 'POST':
-        form = StudentForm(request.POST, request.FILES)
-        try:
-            if 'classroom' in form.fields:
-                cast(Any, form.fields['classroom']).queryset = ClassRoom.objects.filter(school=school)
-            if 'stream' in form.fields:
-                # Load streams for the classroom (if selected in form data)
-                classroom_id = request.POST.get('classroom')
-                if classroom_id:
-                    cast(Any, form.fields['stream']).queryset = Stream.objects.filter(classroom_id=classroom_id)
-                else:
-                    cast(Any, form.fields['stream']).queryset = Stream.objects.all()
-        except Exception:
-            pass
+        form = StudentForm(request.POST, request.FILES, school=school)
 
         if form.is_valid():
             student = form.save(commit=False)
             student.school = school
             student.save()
+            parent_username, parent_password, parent_error = _sync_parent_account_for_student(student)
+            if parent_error:
+                if is_ajax:
+                    return JsonResponse({'success': False, 'errors': {'parent_phone': [parent_error]}}, status=400)
+                form.add_error('parent_phone', parent_error)
+                return render(request, 'schools/admit_student_form.html', {'form': form})
             if is_ajax:
                 photo_url = ''
                 try:
@@ -1932,23 +1916,20 @@ def admit_student_new(request):
                     'stream': str(student.stream) if student.stream else '',
                     'parent_name': getattr(student, 'parent_name', '') or '',
                     'parent_phone': getattr(student, 'parent_phone', '') or '',
+                    'parent_username': parent_username,
+                    'parent_password': parent_password,
                     'photo_url': photo_url,
                 }
                 return JsonResponse({'success': True, 'student': student_data})
 
+            if parent_username and parent_password:
+                messages.success(request, f'Parent account created. Username: {parent_username} | Password: {parent_password}')
             return redirect('admit_student')
         else:
             if is_ajax:
                 return JsonResponse({'success': False, 'errors': form.errors}, status=400)
     else:
-        form = StudentForm()
-        try:
-            if 'classroom' in form.fields:
-                cast(Any, form.fields['classroom']).queryset = ClassRoom.objects.filter(school=school)
-            if 'stream' in form.fields:
-                cast(Any, form.fields['stream']).queryset = Stream.objects.all()
-        except Exception:
-            pass
+        form = StudentForm(school=school)
 
     return render(request, 'schools/admit_student_form.html', {'form': form})
 
@@ -2180,22 +2161,16 @@ def edit_student(request, student_id):
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
     if request.method == 'POST':
-        form = StudentForm(request.POST, request.FILES, instance=student)
-        try:
-            if 'classroom' in form.fields:
-                cast(Any, form.fields['classroom']).queryset = ClassRoom.objects.filter(school=school)
-            if 'stream' in form.fields:
-                # Load streams for the classroom (if selected in form data)
-                classroom_id = request.POST.get('classroom')
-                if classroom_id:
-                    cast(Any, form.fields['stream']).queryset = Stream.objects.filter(classroom_id=classroom_id)
-                else:
-                    cast(Any, form.fields['stream']).queryset = Stream.objects.all()
-        except Exception:
-            pass
+        form = StudentForm(request.POST, request.FILES, instance=student, school=school)
 
         if form.is_valid():
             student = form.save()
+            parent_username, parent_password, parent_error = _sync_parent_account_for_student(student)
+            if parent_error:
+                if is_ajax:
+                    return JsonResponse({'success': False, 'errors': {'parent_phone': [parent_error]}}, status=400)
+                messages.error(request, parent_error)
+                return redirect('edit_student', student_id=student.id)
             pathway_id = request.POST.get('pathway_id')
             level_name = student.classroom.level.name if student.classroom and student.classroom.level else None
             if school.system_type == 'CBE':
@@ -2237,27 +2212,20 @@ def edit_student(request, student_id):
                     'stream': str(student.stream) if student.stream else '',
                     'parent_name': getattr(student, 'parent_name', '') or '',
                     'parent_phone': getattr(student, 'parent_phone', '') or '',
+                    'parent_username': parent_username,
+                    'parent_password': parent_password,
                     'photo_url': photo_url,
                 }
                 return JsonResponse({'success': True, 'student': student_data})
 
+            if parent_username and parent_password:
+                messages.success(request, f'Parent account updated. Username: {parent_username} | Password: {parent_password}')
             return redirect('edit_students')
         else:
             if is_ajax:
                 return JsonResponse({'success': False, 'errors': form.errors}, status=400)
     else:
-        form = StudentForm(instance=student)
-        try:
-            if 'classroom' in form.fields:
-                cast(Any, form.fields['classroom']).queryset = ClassRoom.objects.filter(school=school)
-            if 'stream' in form.fields:
-                # Load streams for the student's current classroom
-                if student.classroom:
-                    cast(Any, form.fields['stream']).queryset = Stream.objects.filter(classroom=student.classroom)
-                else:
-                    cast(Any, form.fields['stream']).queryset = Stream.objects.all()
-        except Exception:
-            pass
+        form = StudentForm(instance=student, school=school)
 
     try:
         from academics.models import StudentPathway
@@ -3675,12 +3643,7 @@ def students_page(request):
         'classroom__level', 'stream'
     ).select_related('studentpathway__pathway').order_by('last_name', 'first_name')
 
-    form = StudentForm()
-    try:
-        if 'classroom' in form.fields:
-            cast(Any, form.fields['classroom']).queryset = ClassRoom.objects.filter(school=school)
-    except Exception:
-        pass
+    form = StudentForm(school=school)
 
     return render(request, 'schools/students_page.html', {
         'students': students,
@@ -3699,17 +3662,15 @@ def admit_student_ajax(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request'}, status=400)
 
-    form = StudentForm(request.POST, request.FILES)
-    try:
-        if 'classroom' in form.fields:
-            cast(Any, form.fields['classroom']).queryset = ClassRoom.objects.filter(school=school)
-    except Exception:
-        pass
+    form = StudentForm(request.POST, request.FILES, school=school)
 
     if form.is_valid():
         student = form.save(commit=False)
         student.school = school
         student.save()
+        parent_username, parent_password, parent_error = _sync_parent_account_for_student(student)
+        if parent_error:
+            return JsonResponse({'success': False, 'errors': {'parent_phone': [parent_error]}}, status=400)
         try:
             photo_url = student.photo.url if student.photo else ''
         except Exception:
@@ -3723,6 +3684,8 @@ def admit_student_ajax(request):
             'classroom': str(student.classroom) if student.classroom else '',
             'parent_name': getattr(student, 'parent_name', '') or '',
             'parent_phone': getattr(student, 'parent_phone', '') or '',
+            'parent_username': parent_username,
+            'parent_password': parent_password,
             'photo_url': photo_url,
         }
         return JsonResponse({'success': True, 'student': student_data})
@@ -7345,6 +7308,53 @@ def _split_full_name(value: str):
     if len(parts) == 1:
         return parts[0], ''
     return parts[0], ' '.join(parts[1:])
+
+
+def _parent_password_for_student(student: Student) -> str:
+    admission = (student.admission_number or '').strip()
+    first_name = (student.first_name or '').strip()
+    return f'{admission}{first_name}'
+
+
+def _sync_parent_account_for_student(student: Student):
+    phone = (student.parent_phone or '').strip()
+    if not phone:
+        if student.parent_user_id:
+            student.parent_user = None
+            student.save(update_fields=['parent_user'])
+        return '', '', ''
+
+    User = get_user_model()
+    username = phone
+    password = _parent_password_for_student(student)
+    first_name, last_name = _split_full_name(student.parent_name or '')
+    first_name = first_name or 'Parent'
+
+    user = User.objects.filter(username=username).first()
+    if user and (hasattr(user, 'headteacher') or hasattr(user, 'teacher')):
+        return '', '', 'Parent phone is already used by a staff account.'
+
+    if user is None:
+        user = User.objects.create_user(
+            username=username,
+            email=f'parent.{student.id}@parents.skulplus.local',
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+        )
+    else:
+        user.first_name = first_name
+        user.last_name = last_name
+        if not user.email:
+            user.email = f'parent.{student.id}@parents.skulplus.local'
+        user.set_password(password)
+        user.save()
+
+    if student.parent_user_id != user.id:
+        student.parent_user = user
+        student.save(update_fields=['parent_user'])
+
+    return username, password, ''
 
 
 @login_required

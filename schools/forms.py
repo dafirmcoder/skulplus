@@ -1,5 +1,5 @@
 from django import forms
-from .models import Teacher, Student, Announcement, ClassRoom, Subject
+from .models import Teacher, Student, Announcement, ClassRoom, Subject, Stream
 from .models import School
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
@@ -108,12 +108,67 @@ class TeacherAllocationForm(forms.Form):
 
 
 class StudentForm(forms.ModelForm):
+    parent_login_password = forms.CharField(
+        label='Parent Login Password',
+        required=False,
+        disabled=True,
+        widget=forms.TextInput(attrs={'readonly': 'readonly'}),
+        help_text='Auto-generated as admission number + first name.',
+    )
+
     class Meta:
         model = Student
         fields = [
             'classroom', 'stream', 'first_name', 'last_name', 'date_of_birth', 'gender',
-            'admission_number', 'admission_date', 'parent_name', 'parent_phone', 'parent_user', 'photo'
+            'admission_number', 'admission_date', 'parent_name', 'parent_phone', 'photo'
         ]
+
+    def __init__(self, *args, **kwargs):
+        school = kwargs.pop('school', None)
+        super().__init__(*args, **kwargs)
+
+        if school and 'classroom' in self.fields:
+            self.fields['classroom'].queryset = ClassRoom.objects.filter(school=school).order_by('name')
+
+        if 'stream' in self.fields:
+            stream_qs = Stream.objects.none()
+            classroom_id = None
+            if self.is_bound:
+                classroom_id = self.data.get('classroom')
+            elif self.instance and self.instance.classroom_id:
+                classroom_id = self.instance.classroom_id
+
+            if classroom_id:
+                stream_qs = Stream.objects.filter(classroom_id=classroom_id)
+                if school:
+                    stream_qs = stream_qs.filter(classroom__school=school)
+            elif school:
+                stream_qs = Stream.objects.filter(classroom__school=school).none()
+            self.fields['stream'].queryset = stream_qs.order_by('name')
+
+        desired_order = [
+            'classroom', 'stream', 'first_name', 'last_name', 'date_of_birth', 'gender',
+            'admission_number', 'admission_date', 'parent_name', 'parent_phone',
+            'parent_login_password', 'photo'
+        ]
+        self.order_fields(desired_order)
+
+        admission = ''
+        first_name = ''
+        if self.is_bound:
+            admission = (self.data.get('admission_number') or '').strip()
+            first_name = (self.data.get('first_name') or '').strip()
+        elif self.instance:
+            admission = (self.instance.admission_number or '').strip()
+            first_name = (self.instance.first_name or '').strip()
+        self.fields['parent_login_password'].initial = f'{admission}{first_name}'
+
+    def clean_stream(self):
+        stream = self.cleaned_data.get('stream')
+        classroom = self.cleaned_data.get('classroom')
+        if stream and classroom and stream.classroom_id != classroom.id:
+            raise forms.ValidationError('Selected stream does not belong to the selected class.')
+        return stream
 
 
 class AnnouncementForm(forms.ModelForm):

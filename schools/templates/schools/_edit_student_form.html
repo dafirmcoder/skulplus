@@ -44,7 +44,7 @@ function setupStreamLoading() {
         return;
       }
       
-      fetch(`/load-streams-for-class/?class_id=${classId}`, {
+      fetch(`/school/load-streams-for-class/?class_id=${classId}`, {
         method: 'GET',
         headers: {'X-Requested-With': 'XMLHttpRequest'}
       })
@@ -77,6 +77,19 @@ function setupStreamLoading() {
 // Call setup immediately (works for AJAX-loaded forms)
 setupStreamLoading();
 
+function setupParentCredentialPreview(){
+  const admission = document.querySelector('[name="admission_number"]');
+  const firstName = document.querySelector('[name="first_name"]');
+  const pwd = document.querySelector('[name="parent_login_password"]');
+  if (!admission || !firstName || !pwd) return;
+  const sync = () => { pwd.value = `${(admission.value || '').trim()}${(firstName.value || '').trim()}`; };
+  admission.addEventListener('input', sync);
+  firstName.addEventListener('input', sync);
+  sync();
+}
+setupParentCredentialPreview();
+
 // Also call on DOMContentLoaded for non-AJAX forms
 document.addEventListener('DOMContentLoaded', setupStreamLoading);
+document.addEventListener('DOMContentLoaded', setupParentCredentialPreview);
 </script>

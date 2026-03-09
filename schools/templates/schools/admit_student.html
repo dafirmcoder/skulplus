@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', function(){
         return;
       }
       
-      fetch(`/load-streams-for-class/?class_id=${classId}`, {
+      fetch(`/school/load-streams-for-class/?class_id=${classId}`, {
         method: 'GET',
         headers: {'X-Requested-With': 'XMLHttpRequest'}
       })
@@ -199,6 +199,9 @@ document.getElementById("admit-form").addEventListener("submit", function(e){
   .then(res=>res.json())
   .then(data=>{
     if(data.success){
+      if (data.student && data.student.parent_username && data.student.parent_password) {
+        alert(`Parent account created.\nUsername: ${data.student.parent_username}\nPassword: ${data.student.parent_password}`);
+      }
       location.reload(); // simplest refresh like classes page
     } else {
       const errDiv = document.getElementById('form-errors');
@@ -219,6 +222,18 @@ document.getElementById("admit-form").addEventListener("submit", function(e){
     errDiv.innerHTML = '<div class="error">Network error: ' + err.message + '</div>';
   });
 });
+
+function setupParentCredentialPreview(){
+  const admission = document.querySelector('[name="admission_number"]');
+  const firstName = document.querySelector('[name="first_name"]');
+  const pwd = document.querySelector('[name="parent_login_password"]');
+  if (!admission || !firstName || !pwd) return;
+  const sync = () => { pwd.value = `${(admission.value || '').trim()}${(firstName.value || '').trim()}`; };
+  admission.addEventListener('input', sync);
+  firstName.addEventListener('input', sync);
+  sync();
+}
+document.addEventListener('DOMContentLoaded', setupParentCredentialPreview);
 </script>
 
   <!-- EDIT MODAL (AJAX) -->
@@ -271,6 +286,9 @@ document.getElementById("admit-form").addEventListener("submit", function(e){
         const data = await res.json();
         if (data.success){
           const s = data.student;
+          if (s.parent_username && s.parent_password) {
+            alert('Parent account updated.\nUsername: ' + s.parent_username + '\nPassword: ' + s.parent_password);
+          }
           // update row in table
           const row = document.querySelector(`#students-table tr[data-student-id="${s.id}"]`);
           if (row){
