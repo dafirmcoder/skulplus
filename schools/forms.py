@@ -190,9 +190,17 @@ class ClassRoomForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        school = kwargs.pop('school', None)
         super().__init__(*args, **kwargs)
         if 'section' in self.fields:
             self.fields['section'].label = 'Stream'
+        if 'class_teacher' in self.fields:
+            if school:
+                self.fields['class_teacher'].queryset = Teacher.objects.filter(
+                    school=school
+                ).select_related('user').order_by('user__first_name', 'user__last_name')
+            else:
+                self.fields['class_teacher'].queryset = Teacher.objects.none()
 
 
 class SubjectForm(forms.ModelForm):

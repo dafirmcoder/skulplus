@@ -3364,14 +3364,14 @@ def classes_view(request):
     school = get_user_school(request.user)
 
     if request.method == 'POST':
-        form = ClassRoomForm(request.POST)
+        form = ClassRoomForm(request.POST, school=school)
         if form.is_valid():
             cls = form.save(commit=False)
             cls.school = school
             cls.save()
             return redirect('classes')
     else:
-        form = ClassRoomForm()
+        form = ClassRoomForm(school=school)
 
     if 'level' in form.fields:
         school_any = cast(Any, school)
@@ -3420,13 +3420,15 @@ def classes_management(request):
 
         # Handle class creation
         if not action or action == 'create_class':
-            name = data.get('name')
-            section = data.get('section', '')
+            name = (data.get('name') or '').strip()
+            section = (data.get('section') or '').strip()
             level_id = data.get('level')
             class_teacher_id = data.get('class_teacher')
 
             if not name:
                 return JsonResponse({'success': False, 'error': 'Name required'}, status=400)
+            if ClassRoom.objects.filter(school=school, name__iexact=name, section__iexact=section).exists():
+                return JsonResponse({'success': False, 'error': 'Class with this name/stream already exists.'}, status=400)
 
             cls = ClassRoom(name=name, section=section, school=school)
             if level_id:
@@ -3439,10 +3441,10 @@ def classes_management(request):
                     return JsonResponse({'success': False, 'error': 'Invalid level selected.'}, status=400)
             if class_teacher_id:
                 try:
-                    teacher = Teacher.objects.get(id=class_teacher_id, school=school)
+                    teacher = Teacher.objects.get(id=int(class_teacher_id), school=school)
                     cls.class_teacher = teacher
-                except Teacher.DoesNotExist:
-                    pass
+                except (TypeError, ValueError, Teacher.DoesNotExist):
+                    return JsonResponse({'success': False, 'error': 'Invalid class teacher selected.'}, status=400)
 
             cls.save()
             cls_any = cast(Any, cls)
@@ -3547,7 +3549,7 @@ def classes_management(request):
         students_count=Count('student'),
         streams_count=Count('streams')
     ).prefetch_related('streams')
-    form = ClassRoomForm()
+    form = ClassRoomForm(school=school)
     if 'level' in form.fields:
         if school.system_type == 'CBE':
             allowed = []
