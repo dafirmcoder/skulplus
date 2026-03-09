@@ -21,7 +21,7 @@
   width: min(1120px, 96vw);
   max-height: 94vh;
   margin: 3vh auto;
-  overflow: auto;
+  overflow: hidden;
   border-radius: 18px;
 }
 
@@ -47,15 +47,22 @@
   margin: 0;
   padding: 48px 34px;
   min-height: 560px;
-  background: radial-gradient(circle at top right, rgba(255,255,255,0.2), transparent 45%),
-              linear-gradient(135deg, #0f3057, #00587a 55%, #008891);
+  background: #f8fbff;
+  box-sizing: border-box;
+}
+
+.auth-modal-container * {
+  box-sizing: border-box;
 }
 
 .auth-modal-container .form-box {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
-  width: 44%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(860px, calc(100% - 48px));
+  max-height: calc(94vh - 92px);
+  overflow-y: auto;
   background: #fff;
   padding: 34px 36px;
   border-radius: 14px;
@@ -66,10 +73,8 @@
   visibility: hidden;
   pointer-events: none;
   z-index: 2;
+  scrollbar-gutter: stable;
 }
-
-.auth-modal-container .form-box.login { left: 4%; }
-.auth-modal-container .form-box.register { right: 4%; }
 
 .auth-modal-container:not(.active) .form-box.login,
 .auth-modal-container.active .form-box.register {
@@ -79,11 +84,11 @@
 }
 
 .auth-modal-container.active .form-box.login {
-  transform: translate(-120%, -50%);
+  transform: translate(-170%, -50%);
 }
 
 .auth-modal-container:not(.active) .form-box.register {
-  transform: translate(120%, -50%);
+  transform: translate(70%, -50%);
 }
 
 .auth-modal-container .form-box h1 {
@@ -214,6 +219,8 @@ body.auth-modal-open {
   .auth-modal-container {
     min-height: auto;
     padding: 20px;
+    overflow-y: auto;
+    max-height: 94vh;
   }
 
   .auth-modal-container .form-box {
