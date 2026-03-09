@@ -7437,6 +7437,7 @@ def new_user(request):
         else:
             is_class_teacher = False
 
+        teacher = None
         try:
             User = get_user_model()
             if user_type == 'teacher':
