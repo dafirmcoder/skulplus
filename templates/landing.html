@@ -79,7 +79,14 @@
 <body>
 
 <header>
-    <h1>SkulPlus</h1>
+    <h1 style="display:flex;align-items:center;gap:10px;">
+        {% if SITE_LOGO_URL %}
+        <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="SkulPlus logo" style="height:40px;border-radius:8px;background:#fff;padding:4px;">
+        {% else %}
+        <img src="{% static 'images/skulplus_logo.png' %}" alt="SkulPlus logo" style="height:40px;border-radius:8px;background:#fff;padding:4px;">
+        {% endif %}
+        <span>SkulPlus</span>
+    </h1>
     <div class="nav-buttons">
         {% if user.is_authenticated %}
             <a href="{% url 'post_login' %}" class="signup-btn-landing">Open Dashboard</a>
@@ -106,7 +113,7 @@
         </div>
     </div>
     {% if SITE_LOGO_URL %}
-    <img src="{{ SITE_LOGO_URL }}" width="260" alt="SkulPlus logo">
+    <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" width="260" alt="SkulPlus logo">
     {% else %}
     <img src="{% static 'images/skulplus_logo.png' %}" width="260" alt="SkulPlus logo">
     {% endif %}

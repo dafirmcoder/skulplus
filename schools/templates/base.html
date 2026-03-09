@@ -185,7 +185,7 @@
       <div class="sidebar" id="sidebar">
         <h2 style="display:flex;align-items:center;gap:8px;justify-content:center">
           {% if SITE_LOGO_URL %}
-            <img src="{{ SITE_LOGO_URL }}" alt="SkulPlus" style="height:36px;border-radius:6px;background:#fff;padding:4px" />
+            <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="SkulPlus" style="height:36px;border-radius:6px;background:#fff;padding:4px" />
           {% else %}
             <img src="{% static 'images/skulplus_logo.png' %}" alt="SkulPlus" style="height:36px;border-radius:6px;background:#fff;padding:4px" />
           {% endif %}
