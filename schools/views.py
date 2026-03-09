@@ -187,12 +187,20 @@ from django.shortcuts import get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login
-from django.http import HttpResponseRedirect
 
-# Simple post_login_redirect view
 def post_login_redirect(request):
-    """Redirects user to dashboard or home after login."""
-    return HttpResponseRedirect('/')
+    """Role-aware post-login redirect."""
+    if not request.user.is_authenticated:
+        return redirect('login')
+    if hasattr(request.user, 'headteacher'):
+        return redirect('headteacher_dashboard')
+    if hasattr(request.user, 'teacher'):
+        return redirect('teacher_dashboard')
+    if request.user.is_superuser:
+        return redirect('headteacher_dashboard')
+    if request.user.is_staff:
+        return redirect('admin:index')
+    return redirect('landing')
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone
@@ -1171,10 +1179,12 @@ def get_students_with_balances(school):
 
 @login_required
 def headteacher_dashboard(request):
-    if not hasattr(request.user, 'headteacher'):
+    if not hasattr(request.user, 'headteacher') and not request.user.is_superuser:
         return HttpResponseForbidden("Access denied")
 
     school = get_user_school(request.user)
+    if not school:
+        return HttpResponseForbidden("No school is linked to this account.")
     debtors = get_students_with_balances(school)
 
     students_count = Student.objects.filter(school=school).count()
@@ -1958,12 +1968,7 @@ def login_view(request):
             if login_form.is_valid():
                 user = login_form.get_user()
                 login(request, user)
-                # Redirect based on role
-                if hasattr(user, 'headteacher'):
-                    return redirect('headteacher_dashboard')
-                if hasattr(user, 'teacher'):
-                    return redirect('teacher_dashboard')
-                return redirect('admin:index')
+                return redirect('post_login')
 
         elif form_type == 'signup':
             signup_form = SchoolRegistrationForm(request.POST)
