@@ -182,5 +182,6 @@ LOGIN_REDIRECT_URL = '/post-login/'
 LOGOUT_REDIRECT_URL = '/login/'
 
 # Media files (user-uploaded)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
+media_root_env = os.environ.get('MEDIA_ROOT', '').strip()
+MEDIA_ROOT = Path(media_root_env) if media_root_env else BASE_DIR / 'media'
