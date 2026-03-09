@@ -101,6 +101,7 @@
   <div class="modal">
     <h3 style="margin:0 0 10px;color:#0f3057;">Update User</h3>
     <form id="edit-form" class="grid">
+      {% csrf_token %}
       <input type="hidden" name="user_id" id="user-id" />
       <div>
         <label class="label">First Name</label>
@@ -168,6 +169,10 @@
 
 <script>
 function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
+function getCsrfToken(){
+  const formToken = (document.querySelector('input[name="csrfmiddlewaretoken"]') || {}).value;
+  return formToken || getCookie('csrftoken') || '';
+}
 async function readApiResponse(resp){
   const contentType = (resp.headers.get('content-type') || '').toLowerCase();
   if (contentType.includes('application/json')) {
@@ -286,7 +291,7 @@ saveBtn.addEventListener('click', async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': getCookie('csrftoken'),
+        'X-CSRFToken': getCsrfToken(),
         'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify(payload)
@@ -307,7 +312,7 @@ document.querySelectorAll('.delete-user').forEach(btn => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRFToken': getCookie('csrftoken'),
+          'X-CSRFToken': getCsrfToken(),
           'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify({ action: 'delete', user_id: btn.dataset.userId })

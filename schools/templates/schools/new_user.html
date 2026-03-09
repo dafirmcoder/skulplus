@@ -26,6 +26,7 @@
     </div>
 
     <form id="new-user-form" class="um-grid" style="margin-top:10px;">
+      {% csrf_token %}
       <div>
         <label class="um-label">User Type</label>
         <select class="um-select" name="user_type" id="user-type" required>
@@ -128,6 +129,10 @@
 
 <script>
 function getCookie(name){const v=`; ${document.cookie}`;const p=v.split(`; ${name}=`);if(p.length===2)return p.pop().split(';').shift();}
+function getCsrfToken(){
+  const formToken = (document.querySelector('input[name="csrfmiddlewaretoken"]') || {}).value;
+  return formToken || getCookie('csrftoken') || '';
+}
 async function readApiResponse(resp){
   const contentType = (resp.headers.get('content-type') || '').toLowerCase();
   if (contentType.includes('application/json')) {
@@ -260,7 +265,7 @@ createBtn.addEventListener('click', async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': getCookie('csrftoken'),
+        'X-CSRFToken': getCsrfToken(),
         'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify(payload)

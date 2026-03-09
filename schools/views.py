@@ -7360,13 +7360,15 @@ def _sync_parent_account_for_student(student: Student):
 @login_required
 def new_user(request):
     school = resolve_user_school(request.user)
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     if not school or not has_full_headteacher_access(request.user, school):
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
         return HttpResponseForbidden()
     teachers = Teacher.objects.filter(school=school).select_related('user').order_by('user__first_name', 'user__last_name')
     staff_qs = Staff.objects.filter(school=school).order_by('full_name')
     classes_qs = ClassRoom.objects.filter(school=school)
     classes = classes_qs.order_by('name')
-    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
     if request.method == 'POST' and is_ajax:
         try:
@@ -7549,9 +7551,11 @@ def new_user(request):
 @login_required
 def user_updates(request):
     school = resolve_user_school(request.user)
-    if not school or not has_full_headteacher_access(request.user, school):
-        return HttpResponseForbidden()
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    if not school or not has_full_headteacher_access(request.user, school):
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+        return HttpResponseForbidden()
     classes = ClassRoom.objects.filter(school=school).order_by('name')
     teachers = list(Teacher.objects.filter(school=school).select_related('user'))
     teachers_by_user_id = {cast(Any, t.user).id: t for t in teachers}
