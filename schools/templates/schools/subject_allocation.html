@@ -176,8 +176,16 @@ function filterSubjects(){
 
     let visible = true;
     if (schoolSystemType === 'CBE' && level) {
-      if (subjectLevel !== level) {
+      if (subjectLevel && subjectLevel !== level) {
         visible = false;
+      }
+
+      if (level === 'Pre School' || level === 'Kindergarten') {
+        if (subjectLevel && !['Primary', 'Lower Primary', 'Upper Primary', 'Pre School', 'Kindergarten'].includes(subjectLevel)) {
+          visible = false;
+        } else {
+          visible = true;
+        }
       }
 
       if (level === 'Senior') {
