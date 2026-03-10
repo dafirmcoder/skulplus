@@ -72,6 +72,7 @@ th{background:#0f3057;color:white}
     <div id="weightWrap" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px"></div>
 
     <label><input type="checkbox" id="splitByStream" checked> Split by Stream</label>
+    <label style="margin-left:12px"><input type="checkbox" id="showRanking" checked> Show Ranking</label>
 
     <button class="btn btn-primary" onclick="loadAnalysis()">Run Analysis</button>
 </div>
@@ -139,6 +140,7 @@ function loadAnalysis(){
     const term = document.getElementById('termSelect').value;
     const compareExamId = document.getElementById('compareExamSelect').value;
     const splitByStream = document.getElementById('splitByStream').checked;
+    const showRanking = document.getElementById('showRanking').checked;
     const examWeights = {};
     document.querySelectorAll('#weightWrap input[data-exam-id]').forEach(inp => {
         const w = parseFloat(inp.value || '1');
@@ -161,6 +163,7 @@ function loadAnalysis(){
     if(term) params.append("term", term);
     if(compareExamId) params.append("compare_exam_id", compareExamId);
     if(splitByStream) params.append("split_by_stream", "true");
+    params.append("show_ranking", showRanking ? "1" : "0");
     params.append("scope", analysisScope);
     params.append("exam_weights", JSON.stringify(examWeights));
 
