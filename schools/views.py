@@ -187,6 +187,7 @@ from django.shortcuts import get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login
+from django.utils import timezone
 from django.urls import reverse
 from .access import (
     get_user_role as resolve_user_role,
@@ -2256,8 +2257,93 @@ def parent_dashboard(request):
     ).order_by('first_name', 'last_name')
     if not students.exists():
         return HttpResponseForbidden()
+
+    term_order = {'Term 1': 1, 'Term 2': 2, 'Term 3': 3}
+
+    def resolve_active_term_year(school):
+        latest_term = (
+            TermDate.objects.filter(school=school)
+            .order_by('-year', '-term')
+            .first()
+        )
+        if latest_term:
+            return latest_term.term, latest_term.year
+        latest_exam = (
+            Exam.objects.filter(school=school)
+            .order_by('-year', '-term', '-start_date')
+            .first()
+        )
+        if latest_exam:
+            return latest_exam.term, latest_exam.year
+        now = timezone.now()
+        return 'Term 1', now.year
+
+    student_cards = []
+    for student in students:
+        school = student.school
+        term, year = resolve_active_term_year(school)
+        balance = student.balance(term, year)
+
+        payments = list(
+            Payment.objects.filter(student=student)
+            .order_by('-date_paid', '-id')[:20]
+        )
+
+        class_level = student.classroom.level.name if student.classroom and student.classroom.level else None
+        resolved_level = resolve_cbe_level(school, class_level)
+        resolve_grade_points, _grade_list = _build_grade_resolver_for_class(
+            school, student.classroom, resolved_level
+        ) if student.classroom else (lambda pct: ('-', None), [])
+
+        marks = (
+            StudentMark.objects.filter(student=student, score__isnull=False)
+            .select_related('marksheet__exam', 'marksheet')
+        )
+        exam_map = {}
+        for m in marks:
+            ms = cast(Any, m).marksheet
+            ex = cast(Any, ms).exam
+            key = ex.id
+            entry = exam_map.setdefault(key, {
+                'title': ex.title,
+                'term': ex.term,
+                'year': ex.year,
+                'scores': [],
+                'order': (ex.year, term_order.get(ex.term, 0), ex.title),
+            })
+            pct = _normalize_pct(m.score, ms.out_of)
+            entry['scores'].append(pct)
+
+        academic_history = []
+        for entry in exam_map.values():
+            scores = entry['scores']
+            avg_pct = round(sum(scores) / len(scores), 2) if scores else 0.0
+            grade, _pts = resolve_grade_points(avg_pct)
+            academic_history.append({
+                'title': entry['title'],
+                'term': entry['term'],
+                'year': entry['year'],
+                'avg_pct': avg_pct,
+                'grade': grade or '-',
+            })
+        academic_history.sort(key=lambda r: (r['year'], term_order.get(r['term'], 0), r['title']), reverse=True)
+
+        student_cards.append({
+            'student': student,
+            'term': term,
+            'year': year,
+            'balance': balance,
+            'payments': payments,
+            'academic_history': academic_history,
+        })
+
+    announcements = Announcement.objects.filter(
+        school_id__in={s.school_id for s in students}
+    ).order_by('-created_at')[:20]
+
     return render(request, 'schools/parent_dashboard.html', {
-        'students': students,
+        'student_cards': student_cards,
+        'announcements': announcements,
     })
 
 
