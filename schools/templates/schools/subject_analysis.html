@@ -143,9 +143,12 @@ function loadAnalysis(){
     const splitByStream = document.getElementById('splitByStream').checked;
     const showRanking = document.getElementById('showRanking').checked;
     const examWeights = {};
+    let totalWeight = 0;
     document.querySelectorAll('#weightWrap input[data-exam-id]').forEach(inp => {
         const w = parseFloat(inp.value || '1');
-        examWeights[inp.dataset.examId] = (Number.isFinite(w) && w > 0) ? w : 1;
+        const val = (Number.isFinite(w) && w > 0) ? w : 1;
+        examWeights[inp.dataset.examId] = val;
+        totalWeight += val;
     });
 
     if(!classId){
@@ -166,6 +169,10 @@ function loadAnalysis(){
     if(splitByStream) params.append("split_by_stream", "true");
     params.append("show_ranking", showRanking ? "1" : "0");
     params.append("scope", analysisScope);
+    if (totalWeight > 100) {
+        alert('Total exam weight cannot exceed 100.');
+        return;
+    }
     params.append("exam_weights", JSON.stringify(examWeights));
 
     fetch(`{% url 'whole_school_subject_stream_analysis' %}?${params.toString()}`)

@@ -790,16 +790,17 @@ def _normalize_pct(score: Any, out_of: Any) -> float:
         return 0.0
 
 
-def _parse_exam_weights_param(raw_weights: str | None, exam_ids: list[int]) -> dict[int, float]:
+def _parse_exam_weights_param(raw_weights: str | None, exam_ids: list[int], max_total: float | None = None) -> tuple[dict[int, float], str | None]:
     weights: dict[int, float] = {int(eid): 1.0 for eid in exam_ids}
     if not raw_weights:
-        return weights
+        return weights, None
     try:
         payload = json.loads(raw_weights)
     except Exception:
-        return weights
+        return weights, None
     if not isinstance(payload, dict):
-        return weights
+        return weights, None
+    total = 0.0
     for key, value in payload.items():
         try:
             exam_id = int(key)
@@ -808,9 +809,12 @@ def _parse_exam_weights_param(raw_weights: str | None, exam_ids: list[int]) -> d
             weight = float(value)
             if weight > 0:
                 weights[exam_id] = weight
+                total += weight
         except Exception:
             continue
-    return weights
+    if max_total is not None and total > max_total:
+        return weights, f'Total exam weight cannot exceed {max_total}.'
+    return weights, None
 
 
 def _weighted_mean(pairs: list[tuple[float, float]]) -> float | None:
@@ -6058,7 +6062,9 @@ def subject_analysis_data(request):
 
     exams = Exam.objects.filter(school=school, term=term).order_by('-year', 'title')
     exam_ids_for_term = [cast(Any, ex).id for ex in exams]
-    exam_weights = _parse_exam_weights_param(raw_exam_weights, exam_ids_for_term)
+    exam_weights, weight_error = _parse_exam_weights_param(raw_exam_weights, exam_ids_for_term, max_total=100)
+    if weight_error:
+        return JsonResponse({'success': False, 'error': weight_error}, status=400)
     results = []
     for exam in exams:
         payload = compute_exam_distribution(exam, term)
@@ -6395,7 +6401,9 @@ def whole_school_subject_stream_analysis(request):
         exam_ids_for_weights = list(
             Exam.objects.filter(school=school, term=term).values_list('id', flat=True)
         )
-    exam_weights = _parse_exam_weights_param(raw_exam_weights, exam_ids_for_weights)
+    exam_weights, weight_error = _parse_exam_weights_param(raw_exam_weights, exam_ids_for_weights, max_total=100)
+    if weight_error:
+        return JsonResponse({'success': False, 'error': weight_error}, status=400)
 
     resolve_grade_points, grades_list = _build_grade_resolver_for_class(school, classroom, resolved_level)
 
@@ -6932,7 +6940,9 @@ def report_cards_data(request):
     )
     exam_ids = [cast(Any, e).id for e in exams_in_term]
     exam_index = {eid: idx for idx, eid in enumerate(exam_ids)}
-    exam_weights = _parse_exam_weights_param(raw_exam_weights, exam_ids)
+    exam_weights, weight_error = _parse_exam_weights_param(raw_exam_weights, exam_ids, max_total=100)
+    if weight_error:
+        return JsonResponse({'success': False, 'error': weight_error}, status=400)
     is_cambridge = getattr(school, 'school_type', '') == 'CAMBRIDGE'
     default_cambridge_ranking = bool(getattr(school, 'cambridge_show_ranking', False))
     if show_ranking_param is None:

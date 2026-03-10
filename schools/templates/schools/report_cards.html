@@ -460,10 +460,17 @@ generateBtn.addEventListener('click', function(){
   generateBtn.disabled = true;
   generateBtn.textContent = 'Generating...';
   const examWeights = {};
+  let totalWeight = 0;
   weightWrap.querySelectorAll('input[data-exam-id]').forEach(inp => {
     const w = parseFloat(inp.value || '1');
-    examWeights[inp.dataset.examId] = (Number.isFinite(w) && w > 0) ? w : 1;
+    const val = (Number.isFinite(w) && w > 0) ? w : 1;
+    examWeights[inp.dataset.examId] = val;
+    totalWeight += val;
   });
+  if (totalWeight > 100) {
+    alert('Total exam weight cannot exceed 100.');
+    return;
+  }
   const params = new URLSearchParams({
     class_id: classId,
     term: term,
