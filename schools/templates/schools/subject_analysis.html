@@ -186,6 +186,10 @@ function loadAnalysis(){
         const container = document.getElementById('results');
         container.innerHTML='';
 
+        if (data.competency_summary) {
+            renderCompetencySummary(container, data.competency_summary);
+        }
+
         data.classes.forEach(cls => {
             renderOverallGradeSummary(container, cls);
             renderTopStudentsOverall(container, cls);
@@ -219,6 +223,32 @@ function rebuildWeightInputs(){
             <input type="number" min="0.01" step="0.01" value="1" data-exam-id="${opt.value}" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:7px">`;
         wrap.appendChild(div);
     });
+}
+
+function renderCompetencySummary(container, summary){
+    const card = document.createElement('div');
+    card.className = 'card';
+    let html = `<h3 style="margin:0 0 8px">Competency Summary</h3>`;
+    const strands = Object.keys(summary || {});
+    if (!strands.length){
+        html += `<div style="color:#64748b">No competencies recorded.</div>`;
+    } else {
+        strands.forEach(strand => {
+            html += `<div style="margin-top:8px"><strong>${strand}</strong></div>`;
+            const subs = summary[strand] || {};
+            const rows = Object.keys(subs).map(sub => {
+                const counts = subs[sub] || {};
+                const parts = Object.keys(counts).map(k => `${k}: ${counts[k]}`).join(', ');
+                return `<tr><td>${sub}</td><td>${parts || '-'}</td></tr>`;
+            }).join('');
+            html += `<table class="stream-analysis-table" style="width:100%;border-collapse:collapse;margin-top:6px">
+                <thead><tr><th>Sub Strand</th><th>Summary</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        });
+    }
+    card.innerHTML = html;
+    container.appendChild(card);
 }
 
 document.getElementById('termSelect').addEventListener('change', rebuildWeightInputs);

@@ -314,6 +314,29 @@ function renderCard(school, card, meta = {}){
   });
 
   const generatedAt = meta.generated_at || '-';
+  const competency = card.competencies || {};
+  let competencyHtml = '';
+  const strandKeys = Object.keys(competency);
+  if (strandKeys.length){
+    competencyHtml = `
+      <div class="competency-box" style="margin-top:12px">
+        <h4 style="margin:0 0 6px">Competencies</h4>
+        ${strandKeys.map(strand => {
+          const items = competency[strand] || [];
+          const rows = items.map(i => `<tr><td>${i.sub_strand}</td><td>${i.level}</td></tr>`).join('');
+          return `
+            <div style="margin-bottom:10px">
+              <div style="font-weight:700;margin-bottom:4px">${strand}</div>
+              <table class="mini-table" style="width:100%">
+                <thead><tr><th>Sub Strand</th><th>Level</th></tr></thead>
+                <tbody>${rows || '<tr><td colspan="2">No entries</td></tr>'}</tbody>
+              </table>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
   return `
   <div class="report-card">
     <div class="school-header">
@@ -349,6 +372,7 @@ function renderCard(school, card, meta = {}){
       </tbody>
     </table>
 
+    ${competencyHtml}
     <div class="positions-wrap">
       <div>
         <table class="mini-table">

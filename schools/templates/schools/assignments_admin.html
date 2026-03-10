@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Assignments Overview{% endblock %}
+
+{% block header %}
+  <h2 style="margin:0">Assignments Overview</h2>
+{% endblock %}
+
+{% block content %}
+  <div class="card" style="padding:16px;margin-bottom:12px">
+    <form method="get">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+        <div>
+          <label>Term</label>
+          <select name="term" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
+            <option value="">All</option>
+            {% for t, label in term_choices %}
+              <option value="{{ t }}" {% if selected.term == t %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Year</label>
+          <input name="year" type="number" value="{{ selected.year }}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px" />
+        </div>
+        <div>
+          <label>Class</label>
+          <select name="class_id" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
+            <option value="">All</option>
+            {% for c in classes %}
+              <option value="{{ c.id }}" {% if selected.class_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Subject</label>
+          <select name="subject_id" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
+            <option value="">All</option>
+            {% for s in subjects %}
+              <option value="{{ s.id }}" {% if selected.subject_id == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" type="submit">Filter</button>
+        {% if selected.term and selected.year %}
+          <a class="btn btn-secondary" href="?term={{ selected.term }}&year={{ selected.year }}&class_id={{ selected.class_id }}&subject_id={{ selected.subject_id }}&export=missing">Download Missing List</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <div class="card" style="padding:16px;margin-bottom:12px">
+    <h3 style="margin:0 0 8px">Uploaded Assignments</h3>
+    <table class="table" style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Class</th>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Subject</th>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Teacher</th>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Term</th>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Year</th>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Title</th>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Download</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in assignments %}
+          <tr>
+            <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ a.classroom.name }}</td>
+            <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ a.subject.name }}</td>
+            <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ a.teacher.user.get_full_name|default:a.teacher.user.username }}</td>
+            <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ a.term }}</td>
+            <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ a.year }}</td>
+            <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ a.title|default:"-" }}</td>
+            <td style="padding:6px;border-bottom:1px solid #f1f5f9"><a href="{% url 'download_assignment' a.id %}">Download</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" style="padding:10px;text-align:center;color:#64748b">No assignments found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="padding:16px">
+    <h3 style="margin:0 0 8px">Missing Assignments</h3>
+    <table class="table" style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Teacher</th>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Class</th>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Subject</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in missing_rows %}
+          <tr>
+            <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ a.teacher.user.get_full_name|default:a.teacher.user.username }}</td>
+            <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ a.classroom.name }}</td>
+            <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ a.subject.name }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" style="padding:10px;text-align:center;color:#64748b">No missing assignments for the selected filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

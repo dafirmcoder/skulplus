@@ -172,11 +172,12 @@ from schools.models import Student, Teacher
 from finance.models import FeePayment as Payment, FeeStructure
 from payroll.models import Staff
 from schools.models import (
-    School, ClassRoom, StreamClassTeacher, TeacherAssignment, Exam, TermDate, MarkSheet, Announcement, Stream, Subject, PromotionLog, EducationLevel, SubjectAllocation, HeadTeacher, SchoolUserAccess
+    School, ClassRoom, StreamClassTeacher, TeacherAssignment, Exam, TermDate, MarkSheet, Announcement, Stream, Subject, PromotionLog, EducationLevel, SubjectAllocation, HeadTeacher, SchoolUserAccess,
+    LearningStrand, SubStrand, StudentCompetency, Assignment
 )
 from schools.models import StudentMark
 from schools.forms import StudentForm, AnnouncementForm, ClassRoomForm
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse, Http404
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
 from reportlab.pdfgen import canvas
@@ -189,6 +190,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login
 from django.utils import timezone
 from django.urls import reverse
+from django.core.exceptions import ValidationError
 from .access import (
     get_user_role as resolve_user_role,
     get_user_school as resolve_user_school,
@@ -770,6 +772,19 @@ CAMBRIDGE_COMMENT_BANK = {
     'F': 'Limited attainment. Urgent reinforcement and guided practice needed.',
     'G': 'Very weak attainment. Immediate intervention is required.',
 }
+
+EARLY_YEARS_LEVELS = {'Kindergarten', 'Pre School'}
+
+
+def _is_early_years_level(level_name: str | None) -> bool:
+    if not level_name:
+        return False
+    return level_name in EARLY_YEARS_LEVELS
+
+
+def _safe_filename(value: str) -> str:
+    cleaned = re.sub(r'[^A-Za-z0-9._-]+', '_', value or '').strip('_')
+    return cleaned or 'file'
 
 
 def _default_cambridge_bands(school) -> list[tuple[float, float, str, int]]:
@@ -2332,6 +2347,38 @@ def parent_dashboard(request):
             })
         academic_history.sort(key=lambda r: (r['year'], term_order.get(r['term'], 0), r['title']), reverse=True)
 
+        competency_history = []
+        class_level = student.classroom.level.name if student.classroom and student.classroom.level else None
+        if _is_early_years_level(class_level):
+            comp_qs = StudentCompetency.objects.filter(
+                student=student
+            ).select_related('exam', 'learning_strand', 'sub_strand')
+            comp_map = {}
+            for c in comp_qs:
+                ex = cast(Any, c).exam
+                key = ex.id
+                entry = comp_map.setdefault(key, {
+                    'title': ex.title,
+                    'term': ex.term,
+                    'year': ex.year,
+                    'strands': {},
+                    'order': (ex.year, term_order.get(ex.term, 0), ex.title),
+                })
+                strand_label = c.learning_strand.name
+                strand_entry = entry['strands'].setdefault(strand_label, [])
+                strand_entry.append({
+                    'sub_strand': c.sub_strand.name,
+                    'level': c.get_level_display(),
+                })
+            for entry in comp_map.values():
+                competency_history.append({
+                    'title': entry['title'],
+                    'term': entry['term'],
+                    'year': entry['year'],
+                    'strands': entry['strands'],
+                })
+            competency_history.sort(key=lambda r: (r['year'], term_order.get(r['term'], 0), r['title']), reverse=True)
+
         student_cards.append({
             'student': student,
             'term': term,
@@ -2339,6 +2386,14 @@ def parent_dashboard(request):
             'balance': balance,
             'payments': payments,
             'academic_history': academic_history,
+            'competency_history': competency_history,
+            'assignments': list(
+                Assignment.objects.filter(
+                    classroom=student.classroom,
+                    term=term,
+                    year=year,
+                ).select_related('subject', 'teacher__user').order_by('subject__name')
+            ) if student.classroom else [],
         })
 
     announcements = Announcement.objects.filter(
@@ -6407,6 +6462,26 @@ def whole_school_subject_stream_analysis(request):
 
     resolve_grade_points, grades_list = _build_grade_resolver_for_class(school, classroom, resolved_level)
 
+    competency_summary = None
+    if _is_early_years_level(class_level) and exam_ids_for_weights:
+        comp_qs = StudentCompetency.objects.filter(
+            student__classroom=classroom,
+            exam_id__in=exam_ids_for_weights,
+        ).select_related('learning_strand', 'sub_strand')
+        summary = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+        for comp in comp_qs:
+            strand = comp.learning_strand.name
+            sub = comp.sub_strand.name
+            level = comp.get_level_display()
+            summary[strand][sub][level] += 1
+        competency_summary = {
+            strand: {
+                sub: dict(levels)
+                for sub, levels in sub_map.items()
+            }
+            for strand, sub_map in summary.items()
+        }
+
     data_by_stream = defaultdict(list)
     subject_grade_distribution = defaultdict(lambda: defaultdict(lambda: {g: 0 for g in grades_list}))
     subject_grade_totals = defaultdict(lambda: {g: 0 for g in grades_list})
@@ -6850,6 +6925,7 @@ def whole_school_subject_stream_analysis(request):
         "classes": classes_output,
         "exam_weights": exam_weights,
         "show_ranking": show_ranking,
+        "competency_summary": competency_summary,
     })
 
 
@@ -7129,6 +7205,20 @@ def report_cards_data(request):
         subj = cast(Any, ms.subject)
         key = (sm_any.student_id, ex.id, subj.id)
         comment_map[key] = (sm_any.comment_text or '').strip()
+
+    competency_by_student: dict[int, dict[str, list[dict[str, str]]]] = defaultdict(lambda: defaultdict(list))
+    class_level = classroom.level.name if classroom.level else None
+    if _is_early_years_level(class_level):
+        competency_qs = StudentCompetency.objects.filter(
+            student_id__in=student_ids,
+            exam_id=cast(Any, exam).id,
+        ).select_related('learning_strand', 'sub_strand')
+        for comp in competency_qs:
+            strand_label = comp.learning_strand.name
+            competency_by_student[comp.student_id][strand_label].append({
+                'sub_strand': comp.sub_strand.name,
+                'level': comp.get_level_display(),
+            })
 
     # Exam ranking maps
     class_rank_by_exam: dict[tuple[int, int], int] = {}
@@ -7470,6 +7560,7 @@ def report_cards_data(request):
                 'average_pct': overall_avg_pct,
                 'overall_level': overall_level,
             },
+            'competencies': competency_by_student.get(sid, {}),
             'pathway': {
                 'priority': best_pathway,
                 'scores': pathway_scores,
@@ -8102,6 +8193,364 @@ def enter_marks_page(request):
     # Keep this route for backward compatibility, but use the main enter_marks flow
     # so teacher and headteacher pages remain identical.
     return enter_marks(request)
+
+
+def _user_can_manage_competencies(user, school, classroom=None) -> bool:
+    if not school:
+        return False
+    if has_full_headteacher_access(user, school) or user_has_permission(user, school, 'academics'):
+        return True
+    if hasattr(user, 'teacher'):
+        teacher = user.teacher
+        allowed_class_ids = _teacher_assigned_class_ids(teacher, school) | _teacher_class_teacher_class_ids(teacher, school)
+        if classroom is None:
+            return bool(allowed_class_ids)
+        level_name = classroom.level.name if classroom.level else None
+        return classroom.id in allowed_class_ids and _is_early_years_level(level_name)
+    return False
+
+
+@login_required
+def competencies_entry(request):
+    school = get_user_school(request.user)
+    if not school:
+        return HttpResponseForbidden()
+    if not _user_can_manage_competencies(request.user, school):
+        return HttpResponseForbidden()
+
+    classes_qs = ClassRoom.objects.filter(school=school, level__name__in=EARLY_YEARS_LEVELS).order_by('name')
+    if hasattr(request.user, 'teacher') and not (has_full_headteacher_access(request.user, school) or user_has_permission(request.user, school, 'academics')):
+        teacher = request.user.teacher
+        allowed_class_ids = _teacher_assigned_class_ids(teacher, school) | _teacher_class_teacher_class_ids(teacher, school)
+        classes_qs = classes_qs.filter(id__in=allowed_class_ids)
+
+    exams = Exam.objects.filter(school=school).order_by('-year', 'title')
+    return render(request, 'schools/competencies_entry.html', {
+        'school': school,
+        'classes': classes_qs,
+        'exams': exams,
+        'level_choices': StudentCompetency.LEVEL_CHOICES,
+    })
+
+
+@login_required
+def assignments_upload(request):
+    school = get_user_school(request.user)
+    if not school:
+        return HttpResponseForbidden()
+    if not hasattr(request.user, 'teacher'):
+        return HttpResponseForbidden()
+
+    teacher = request.user.teacher
+    assigned_qs = TeacherAssignment.objects.filter(teacher=teacher, classroom__school=school).select_related('classroom', 'subject')
+    assigned_pairs = {(a.classroom_id, a.subject_id) for a in assigned_qs}
+
+    classes = ClassRoom.objects.filter(id__in={cid for cid, _ in assigned_pairs}).order_by('name')
+    subjects = Subject.objects.filter(id__in={sid for _, sid in assigned_pairs}).order_by('name')
+
+    if request.method == 'POST':
+        class_id = request.POST.get('class_id')
+        subject_id = request.POST.get('subject_id')
+        term = (request.POST.get('term') or '').strip()
+        year = request.POST.get('year')
+        title = (request.POST.get('title') or '').strip()
+        doc = request.FILES.get('document')
+
+        try:
+            class_pk = int(class_id)
+            subject_pk = int(subject_id)
+            year_val = int(year)
+        except Exception:
+            messages.error(request, 'Invalid class, subject, or year.')
+            return redirect('assignments_upload')
+
+        if (class_pk, subject_pk) not in assigned_pairs:
+            messages.error(request, 'You are not assigned to this class/subject.')
+            return redirect('assignments_upload')
+        if term not in dict(Exam.TERM_CHOICES):
+            messages.error(request, 'Select a valid term.')
+            return redirect('assignments_upload')
+        if not doc:
+            messages.error(request, 'Upload a PDF document.')
+            return redirect('assignments_upload')
+
+        assignment, _created = Assignment.objects.update_or_create(
+            school=school,
+            classroom_id=class_pk,
+            subject_id=subject_pk,
+            term=term,
+            year=year_val,
+            defaults={
+                'teacher': teacher,
+                'title': title,
+                'document': doc,
+            },
+        )
+        try:
+            assignment.full_clean()
+            assignment.save()
+        except ValidationError as exc:
+            messages.error(request, '; '.join([str(e) for e in exc.messages]) if hasattr(exc, 'messages') else str(exc))
+            return redirect('assignments_upload')
+
+        messages.success(request, 'Assignment uploaded.')
+        return redirect('assignments_upload')
+
+    assignments = Assignment.objects.filter(teacher=teacher).select_related('classroom', 'subject').order_by('-year', '-term', '-created_at')[:50]
+    return render(request, 'schools/assignments_upload.html', {
+        'classes': classes,
+        'subjects': subjects,
+        'assignments': assignments,
+        'term_choices': Exam.TERM_CHOICES,
+    })
+
+
+@login_required
+def assignments_admin(request):
+    school = get_user_school(request.user)
+    if not school:
+        return HttpResponseForbidden()
+    if not (has_full_headteacher_access(request.user, school) or user_has_permission(request.user, school, 'academics')):
+        return HttpResponseForbidden()
+
+    term = (request.GET.get('term') or '').strip()
+    year = request.GET.get('year')
+    class_id = request.GET.get('class_id')
+    subject_id = request.GET.get('subject_id')
+
+    assignments_qs = Assignment.objects.filter(school=school).select_related('classroom', 'subject', 'teacher__user')
+    if term:
+        assignments_qs = assignments_qs.filter(term=term)
+    if year:
+        try:
+            assignments_qs = assignments_qs.filter(year=int(year))
+        except Exception:
+            pass
+    if class_id:
+        assignments_qs = assignments_qs.filter(classroom_id=class_id)
+    if subject_id:
+        assignments_qs = assignments_qs.filter(subject_id=subject_id)
+
+    missing_rows = []
+    if term and year:
+        try:
+            year_val = int(year)
+        except Exception:
+            year_val = None
+        if year_val:
+            assigned = TeacherAssignment.objects.filter(classroom__school=school).select_related('teacher__user', 'classroom', 'subject')
+            for a in assigned:
+                if class_id and str(a.classroom_id) != str(class_id):
+                    continue
+                if subject_id and str(a.subject_id) != str(subject_id):
+                    continue
+                exists = Assignment.objects.filter(
+                    school=school,
+                    classroom_id=a.classroom_id,
+                    subject_id=a.subject_id,
+                    term=term,
+                    year=year_val,
+                ).exists()
+                if not exists:
+                    missing_rows.append(a)
+
+    if request.GET.get('export') == 'missing' and missing_rows:
+        output = io.StringIO()
+        output.write('Teacher,Class,Subject,Term,Year\n')
+        for a in missing_rows:
+            teacher_name = a.teacher.user.get_full_name() or a.teacher.user.username
+            output.write(f'"{teacher_name}","{a.classroom.name}","{a.subject.name}","{term}","{year}"\n')
+        filename = f'missing_assignments_{term}_{year}.csv'
+        resp = HttpResponse(output.getvalue(), content_type='text/csv')
+        resp['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return resp
+
+    return render(request, 'schools/assignments_admin.html', {
+        'assignments': assignments_qs.order_by('-year', '-term', '-created_at')[:200],
+        'missing_rows': missing_rows,
+        'classes': ClassRoom.objects.filter(school=school).order_by('name'),
+        'subjects': Subject.objects.filter(school=school).order_by('name'),
+        'term_choices': Exam.TERM_CHOICES,
+        'selected': {'term': term, 'year': year, 'class_id': class_id, 'subject_id': subject_id},
+    })
+
+
+@login_required
+def download_assignment(request, assignment_id):
+    assignment = Assignment.objects.select_related('school', 'classroom', 'subject', 'teacher').filter(id=assignment_id).first()
+    if not assignment:
+        raise Http404()
+    school = assignment.school
+
+    allowed = False
+    if has_full_headteacher_access(request.user, school) or user_has_permission(request.user, school, 'academics'):
+        allowed = True
+    elif hasattr(request.user, 'teacher'):
+        teacher = request.user.teacher
+        allowed = TeacherAssignment.objects.filter(
+            teacher=teacher,
+            classroom=assignment.classroom,
+            subject=assignment.subject,
+        ).exists()
+    else:
+        allowed = Student.objects.filter(parent_user=request.user, classroom=assignment.classroom).exists()
+
+    if not allowed:
+        return HttpResponseForbidden()
+
+    file_handle = assignment.document.open('rb')
+    filename = f"{assignment.classroom.name}_{assignment.subject.name}_{assignment.term}_{assignment.year}.pdf"
+    filename = _safe_filename(filename)
+    response = FileResponse(file_handle, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+def load_competency_students(request):
+    school = get_user_school(request.user)
+    if not school:
+        return JsonResponse({'error': 'No school associated with this account.'}, status=403)
+
+    class_id = request.GET.get('class_id')
+    exam_id = request.GET.get('exam_id')
+    if not class_id or not exam_id:
+        return JsonResponse({'error': 'Select class and exam.'}, status=400)
+
+    classroom = ClassRoom.objects.filter(id=class_id, school=school).select_related('level').first()
+    if not classroom:
+        return JsonResponse({'error': 'Class not found.'}, status=404)
+
+    if not _user_can_manage_competencies(request.user, school, classroom):
+        return JsonResponse({'error': 'Access denied.'}, status=403)
+
+    level_name = classroom.level.name if classroom.level else None
+    if not _is_early_years_level(level_name):
+        return JsonResponse({'error': 'Competencies are only available for Pre School/Kindergarten.'}, status=400)
+
+    exam = Exam.objects.filter(id=exam_id, school=school).first()
+    if not exam:
+        return JsonResponse({'error': 'Exam not found.'}, status=404)
+
+    students = Student.objects.filter(school=school, classroom=classroom).order_by('first_name', 'last_name')
+    student_ids = [cast(Any, s).id for s in students]
+
+    strands = LearningStrand.objects.filter(
+        school=school,
+        education_level__name=level_name,
+    ).prefetch_related('sub_strands').order_by('name')
+
+    competency_map = {}
+    existing = StudentCompetency.objects.filter(
+        student_id__in=student_ids,
+        exam=exam,
+    ).select_related('sub_strand')
+    for c in existing:
+        competency_map[(c.student_id, c.sub_strand_id)] = c.level
+
+    payload_strands = []
+    for strand in strands:
+        sub_items = [{'id': ss.id, 'name': ss.name} for ss in strand.sub_strands.all().order_by('name')]
+        payload_strands.append({
+            'id': strand.id,
+            'name': strand.name,
+            'sub_strands': sub_items,
+        })
+
+    student_payload = []
+    for s in students:
+        s_any = cast(Any, s)
+        student_payload.append({
+            'id': s_any.id,
+            'name': f'{s_any.first_name} {s_any.last_name}',
+            'admission': s_any.admission_number,
+        })
+
+    return JsonResponse({
+        'students': student_payload,
+        'strands': payload_strands,
+        'levels': [{'value': v, 'label': l} for v, l in StudentCompetency.LEVEL_CHOICES],
+        'entries': {f'{sid}:{sub_id}': level for (sid, sub_id), level in competency_map.items()},
+    })
+
+
+@login_required
+@require_POST
+def save_competencies(request):
+    school = get_user_school(request.user)
+    if not school:
+        return JsonResponse({'success': False, 'error': 'No school associated with this account.'}, status=403)
+
+    try:
+        data = json.loads(request.body or '{}')
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Invalid payload.'}, status=400)
+
+    class_id = data.get('class_id')
+    exam_id = data.get('exam_id')
+    entries = data.get('entries') or []
+    if not class_id or not exam_id:
+        return JsonResponse({'success': False, 'error': 'Class and exam are required.'}, status=400)
+
+    classroom = ClassRoom.objects.filter(id=class_id, school=school).select_related('level').first()
+    if not classroom:
+        return JsonResponse({'success': False, 'error': 'Class not found.'}, status=404)
+    if not _user_can_manage_competencies(request.user, school, classroom):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+
+    level_name = classroom.level.name if classroom.level else None
+    if not _is_early_years_level(level_name):
+        return JsonResponse({'success': False, 'error': 'Competencies are only available for Pre School/Kindergarten.'}, status=400)
+
+    exam = Exam.objects.filter(id=exam_id, school=school).first()
+    if not exam:
+        return JsonResponse({'success': False, 'error': 'Exam not found.'}, status=404)
+
+    valid_levels = {c[0] for c in StudentCompetency.LEVEL_CHOICES}
+    student_ids = set(Student.objects.filter(school=school, classroom=classroom).values_list('id', flat=True))
+    sub_strands = SubStrand.objects.filter(
+        learning_strand__school=school,
+        learning_strand__education_level__name=level_name,
+    ).select_related('learning_strand')
+    sub_strand_map = {ss.id: ss for ss in sub_strands}
+
+    updates = 0
+    for entry in entries:
+        try:
+            student_id = int(entry.get('student_id'))
+            sub_strand_id = int(entry.get('sub_strand_id'))
+        except Exception:
+            continue
+        level = (entry.get('level') or '').strip()
+        if student_id not in student_ids:
+            continue
+        sub_strand = sub_strand_map.get(sub_strand_id)
+        if not sub_strand:
+            continue
+        if level and level not in valid_levels:
+            continue
+
+        if not level:
+            StudentCompetency.objects.filter(
+                student_id=student_id,
+                exam=exam,
+                sub_strand_id=sub_strand_id,
+            ).delete()
+            continue
+
+        StudentCompetency.objects.update_or_create(
+            student_id=student_id,
+            exam=exam,
+            sub_strand_id=sub_strand_id,
+            defaults={
+                'learning_strand': sub_strand.learning_strand,
+                'level': level,
+                'recorded_by': request.user,
+            },
+        )
+        updates += 1
+
+    return JsonResponse({'success': True, 'updated': updates})
 
 
 @login_required

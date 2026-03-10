@@ -259,11 +259,14 @@
         {% url 'enter_marks' as enter_marks_url %}
         {% url 'entered_marks' as entered_marks_url %}
         {% url 'set_exams' as set_exams_url %}
+        {% url 'competencies_entry' as competencies_entry_url %}
         {% url 'merit_lists' as merit_lists_url %}
         {% url 'subject_analysis' as subject_analysis_url %}
         {% url 'full_class_analysis' as full_class_analysis_url %}
         {% url 'report_cards' as report_cards_url %}
         {% url 'send_reports' as send_reports_url %}
+        {% url 'assignments_upload' as assignments_upload_url %}
+        {% url 'assignments_admin' as assignments_admin_url %}
         {% url 'fee_structure' as fee_structure_url %}
         {% url 'add_payment' as add_payment_url %}
         {% url 'balance_report' as balance_report_url %}
@@ -316,6 +319,8 @@
             <li><a href="{{ enter_marks_url }}" onclick="event.stopPropagation();" class="{% if request.path == enter_marks_url %}active-link{% endif %}"><i class="fas fa-clipboard-check"></i> Exam Marks</a></li>
             <li><a href="{{ entered_marks_url }}" onclick="event.stopPropagation();" class="{% if request.path == entered_marks_url %}active-link{% endif %}"><i class="fas fa-table-list"></i> Entered Marks</a></li>
             <li><a href="{{ set_exams_url }}" onclick="event.stopPropagation();" class="{% if request.path == set_exams_url %}active-link{% endif %}"><i class="fas fa-lock"></i> Set Exams</a></li>
+            <li><a href="{{ competencies_entry_url }}" onclick="event.stopPropagation();" class="{% if request.path == competencies_entry_url %}active-link{% endif %}"><i class="fas fa-clipboard-list"></i> Competencies</a></li>
+            <li><a href="{{ assignments_admin_url }}" onclick="event.stopPropagation();" class="{% if request.path == assignments_admin_url %}active-link{% endif %}"><i class="fas fa-file-pdf"></i> Assignments</a></li>
             <li><a href="{{ cbc_comments_report_url }}" onclick="event.stopPropagation();" class="{% if request.path == cbc_comments_report_url %}active-link{% endif %}"><i class="fas fa-list-check"></i> Competency Rubrics</a></li>
           </ul>
         </li>
@@ -359,6 +364,7 @@
 
     <li><a href="{% url 'class_lists' %}"><i class="fas fa-list"></i><span>Class Lists</span></a></li>
     <li><a href="{{ enter_marks_url }}" class="{% if request.path == enter_marks_url %}active-link{% endif %}"><i class="fas fa-clipboard-check"></i><span>Marks Entry</span></a></li>
+    <li><a href="{{ assignments_upload_url }}" class="{% if request.path == assignments_upload_url %}active-link{% endif %}"><i class="fas fa-file-pdf"></i><span>Assignments</span></a></li>
     {% if request.user.teacher.is_class_teacher %}
     <li><a href="{{ entered_marks_url }}" class="{% if request.path == entered_marks_url %}active-link{% endif %}"><i class="fas fa-table-list"></i><span>Entered Marks</span></a></li>
     {% endif %}

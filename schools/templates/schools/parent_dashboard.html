@@ -82,6 +82,57 @@
           </tbody>
         </table>
       </div>
+
+      <div style="margin-top:14px">
+        <h4 style="margin:0 0 8px">Assignments ({{ item.term }} {{ item.year }})</h4>
+        <table class="table" style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Subject</th>
+              <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Teacher</th>
+              <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Title</th>
+              <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Download</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for assign in item.assignments %}
+              <tr>
+                <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ assign.subject.name }}</td>
+                <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ assign.teacher.user.get_full_name|default:assign.teacher.user.username }}</td>
+                <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ assign.title|default:"-" }}</td>
+                <td style="padding:6px;border-bottom:1px solid #f1f5f9"><a href="{% url 'download_assignment' assign.id %}">Download</a></td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" style="padding:10px;text-align:center;color:#64748b">No assignments uploaded.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if item.competency_history %}
+      <div style="margin-top:14px">
+        <h4 style="margin:0 0 8px">Competency History</h4>
+        {% for entry in item.competency_history %}
+          <div style="margin-bottom:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px">
+            <div style="font-weight:700">{{ entry.title }} • {{ entry.term }} {{ entry.year }}</div>
+            {% for strand, items in entry.strands.items %}
+              <div style="margin-top:8px"><strong>{{ strand }}</strong></div>
+              <table class="table" style="width:100%;border-collapse:collapse">
+                <thead><tr><th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Sub Strand</th><th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Level</th></tr></thead>
+                <tbody>
+                  {% for item_row in items %}
+                    <tr>
+                      <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ item_row.sub_strand }}</td>
+                      <td style="padding:6px;border-bottom:1px solid #f1f5f9">{{ item_row.level }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
     {% endwith %}
   {% endfor %}

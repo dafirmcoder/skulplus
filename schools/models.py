@@ -4,6 +4,7 @@ from typing import Any, cast
 import re
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from .cbe import is_junior_subject_name, is_primary_subject_name
 
 
@@ -546,5 +547,89 @@ class CompetencyComment(models.Model):
     def __str__(self):
         subject_name = self.subject.name if self.subject else 'General'
         return f"{self.education_level} {subject_name} {self.performance_level}"
+
+
+class LearningStrand(models.Model):
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='learning_strands')
+    education_level = models.ForeignKey('EducationLevel', on_delete=models.CASCADE)
+    name = models.CharField(max_length=120)
+
+    class Meta:
+        ordering = ['education_level__name', 'name']
+        unique_together = ('school', 'education_level', 'name')
+
+    def __str__(self):
+        return f"{self.name} ({self.education_level.name})"
+
+
+class SubStrand(models.Model):
+    learning_strand = models.ForeignKey(LearningStrand, on_delete=models.CASCADE, related_name='sub_strands')
+    name = models.CharField(max_length=120)
+
+    class Meta:
+        ordering = ['name']
+        unique_together = ('learning_strand', 'name')
+
+    def __str__(self):
+        return f"{self.learning_strand.name} - {self.name}"
+
+
+class StudentCompetency(models.Model):
+    LEVEL_NOT_YET = 'NOT_YET'
+    LEVEL_DEVELOPING = 'DEVELOPING'
+    LEVEL_ACHIEVED = 'ACHIEVED'
+    LEVEL_EXCEEDS = 'EXCEEDS'
+    LEVEL_CHOICES = (
+        (LEVEL_NOT_YET, 'Not Yet'),
+        (LEVEL_DEVELOPING, 'Developing'),
+        (LEVEL_ACHIEVED, 'Achieved'),
+        (LEVEL_EXCEEDS, 'Exceeds'),
+    )
+
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='competencies')
+    exam = models.ForeignKey('Exam', on_delete=models.CASCADE, related_name='competencies')
+    learning_strand = models.ForeignKey(LearningStrand, on_delete=models.CASCADE)
+    sub_strand = models.ForeignKey(SubStrand, on_delete=models.CASCADE)
+    level = models.CharField(max_length=20, choices=LEVEL_CHOICES)
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('student', 'exam', 'sub_strand')
+
+
+def _validate_pdf_size(file_obj):
+    if not file_obj:
+        return
+    max_size = 5 * 1024 * 1024
+    if file_obj.size > max_size:
+        raise ValidationError('PDF must not exceed 5MB.')
+
+
+class Assignment(models.Model):
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='assignments')
+    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, related_name='assignments')
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='assignments')
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='assignments')
+    term = models.CharField(max_length=20, choices=Exam.TERM_CHOICES)
+    year = models.IntegerField()
+    title = models.CharField(max_length=160, blank=True, default='')
+    document = models.FileField(
+        upload_to='assignments/',
+        validators=[FileExtensionValidator(['pdf']), _validate_pdf_size],
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-year', '-term', '-created_at']
+        unique_together = ('school', 'classroom', 'subject', 'term', 'year')
+
+    def __str__(self):
+        return f'{self.classroom} {self.subject} {self.term} {self.year}'
+
+    def clean(self):
+        super().clean()
+        if self.document and not self.document.name.lower().endswith('.pdf'):
+            raise ValidationError({'document': 'Only PDF files are allowed.'})
 
 

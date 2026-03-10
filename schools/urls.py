@@ -79,6 +79,9 @@ urlpatterns = [
     path('reports/report-cards/data/', views.report_cards_data, name='report_cards_data'),
     path('reports/send-reports/', views.send_reports, name='send_reports'),
     path('parents/dashboard/', views.parent_dashboard, name='parent_dashboard'),
+    path('assignments/upload/', views.assignments_upload, name='assignments_upload'),
+    path('assignments/admin/', views.assignments_admin, name='assignments_admin'),
+    path('assignments/download/<int:assignment_id>/', views.download_assignment, name='download_assignment'),
 
     # User management
     path('users/new/', views.new_user, name='new_user'),
@@ -98,12 +101,15 @@ urlpatterns = [
     path('enter-marks/', views.enter_marks_page, name='enter_marks'),
 path('entered-marks/', views.entered_marks, name='entered_marks'),
 path('set-exams/', views.set_exams, name='set_exams'),
-path('set-exams/<int:exam_id>/toggle-lock/', views.toggle_exam_lock, name='toggle_exam_lock'),
-path('load-marks-students/', views.load_marks_students, name='load_marks_students'),
-path('save-marks/', views.save_marks, name='save_marks'),
-path('suggested-comments/', views.get_suggested_comments, name='get_suggested_comments'),
-path('publish-marks/<int:marksheet_id>/', views.publish_marks, name='publish_marks'),
-path('unpublish-marks/<int:marksheet_id>/', views.unpublish_marks, name='unpublish_marks'),
+    path('set-exams/<int:exam_id>/toggle-lock/', views.toggle_exam_lock, name='toggle_exam_lock'),
+    path('load-marks-students/', views.load_marks_students, name='load_marks_students'),
+    path('save-marks/', views.save_marks, name='save_marks'),
+    path('suggested-comments/', views.get_suggested_comments, name='get_suggested_comments'),
+    path('publish-marks/<int:marksheet_id>/', views.publish_marks, name='publish_marks'),
+    path('unpublish-marks/<int:marksheet_id>/', views.unpublish_marks, name='unpublish_marks'),
+    path('marks/competencies/', views.competencies_entry, name='competencies_entry'),
+    path('marks/competencies/students/', views.load_competency_students, name='load_competency_students'),
+    path('marks/competencies/save/', views.save_competencies, name='save_competencies'),
 ]
 
 

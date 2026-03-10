@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Competencies Entry{% endblock %}
+
+{% block header %}
+  <h2 style="margin:0">Competencies Entry</h2>
+{% endblock %}
+
+{% block content %}
+  <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+  <div class="card" style="padding:16px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+      <div>
+        <label>Class</label>
+        <select id="classSelect" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
+          <option value="">Select class</option>
+          {% for c in classes %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Exam</label>
+        <select id="examSelect" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
+          <option value="">Select exam</option>
+          {% for e in exams %}
+            <option value="{{ e.id }}">{{ e.title }} - {{ e.term }} {{ e.year }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="loadBtn">Load</button>
+      <button class="btn btn-success" id="saveBtn" disabled>Save</button>
+    </div>
+  </div>
+
+  <div class="card" style="padding:16px">
+    <div id="competencyTableWrap" style="overflow:auto"></div>
+  </div>
+
+<script>
+const loadBtn = document.getElementById('loadBtn');
+const saveBtn = document.getElementById('saveBtn');
+const classSelect = document.getElementById('classSelect');
+const examSelect = document.getElementById('examSelect');
+const tableWrap = document.getElementById('competencyTableWrap');
+
+function csrfToken(){
+  const el = document.querySelector('input[name=csrfmiddlewaretoken]');
+  return el ? el.value : '';
+}
+
+function renderTable(payload){
+  const students = payload.students || [];
+  const strands = payload.strands || [];
+  const levels = payload.levels || [];
+  const entries = payload.entries || {};
+
+  if (!students.length || !strands.length){
+    tableWrap.innerHTML = '<div style="color:#64748b">No students or strands configured.</div>';
+    saveBtn.disabled = true;
+    return;
+  }
+
+  let headerTop = '<tr><th rowspan="2" style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Student</th>';
+  let headerBottom = '<tr>';
+  strands.forEach(strand => {
+    const count = (strand.sub_strands || []).length || 1;
+    headerTop += `<th colspan="${count}" style="text-align:center;padding:6px;border-bottom:1px solid #e2e8f0">${strand.name}</th>`;
+    (strand.sub_strands || []).forEach(ss => {
+      headerBottom += `<th style="text-align:center;padding:6px;border-bottom:1px solid #e2e8f0">${ss.name}</th>`;
+    });
+  });
+  headerTop += '</tr>';
+  headerBottom += '</tr>';
+
+  let body = '';
+  students.forEach(stu => {
+    body += `<tr><td style="padding:6px;border-bottom:1px solid #f1f5f9">${stu.name}</td>`;
+    strands.forEach(strand => {
+      (strand.sub_strands || []).forEach(ss => {
+        const key = `${stu.id}:${ss.id}`;
+        const current = entries[key] || '';
+        let options = '<option value=""></option>';
+        levels.forEach(l => {
+          const sel = (l.value === current) ? 'selected' : '';
+          options += `<option value="${l.value}" ${sel}>${l.label}</option>`;
+        });
+        body += `<td style="padding:6px;border-bottom:1px solid #f1f5f9">
+          <select data-student-id="${stu.id}" data-sub-strand-id="${ss.id}" style="width:100%;padding:6px;border:1px solid #e2e8f0;border-radius:6px">
+            ${options}
+          </select>
+        </td>`;
+      });
+    });
+    body += '</tr>';
+  });
+
+  tableWrap.innerHTML = `
+    <table class="table" style="width:100%;border-collapse:collapse">
+      <thead>${headerTop}${headerBottom}</thead>
+      <tbody>${body}</tbody>
+    </table>`;
+  saveBtn.disabled = false;
+}
+
+loadBtn.addEventListener('click', () => {
+  const classId = classSelect.value;
+  const examId = examSelect.value;
+  if (!classId || !examId){
+    alert('Select class and exam.');
+    return;
+  }
+  fetch(`{% url 'load_competency_students' %}?class_id=${classId}&exam_id=${examId}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error){
+        alert(data.error);
+        return;
+      }
+      renderTable(data);
+    })
+    .catch(err => alert(err.message));
+});
+
+saveBtn.addEventListener('click', () => {
+  const classId = classSelect.value;
+  const examId = examSelect.value;
+  if (!classId || !examId){
+    alert('Select class and exam.');
+    return;
+  }
+  const entries = [];
+  tableWrap.querySelectorAll('select[data-student-id]').forEach(sel => {
+    entries.push({
+      student_id: sel.dataset.studentId,
+      sub_strand_id: sel.dataset.subStrandId,
+      level: sel.value
+    });
+  });
+  fetch(`{% url 'save_competencies' %}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken()
+    },
+    body: JSON.stringify({ class_id: classId, exam_id: examId, entries })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.success){
+      alert(data.error || 'Unable to save.');
+      return;
+    }
+    alert('Saved.');
+  })
+  .catch(err => alert(err.message));
+});
+</script>
+{% endblock %}
