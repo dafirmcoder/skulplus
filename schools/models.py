@@ -610,7 +610,7 @@ class Assignment(models.Model):
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='assignments')
     classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, related_name='assignments')
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='assignments')
-    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='assignments')
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='uploaded_assignments')
     term = models.CharField(max_length=20, choices=Exam.TERM_CHOICES)
     year = models.IntegerField()
     title = models.CharField(max_length=160, blank=True, default='')

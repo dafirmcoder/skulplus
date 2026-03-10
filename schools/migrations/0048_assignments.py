@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
                 ('classroom', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='assignments', to='schools.classroom')),
                 ('school', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='assignments', to='schools.school')),
                 ('subject', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='assignments', to='schools.subject')),
-                ('teacher', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='assignments', to='schools.teacher')),
+                ('teacher', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='uploaded_assignments', to='schools.teacher')),
             ],
             options={
                 'ordering': ['-year', '-term', '-created_at'],
