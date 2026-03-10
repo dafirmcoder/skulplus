@@ -4254,7 +4254,7 @@ def subjects(request):
 
     # handle subject creation via AJAX POST
     if request.method == 'POST':
-        form = SubjectForm(request.POST)
+        form = SubjectForm(request.POST, school=school)
         if form.is_valid():
             subj = form.save(commit=False)
             subj.school = school
@@ -4266,7 +4266,7 @@ def subjects(request):
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
-    form = SubjectForm()
+    form = SubjectForm(school=school)
 
     # Include normal school-visible subjects plus any legacy subjects already used in marksheets.
     base_subjects = Subject.objects.filter(school=school).select_related('pathway', 'education_level')
@@ -4297,7 +4297,7 @@ def edit_subject(request, subject_id):
     subject = get_object_or_404(Subject, id=subject_id, school=school)
 
     if request.method == 'POST':
-        form = SubjectForm(request.POST, instance=subject)
+        form = SubjectForm(request.POST, instance=subject, school=school)
         if form.is_valid():
             form.save()
             return JsonResponse({'success': True})
@@ -4311,6 +4311,7 @@ def edit_subject(request, subject_id):
         'name': subject_any.name,
         'short_name': subject_any.short_name or '',
         'subject_category': subject_any.subject_category or '',
+        'education_level': subject_any.education_level_id or '',
     })
 
 

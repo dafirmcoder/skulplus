@@ -1,5 +1,5 @@
 from django import forms
-from .models import Teacher, Student, Announcement, ClassRoom, Subject, Stream
+from .models import Teacher, Student, Announcement, ClassRoom, Subject, Stream, EducationLevel
 from .models import School
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
@@ -219,13 +219,24 @@ class ClassRoomForm(forms.ModelForm):
 class SubjectForm(forms.ModelForm):
     class Meta:
         model = Subject
-        fields = ['code', 'name', 'short_name', 'subject_category']
+        fields = ['code', 'name', 'short_name', 'subject_category', 'education_level']
         widgets = {
             'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. MATH101'}),
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Mathematics'}),
             'short_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Math'}),
             'subject_category': forms.Select(attrs={'class': 'form-control'}),
+            'education_level': forms.Select(attrs={'class': 'form-control'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        school = kwargs.pop('school', None)
+        super().__init__(*args, **kwargs)
+        if 'education_level' in self.fields:
+            qs = EducationLevel.objects.all().order_by('name')
+            if school and getattr(school, 'school_type', '') == 'CAMBRIDGE':
+                qs = qs.filter(name__in=['Kindergarten', 'Lower Primary', 'Upper Primary', 'Lower Secondary', 'Upper Secondary (IGCSE)', 'A Level'])
+            self.fields['education_level'].queryset = qs
+            self.fields['education_level'].required = True
 
 
 class SchoolDetailsForm(forms.ModelForm):
