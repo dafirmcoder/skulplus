@@ -204,6 +204,8 @@ def post_login_redirect(request):
         return redirect('headteacher_dashboard')
     if hasattr(request.user, 'teacher'):
         return redirect('teacher_dashboard')
+    if Student.objects.filter(parent_user=request.user).exists():
+        return redirect('parent_dashboard')
     # Backward-compat fallback for legacy accounts tied to school email.
     school = School.objects.filter(email__iexact=request.user.username).first()
     if school:
@@ -230,11 +232,11 @@ def post_login_redirect(request):
 
 def _build_login_form(request, data=None):
     form = AuthenticationForm(request, data=data)
-    form.fields['username'].label = 'Email'
+    form.fields['username'].label = 'Email / Phone'
     form.fields['username'].widget.attrs.update({
-        'placeholder': 'Email',
+        'placeholder': 'Email or Phone',
         'autocomplete': 'email',
-        'inputmode': 'email',
+        'inputmode': 'text',
     })
     form.fields['password'].widget.attrs.update({
         'placeholder': 'Password',
@@ -2248,6 +2250,18 @@ def edit_students(request):
 
 
 @login_required
+def parent_dashboard(request):
+    students = Student.objects.filter(parent_user=request.user).select_related(
+        'classroom__level', 'stream', 'school'
+    ).order_by('first_name', 'last_name')
+    if not students.exists():
+        return HttpResponseForbidden()
+    return render(request, 'schools/parent_dashboard.html', {
+        'students': students,
+    })
+
+
+@login_required
 def edit_student(request, student_id):
     school, denied = _require_school_permission(request, 'students')
     if denied:
@@ -3476,18 +3490,20 @@ def classes_view(request):
 
     if 'level' in form.fields:
         school_any = cast(Any, school)
-        if school_any.system_type == 'CBE':
-            allowed = []
+        allowed: list[str] = []
+        if getattr(school_any, 'school_type', '') == 'CAMBRIDGE':
+            allowed = ['Kindergarten', 'Lower Primary', 'Upper Primary', 'Lower Secondary', 'Upper Secondary (IGCSE)', 'A Level']
+        elif school_any.system_type == 'CBE':
             if school_any.school_category == 'PRIMARY':
-                allowed = ['Lower Primary', 'Upper Primary']
+                allowed = ['Pre School', 'Lower Primary', 'Upper Primary']
             elif school_any.school_category == 'JUNIOR':
                 allowed = ['Junior']
             elif school_any.school_category == 'SENIOR':
                 allowed = ['Senior']
             elif school_any.school_category == 'COMPREHENSIVE':
-                allowed = ['Lower Primary', 'Upper Primary', 'Junior']
-            if allowed:
-                cast(Any, form.fields['level']).queryset = EducationLevel.objects.filter(name__in=allowed).order_by('name')
+                allowed = ['Pre School', 'Lower Primary', 'Upper Primary', 'Junior']
+        if allowed:
+            cast(Any, form.fields['level']).queryset = EducationLevel.objects.filter(name__in=allowed).order_by('name')
         else:
             cast(Any, form.fields['level']).queryset = EducationLevel.objects.all().order_by('name')
 
@@ -3535,7 +3551,11 @@ def classes_management(request):
             if level_id:
                 try:
                     level_obj = EducationLevel.objects.get(id=level_id)
-                    if school_obj.system_type == 'CBE' and hasattr(school_obj, 'allows_level') and not school_obj.allows_level(level_obj.name):
+                    if getattr(school_obj, 'school_type', '') == 'CAMBRIDGE':
+                        allowed_cambridge = ['Kindergarten', 'Lower Primary', 'Upper Primary', 'Lower Secondary', 'Upper Secondary (IGCSE)', 'A Level']
+                        if level_obj.name not in allowed_cambridge:
+                            return JsonResponse({'success': False, 'error': f"{level_obj.name} level is not allowed for Cambridge schools."}, status=400)
+                    elif school_obj.system_type == 'CBE' and hasattr(school_obj, 'allows_level') and not school_obj.allows_level(level_obj.name):
                         return JsonResponse({'success': False, 'error': f"{level_obj.name} level is not allowed for this school."}, status=400)
                     cast(Any, cls).level = level_obj
                 except EducationLevel.DoesNotExist:
@@ -3652,18 +3672,20 @@ def classes_management(request):
     ).prefetch_related('streams')
     form = ClassRoomForm(school=school)
     if 'level' in form.fields:
-        if school.system_type == 'CBE':
-            allowed = []
+        allowed: list[str] = []
+        if getattr(school, 'school_type', '') == 'CAMBRIDGE':
+            allowed = ['Kindergarten', 'Lower Primary', 'Upper Primary', 'Lower Secondary', 'Upper Secondary (IGCSE)', 'A Level']
+        elif school.system_type == 'CBE':
             if school.school_category == 'PRIMARY':
-                allowed = ['Lower Primary', 'Upper Primary']
+                allowed = ['Pre School', 'Lower Primary', 'Upper Primary']
             elif school.school_category == 'JUNIOR':
                 allowed = ['Junior']
             elif school.school_category == 'SENIOR':
                 allowed = ['Senior']
             elif school.school_category == 'COMPREHENSIVE':
-                allowed = ['Lower Primary', 'Upper Primary', 'Junior']
-            if allowed:
-                cast(Any, form.fields['level']).queryset = EducationLevel.objects.filter(name__in=allowed).order_by('name')
+                allowed = ['Pre School', 'Lower Primary', 'Upper Primary', 'Junior']
+        if allowed:
+            cast(Any, form.fields['level']).queryset = EducationLevel.objects.filter(name__in=allowed).order_by('name')
         else:
             cast(Any, form.fields['level']).queryset = EducationLevel.objects.all().order_by('name')
     return render(request, 'schools/classes.html', {'classes': classes, 'form': form})

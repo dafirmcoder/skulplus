@@ -98,7 +98,8 @@ function isJuniorClass(cls){
 }
 
 function isPrimaryClass(cls){
-    return cls && cls.class_level === 'Primary';
+    if (!cls) return false;
+    return ['Primary', 'Lower Primary', 'Upper Primary', 'Pre School', 'Kindergarten'].includes(cls.class_level);
 }
 
 function levelLabel(cls){

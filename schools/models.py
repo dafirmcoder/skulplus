@@ -59,13 +59,13 @@ class School(models.Model):
             return True
         category = self.school_category
         if category == 'PRIMARY':
-            return level_name in ('Lower Primary', 'Upper Primary')
+            return level_name in ('Pre School', 'Lower Primary', 'Upper Primary')
         if category == 'JUNIOR':
             return level_name == 'Junior'
         if category == 'SENIOR':
             return level_name == 'Senior'
         if category == 'COMPREHENSIVE':
-            return level_name in ('Lower Primary', 'Upper Primary', 'Junior')
+            return level_name in ('Pre School', 'Lower Primary', 'Upper Primary', 'Junior')
         return True
 
     def resolve_cbe_level(self, class_level_name=None):
@@ -73,7 +73,7 @@ class School(models.Model):
             return class_level_name
         category = self.school_category
         if category == 'PRIMARY':
-            return class_level_name if class_level_name in ('Lower Primary', 'Upper Primary') else 'Lower Primary'
+            return class_level_name if class_level_name in ('Pre School', 'Lower Primary', 'Upper Primary') else 'Lower Primary'
         if category == 'JUNIOR':
             return 'Junior'
         if category == 'SENIOR':

@@ -78,6 +78,7 @@ urlpatterns = [
     path('reports/report-cards/', views.report_cards, name='report_cards'),
     path('reports/report-cards/data/', views.report_cards_data, name='report_cards_data'),
     path('reports/send-reports/', views.send_reports, name='send_reports'),
+    path('parents/dashboard/', views.parent_dashboard, name='parent_dashboard'),
 
     # User management
     path('users/new/', views.new_user, name='new_user'),

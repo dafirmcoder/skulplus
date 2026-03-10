@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Parent Dashboard{% endblock %}
+
+{% block header %}
+  <h2 style="margin:0">Parent Dashboard</h2>
+{% endblock %}
+
+{% block content %}
+  <div class="card" style="padding:16px;margin-bottom:16px">
+    <p style="margin:0;color:#334155">Welcome. Here are your linked students.</p>
+  </div>
+
+  <div class="card" style="padding:16px">
+    <table class="table" style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0">Student</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0">Class</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0">Stream</th>
+          <th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0">School</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in students %}
+          <tr>
+            <td style="padding:8px;border-bottom:1px solid #f1f5f9">{{ student.first_name }} {{ student.last_name }}</td>
+            <td style="padding:8px;border-bottom:1px solid #f1f5f9">{{ student.classroom.name|default:"-" }}</td>
+            <td style="padding:8px;border-bottom:1px solid #f1f5f9">{{ student.stream.name|default:"-" }}</td>
+            <td style="padding:8px;border-bottom:1px solid #f1f5f9">{{ student.school.name }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4" style="padding:12px;text-align:center;color:#64748b">No linked students found.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
