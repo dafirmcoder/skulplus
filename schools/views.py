@@ -7532,7 +7532,103 @@ def report_cards_data(request):
     exam = get_object_or_404(Exam, id=exam_id, school=school)
     term_filter = term or exam.term
 
+    students = list(
+        Student.objects.filter(school=school, classroom=classroom)
+        .select_related('stream')
+        .order_by('admission_number', 'last_name', 'first_name')
+    )
+    if not students:
+        return JsonResponse({'success': False, 'error': 'No students found in selected class.'}, status=404)
+
     class_level = classroom.level.name if classroom.level else None
+    is_early_years = _is_early_years_level(class_level)
+    if is_early_years:
+        student_ids = [cast(Any, s).id for s in students]
+        competency_by_student: dict[int, dict[str, list[dict[str, str]]]] = defaultdict(lambda: defaultdict(list))
+        competency_list_by_student: dict[int, list[StudentCompetency]] = defaultdict(list)
+        competency_qs = StudentCompetency.objects.filter(
+            student_id__in=student_ids,
+            exam_id=cast(Any, exam).id,
+        ).select_related('learning_strand', 'sub_strand')
+        for comp in competency_qs:
+            strand_label = comp.learning_strand.name
+            competency_by_student[comp.student_id][strand_label].append({
+                'sub_strand': comp.sub_strand.name,
+                'level': comp.get_level_display(),
+                'comment': (comp.comment_text or '').strip(),
+            })
+            competency_list_by_student[comp.student_id].append(comp)
+
+        summary_qs = StudentCompetencySummary.objects.filter(
+            student_id__in=student_ids,
+            exam_id=cast(Any, exam).id,
+        )
+        summary_map = {sc.student_id: sc for sc in summary_qs}
+
+        cards = []
+        for s in students:
+            s_any = cast(Any, s)
+            sid = s_any.id
+            summary = summary_map.get(sid)
+            if summary and summary.overall_comment:
+                overall_comment = summary.overall_comment
+            else:
+                seed_key = f'overall:{sid}:{cast(Any, exam).id}'
+                overall_comment = _overall_competency_comment(
+                    school,
+                    f"{s_any.first_name} {s_any.last_name}".strip(),
+                    competency_list_by_student.get(sid, []),
+                    seed_key,
+                )
+            cards.append({
+                'student': {
+                    'id': sid,
+                    'adm': s_any.admission_number,
+                    'name': f"{s_any.first_name} {s_any.last_name}".strip(),
+                    'class': classroom.name,
+                    'stream': (cast(Any, s_any.stream).name if s_any.stream else 'No Stream'),
+                    'term': term_filter,
+                    'exam': exam.title,
+                    'photo_url': (s_any.photo.url if getattr(s_any, 'photo', None) else ''),
+                },
+                'competencies': competency_by_student.get(sid, {}),
+                'competency_overall_comment': overall_comment,
+            })
+
+        generated_at = timezone.localtime(timezone.now())
+        generated_at_display = generated_at.strftime('%d %b %Y, %I:%M %p %Z')
+        school_logo_url = cast(Any, school).logo.url if getattr(cast(Any, school), 'logo', None) else ''
+        school_stamp_url = cast(Any, school).stamp.url if getattr(cast(Any, school), 'stamp', None) else ''
+        school_signature_url = cast(Any, school).head_signature.url if getattr(cast(Any, school), 'head_signature', None) else ''
+        return JsonResponse({
+            'success': True,
+            'school': {
+                'name': cast(Any, school).name,
+                'motto': getattr(cast(Any, school), 'motto', '') or '',
+                'address': getattr(cast(Any, school), 'address', '') or '',
+                'phone': getattr(cast(Any, school), 'phone', '') or '',
+                'email': getattr(cast(Any, school), 'email', '') or '',
+                'school_type': cast(Any, school).get_school_type_display() if getattr(cast(Any, school), 'school_type', None) else '',
+                'system_type': cast(Any, school).get_system_type_display() if getattr(cast(Any, school), 'system_type', None) else '',
+                'school_category': cast(Any, school).get_school_category_display() if getattr(cast(Any, school), 'school_category', None) else '',
+                'logo_url': school_logo_url,
+                'stamp_url': school_stamp_url,
+                'signature_url': school_signature_url,
+            },
+            'meta': {
+                'class': classroom.name,
+                'term': term_filter,
+                'exam': exam.title,
+                'count': len(cards),
+                'generated_at': generated_at_display,
+                'timezone': timezone.get_current_timezone_name(),
+                'show_ranking': False,
+                'exam_weights': {},
+                'early_years': True,
+            },
+            'cards': cards,
+        })
+
     resolved_level = resolve_cbe_level(school, class_level)
     resolve_grade_points, _grades_list = _build_grade_resolver_for_class(school, classroom, resolved_level)
     selected_section = _grading_section_for_classroom(classroom, resolved_level)
@@ -7554,14 +7650,6 @@ def report_cards_data(request):
     me2_threshold = next((b['min_score'] for b in active_threshold_bands if _level_key(str(b['label'])) == 'ME2'), None)
     me_threshold = next((b['min_score'] for b in active_threshold_bands if _level_key(str(b['label'])) == 'ME'), None)
     eligibility_threshold = me2_threshold if me2_threshold is not None else me_threshold
-
-    students = list(
-        Student.objects.filter(school=school, classroom=classroom)
-        .select_related('stream')
-        .order_by('admission_number', 'last_name', 'first_name')
-    )
-    if not students:
-        return JsonResponse({'success': False, 'error': 'No students found in selected class.'}, status=404)
 
     exam_order_rank = {'Term 1': 1, 'Term 2': 2, 'Term 3': 3}
     marksheets = list(

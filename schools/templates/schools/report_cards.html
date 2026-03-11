@@ -52,6 +52,9 @@
 .summary-box { border:1px solid #dbe2ea; border-radius:8px; padding:8px; background:#f8fafc; }
 .summary-box h4 { margin:0 0 6px; font-size:12px; color:#0f3057; }
 .summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px; }
+.competency-section { margin-top:10px; }
+.competency-section h4 { margin:0 0 6px; font-size:13px; color:#0f3057; }
+.competency-note { font-size:11px; color:#64748b; margin-bottom:6px; }
 .pathway-box { margin-top:8px; border:1px solid #dbe2ea; border-radius:8px; padding:8px; background:#ffffff; }
 .pathway-title { margin:0 0 6px; font-size:12px; color:#0f3057; font-weight:700; }
 .pathway-priority { font-size:12px; margin-bottom:6px; }
@@ -282,7 +285,95 @@ function buildOverallTrendSvg(points){
   </svg>`;
 }
 
+function renderEarlyYearsCard(school, card, meta = {}){
+  const competency = card.competencies || {};
+  const competencyOverall = card.competency_overall_comment || '';
+  const strandKeys = Object.keys(competency);
+  const competencyHtml = strandKeys.length ? strandKeys.map(strand => {
+    const items = competency[strand] || [];
+    const rows = items.map(i => `<tr><td>${i.sub_strand}</td><td>${i.level}</td><td>${i.comment || '-'}</td></tr>`).join('');
+    return `
+      <div style="margin-bottom:10px">
+        <div style="font-weight:700;margin-bottom:4px">${strand}</div>
+        <table class="mini-table" style="width:100%">
+          <thead><tr><th>Sub Strand</th><th>Level</th><th>Comment</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="3">No entries</td></tr>'}</tbody>
+        </table>
+      </div>
+    `;
+  }).join('') : '<div class="competency-note">No competency entries found for this exam.</div>';
+
+  const generatedAt = meta.generated_at || '-';
+  return `
+  <div class="report-card">
+    <div class="school-header">
+      ${school.logo_url ? `<img class="school-logo" src="${school.logo_url}" alt="${school.name}">` : ''}
+      <div class="school-text">
+        <h2>${school.name || ''}</h2>
+        ${school.motto ? `<p>${school.motto}</p>` : ''}
+        ${school.address ? `<p>${school.address}</p>` : ''}
+        ${(school.phone || school.email) ? `<p>${school.phone ? `Tel: ${school.phone}` : ''}${(school.phone && school.email) ? ' | ' : ''}${school.email ? `Email: ${school.email}` : ''}</p>` : ''}
+      </div>
+      ${card.student.photo_url
+        ? `<img class="student-photo" src="${card.student.photo_url}" alt="${card.student.name || 'Student'}">`
+        : `<div class="student-photo-placeholder">No Photo</div>`
+      }
+    </div>
+
+    <div class="student-meta">
+      <div><strong>ADM NO:</strong> ${card.student.adm || ''}</div>
+      <div><strong>NAME:</strong> ${card.student.name || ''}</div>
+      <div><strong>CLASS:</strong> ${card.student.class || ''}</div>
+      <div><strong>STREAM:</strong> ${card.student.stream || ''}</div>
+      <div><strong>TERM:</strong> ${card.student.term || ''}</div>
+      <div><strong>EXAM:</strong> ${card.student.exam || ''}</div>
+    </div>
+
+    <div class="competency-section">
+      <h4>Early Years Competency Report</h4>
+      ${competencyHtml}
+      ${competencyOverall ? `
+        <div style="margin-top:10px;border-top:1px solid #e2e8f0;padding-top:8px">
+          <div style="font-weight:700;margin-bottom:4px">Overall Comment</div>
+          <div>${competencyOverall}</div>
+        </div>
+      ` : ''}
+    </div>
+
+    <div class="remarks-approval-row">
+      <div class="remarks">
+        <div><strong>Class Teacher's Remarks:</strong></div>
+        <div class="remarks-line"></div>
+        <div><strong>Principals/ Headteachers comments :</strong></div>
+        <div class="remarks-line"></div>
+      </div>
+
+      <div class="approval-wrap">
+        <div class="approval-stack">
+          ${(school.stamp_url || school.signature_url) ? `
+            ${school.stamp_url ? `
+              <div class="approval-item">
+                <img class="approval-image approval-image-stamp" src="${school.stamp_url}" alt="School stamp">
+              </div>` : ''
+            }
+            ${school.signature_url ? `
+              <div class="approval-item">
+                <img class="approval-image" src="${school.signature_url}" alt="Head signature">
+                <div class="approval-label">Signature</div>
+              </div>` : ''
+            }
+          ` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="timestamp-footer">Generated: ${generatedAt}</div>
+  </div>`;
+}
+
 function renderCard(school, card, meta = {}){
+  if (meta.early_years) {
+    return renderEarlyYearsCard(school, card, meta);
+  }
   const exams = card.exams || [];
   const rows = card.rows || [];
   let headerTop = `<th rowspan="2" class="subject-col">SUBJECT</th><th rowspan="2" class="teacher-col">TEACHER</th>`;

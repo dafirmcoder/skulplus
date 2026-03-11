@@ -338,6 +338,8 @@
         <li><a href="{{ merit_lists_url }}" onclick="event.stopPropagation();" class="{% if request.path == merit_lists_url %}active-link{% endif %}"><i class="fas fa-award"></i> Merit Lists</a></li>
         <li><a href="{{ subject_analysis_url }}" onclick="event.stopPropagation();" class="{% if request.path == subject_analysis_url %}active-link{% endif %}"><i class="fas fa-chart-pie"></i> Subject Analysis</a></li>
         <li><a href="{{ report_cards_url }}" onclick="event.stopPropagation();" class="{% if request.path == report_cards_url %}active-link{% endif %}"><i class="fas fa-file-pdf"></i> Report Cards</a></li>
+        {% if ACCESS_CAN_COMPETENCIES %}
+        {% endif %}
         <li><a href="{{ send_reports_url }}" onclick="event.stopPropagation();" class="{% if request.path == send_reports_url %}active-link{% endif %}"><i class="fas fa-paper-plane"></i> Send Reports</a></li>
       </ul>
     </li>
