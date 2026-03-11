@@ -3665,8 +3665,6 @@ def classes_view(request):
                 allowed = ['Pre School', 'Lower Primary', 'Upper Primary', 'Junior']
         if allowed:
             cast(Any, form.fields['level']).queryset = EducationLevel.objects.filter(name__in=allowed).order_by('name')
-        else:
-            cast(Any, form.fields['level']).queryset = EducationLevel.objects.all().order_by('name')
 
     # annotate student counts (student_set) for display
     from django.db.models import Count
@@ -3847,8 +3845,6 @@ def classes_management(request):
                 allowed = ['Pre School', 'Lower Primary', 'Upper Primary', 'Junior']
         if allowed:
             cast(Any, form.fields['level']).queryset = EducationLevel.objects.filter(name__in=allowed).order_by('name')
-        else:
-            cast(Any, form.fields['level']).queryset = EducationLevel.objects.all().order_by('name')
     return render(request, 'schools/classes.html', {'classes': classes, 'form': form})
 
 
