@@ -281,6 +281,7 @@ body { background: var(--light); font-family: 'Segoe UI', Tahoma, Geneva, Verdan
             <td>
               <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ ev.color }};margin-right:6px;"></span>
               {{ ev.title }}
+              {% if ev.is_past %}<span class="badge badge-warning" style="margin-left:6px;">Past</span>{% endif %}
             </td>
             <td>{{ ev.description|default:"-" }}</td>
           </tr>

@@ -271,6 +271,7 @@
         {% url 'send_reports' as send_reports_url %}
         {% url 'assignments_upload' as assignments_upload_url %}
         {% url 'assignments_admin' as assignments_admin_url %}
+        {% url 'post_announcement' as post_announcement_url %}
         {% url 'fee_structure' as fee_structure_url %}
         {% url 'add_payment' as add_payment_url %}
         {% url 'balance_report' as balance_report_url %}
@@ -317,7 +318,7 @@
     {% endif %}
 
     {% if ACCESS_CAN_ACADEMICS %}
-    <li class="has-submenu{% if request.path == enter_marks_url or request.path == entered_marks_url or request.path == set_exams_url or request.path == cbc_comments_report_url or request.path == merit_lists_url or request.path == subject_analysis_url or request.path == report_cards_url or request.path == send_reports_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
+    <li class="has-submenu{% if request.path == enter_marks_url or request.path == entered_marks_url or request.path == set_exams_url or request.path == cbc_comments_report_url or request.path == merit_lists_url or request.path == subject_analysis_url or request.path == report_cards_url or request.path == send_reports_url or request.path == post_announcement_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
       <i class="fas fa-chart-bar"></i><span>Academics</span>
       <ul class="submenu">
         <li class="has-submenu{% if request.path == enter_marks_url or request.path == entered_marks_url or request.path == set_exams_url or request.path == cbc_comments_report_url %} active active-section{% endif %}" onclick="toggleMenu(event, this); event.stopPropagation();">
@@ -335,6 +336,7 @@
         <li><a href="{{ subject_analysis_url }}" onclick="event.stopPropagation();" class="{% if request.path == subject_analysis_url %}active-link{% endif %}"><i class="fas fa-chart-pie"></i> Subject Analysis</a></li>
         <li><a href="{{ report_cards_url }}" onclick="event.stopPropagation();" class="{% if request.path == report_cards_url %}active-link{% endif %}"><i class="fas fa-file-pdf"></i> Report Cards</a></li>
         <li><a href="{{ send_reports_url }}" onclick="event.stopPropagation();" class="{% if request.path == send_reports_url %}active-link{% endif %}"><i class="fas fa-paper-plane"></i> Send Reports</a></li>
+        <li><a href="{{ post_announcement_url }}" onclick="event.stopPropagation();" class="{% if request.path == post_announcement_url %}active-link{% endif %}"><i class="fas fa-bullhorn"></i> Announcements</a></li>
       </ul>
     </li>
     {% endif %}

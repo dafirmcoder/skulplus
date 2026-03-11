@@ -1026,7 +1026,7 @@ def teacher_dashboard(request):
         overall_completion = int(sum(es['completion_percentage'] for es in exam_status) / len(exam_status))
     
     quick_entry_exam = Exam.objects.filter(school=school).order_by('-year', '-id').first()
-    calendar_events = _get_upcoming_calendar_events(school, 'teachers', limit=10)
+    calendar_events = _get_calendar_events_with_past(school, 'teachers', limit_upcoming=10, limit_past=6)
 
     context = {
         'teacher': teacher,
@@ -1204,7 +1204,7 @@ def _parse_bool(value) -> bool:
     return str(value or '').strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
-def _get_upcoming_calendar_events(school, audience: str, limit: int = 8):
+def _get_calendar_events_with_past(school, audience: str, limit_upcoming: int = 8, limit_past: int = 4):
     if not school:
         return []
     today = timezone.now().date()
@@ -1213,8 +1213,19 @@ def _get_upcoming_calendar_events(school, audience: str, limit: int = 8):
         qs = qs.filter(send_to_parents=True)
     elif audience == 'teachers':
         qs = qs.filter(send_to_teachers=True)
-    qs = qs.filter(Q(start_date__gte=today) | Q(end_date__gte=today))
-    return list(qs.order_by('start_date', 'end_date', 'title')[:limit])
+    upcoming = list(
+        qs.filter(Q(start_date__gte=today) | Q(end_date__gte=today))
+        .order_by('start_date', 'end_date', 'title')[:limit_upcoming]
+    )
+    past = list(
+        qs.filter(Q(end_date__lt=today) | Q(end_date__isnull=True, start_date__lt=today))
+        .order_by('-start_date', '-end_date', 'title')[:limit_past]
+    )
+    combined = upcoming + past
+    for ev in combined:
+        ev_end = ev.end_date or ev.start_date
+        ev.is_past = ev_end < today
+    return combined
 
 
 @login_required
@@ -1660,7 +1671,7 @@ def headteacher_dashboard(request):
         .annotate(avg_score=Avg('score'))
         .order_by('marksheet__subject__name')
     )
-    calendar_events = _get_upcoming_calendar_events(school, 'teachers', limit=10)
+    calendar_events = _get_calendar_events_with_past(school, 'teachers', limit_upcoming=10, limit_past=6)
 
     context = {
         'school': school,
@@ -1682,7 +1693,7 @@ def bursar_dashboard(request):
     school, denied = _require_school_permission(request, 'finance')
     if denied:
         return denied
-    calendar_events = _get_upcoming_calendar_events(school, 'teachers', limit=10)
+    calendar_events = _get_calendar_events_with_past(school, 'teachers', limit_upcoming=10, limit_past=6)
     return render(request, 'schools/bursar_dashboard.html', {'school': school, 'calendar_events': calendar_events})
 
 
@@ -2690,15 +2701,27 @@ def parent_dashboard(request):
         school_id__in={s.school_id for s in students}
     ).order_by('-created_at')[:20]
     today = timezone.now().date()
-    parent_calendar_events = (
+    parent_calendar_qs = (
         SchoolCalendarEvent.objects.filter(
             school_id__in={s.school_id for s in students},
             send_to_parents=True,
         )
-        .filter(Q(start_date__gte=today) | Q(end_date__gte=today))
         .select_related('school')
+    )
+    parent_calendar_upcoming = list(
+        parent_calendar_qs
+        .filter(Q(start_date__gte=today) | Q(end_date__gte=today))
         .order_by('start_date', 'end_date', 'title')[:12]
     )
+    parent_calendar_past = list(
+        parent_calendar_qs
+        .filter(Q(end_date__lt=today) | Q(end_date__isnull=True, start_date__lt=today))
+        .order_by('-start_date', '-end_date', 'title')[:6]
+    )
+    parent_calendar_events = parent_calendar_upcoming + parent_calendar_past
+    for ev in parent_calendar_events:
+        ev_end = ev.end_date or ev.start_date
+        ev.is_past = ev_end < today
 
     return render(request, 'schools/parent_dashboard.html', {
         'student_cards': student_cards,
