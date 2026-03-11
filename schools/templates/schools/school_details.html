@@ -1,125 +1,194 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load static %}
 {% block content %}
-<h1>School Details</h1>
 {% if school %}
-  <div style="display:flex;gap:20px;align-items:flex-start">
-    <div style="flex:1">
-        <form method="post" enctype="multipart/form-data" id="schoolDetailsForm">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0f3057;
+    --sea:#0ea5e9;
+    --mint:#16a34a;
+    --sun:#f59e0b;
+    --rose:#dc2626;
+    --paper:#f4f7fb;
+    --card:#ffffff;
+    --border:#e2e8f0;
+    --shadow:0 18px 40px rgba(15,48,87,.12);
+  }
+  body{background:radial-gradient(1100px 300px at 20% -10%, #d9f2ff, transparent 70%), var(--paper); font-family:'Inter',sans-serif;}
+  .page-shell{display:grid;gap:16px;}
+  .hero{
+    background:linear-gradient(135deg,#0f3057 0%, #134e8a 35%, #2563eb 100%);
+    color:#fff;border-radius:18px;padding:18px 20px;box-shadow:var(--shadow);
+    display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+  }
+  .hero h1{font-family:'Playfair Display',serif;margin:0;font-size:26px;}
+  .hero p{margin:6px 0 0;color:#dbeafe;font-size:13px;}
+  .layout{display:grid;grid-template-columns:1.2fr .8fr;gap:16px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 8px 22px rgba(15,48,87,.08);} 
+  .section-title{font-family:'Playfair Display',serif;color:var(--ink);margin:0 0 10px;}
+  label{font-weight:600;color:#334155;font-size:13px;display:block;margin-bottom:4px;}
+  input, select, textarea{
+    width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;
+    transition:box-shadow .15s ease,border-color .15s ease;
+  }
+  input:focus, select:focus, textarea:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 4px rgba(59,130,246,.12);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;}
+  .btn-primary{
+    background:linear-gradient(135deg,var(--mint),#22c55e);
+    color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;
+  }
+  .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-weight:600;}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:#e0f2fe;color:#075985;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;}
+  .preview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+  .preview-box{border:1px dashed #e5e7eb;border-radius:12px;padding:10px;background:#f8fafc;display:grid;gap:8px;justify-items:start;}
+  .preview-img{height:80px;border:1px solid #e2e8f0;padding:4px;border-radius:8px;background:#fff;object-fit:contain;}
+  .meta-list{display:grid;gap:8px;font-size:13px;color:#334155;}
+  .meta-item{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed #e5e7eb;padding-bottom:6px;}
+  .meta-item span{color:#64748b;}
+  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:1200;}
+  .modal{background:#fff;border-radius:16px;padding:18px;max-width:880px;width:95%;box-shadow:var(--shadow);} 
+  .modal h3{margin:0 0 10px;color:var(--ink);}
+  .btn-danger{background:#fee2e2;color:#b91c1c;border:none;border-radius:8px;padding:6px 10px;font-weight:700;}
+  @media (max-width:900px){.layout{grid-template-columns:1fr;}}
+</style>
+
+<div class="page-shell">
+  <div class="hero">
+    <div>
+      <h1>School Details</h1>
+      <p>Update identity, branding, and key contact details for your school.</p>
+    </div>
+    <span class="chip"><i class="fas fa-school"></i> Admin Settings</span>
+  </div>
+
+  <div class="layout">
+    <div class="card">
+      <h3 class="section-title">Edit Details</h3>
+      <form method="post" enctype="multipart/form-data" id="schoolDetailsForm">
         {% csrf_token %}
-        <div style="margin-bottom:8px">
-          <label><strong>School Name</strong></label>
-          {{ form.name }}
+        <div class="grid">
+          <div>
+            <label>School Name</label>
+            {{ form.name }}
+          </div>
+          <div>
+            <label>Motto</label>
+            {{ form.motto }}
+          </div>
+          <div>
+            <label>School Category</label>
+            {{ form.school_category }}
+          </div>
+          <div>
+            <label>Cambridge Grading</label>
+            {{ form.cambridge_grading_system }}
+          </div>
+          <div>
+            <label>Cambridge Show Ranking</label>
+            {{ form.cambridge_show_ranking }}
+          </div>
+          <div>
+            <label>Phone</label>
+            {{ form.phone }}
+          </div>
+          <div>
+            <label>Email</label>
+            {{ form.email }}
+          </div>
         </div>
-        <div style="margin-bottom:8px">
-          <label><strong>Motto</strong></label>
-          {{ form.motto }}
-        </div>
-        <div style="margin-bottom:8px">
-          <label><strong>School Category</strong></label>
-          {{ form.school_category }}
-        </div>
-        <div style="margin-bottom:8px">
-          <label><strong>Cambridge Grading</strong></label>
-          {{ form.cambridge_grading_system }}
-        </div>
-        <div style="margin-bottom:8px">
-          <label><strong>Cambridge Show Ranking</strong></label><br>
-          {{ form.cambridge_show_ranking }}
-        </div>
-        <div style="margin-bottom:8px">
-          <label><strong>Address</strong></label>
+        <div style="margin-top:10px;">
+          <label>Address</label>
           {{ form.address }}
         </div>
-        <div style="margin-bottom:8px">
-          <label><strong>Phone</strong></label>
-          {{ form.phone }}
-        </div>
-        <div style="margin-bottom:8px">
-          <label><strong>Email</strong></label>
-          {{ form.email }}
+
+        <div style="margin-top:14px;">
+          <h4 style="margin:0 0 8px;color:var(--ink)">Brand Assets</h4>
+          <div class="preview-grid">
+            <div class="preview-box">
+              <strong>Logo</strong>
+              {% if school.logo %}
+                <img id="logoPreview" class="preview-img" src="{{ school.logo.url }}" alt="Logo">
+              {% else %}
+                <img id="logoPreview" class="preview-img" src="{% static 'images/skulplus_logo.png' %}" alt="Logo">
+              {% endif %}
+              <button type="button" class="btn-ghost" onclick="openImageModal('logo')">Change Logo</button>
+              {{ form.logo }}
+            </div>
+            <div class="preview-box">
+              <strong>School Stamp</strong>
+              {% if school.stamp %}
+                <img id="stampPreview" class="preview-img" src="{{ school.stamp.url }}" alt="Stamp">
+              {% else %}
+                <img id="stampPreview" class="preview-img" src="{% static 'images/skulplus_logo.png' %}" alt="Stamp">
+              {% endif %}
+              <button type="button" class="btn-ghost" onclick="openImageModal('stamp')">Change Stamp</button>
+              {{ form.stamp }}
+            </div>
+            <div class="preview-box">
+              <strong>Headteacher Signature</strong>
+              {% if school.head_signature %}
+                <img id="signaturePreview" class="preview-img" src="{{ school.head_signature.url }}" alt="Signature">
+              {% else %}
+                <img id="signaturePreview" class="preview-img" src="{% static 'images/skulplus_logo.png' %}" alt="Signature">
+              {% endif %}
+              <button type="button" class="btn-ghost" onclick="openImageModal('signature')">Change Signature</button>
+              {{ form.head_signature }}
+            </div>
+          </div>
         </div>
 
-        <div style="margin-bottom:8px">
-          <label><strong>Logo</strong></label><br>
-          {% if school.logo %}
-            <img id="logoPreview" src="{{ school.logo.url }}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
-          {% else %}
-            <img id="logoPreview" src="{% static 'images/skulplus_logo.png' %}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
-          {% endif %}
-          <button type="button" class="btn" onclick="openImageModal('logo')">Change Logo</button>
-          {{ form.logo }}
-        </div>
-
-        <div style="margin-bottom:8px">
-          <label><strong>School Stamp (for documents)</strong></label><br>
-          {% if school.stamp %}
-            <img id="stampPreview" src="{{ school.stamp.url }}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
-          {% else %}
-            <img id="stampPreview" src="{% static 'images/skulplus_logo.png' %}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
-          {% endif %}
-          <button type="button" class="btn" onclick="openImageModal('stamp')">Change Stamp</button>
-          {{ form.stamp }}
-        </div>
-
-        <div style="margin-bottom:8px">
-          <label><strong>Headteacher Signature</strong></label><br>
-          {% if school.head_signature %}
-            <img id="signaturePreview" src="{{ school.head_signature.url }}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
-          {% else %}
-            <img id="signaturePreview" src="{% static 'images/skulplus_logo.png' %}" style="height:80px;border:1px solid #ddd;padding:4px;margin-bottom:6px"><br>
-          {% endif %}
-          <button type="button" class="btn" onclick="openImageModal('signature')">Change Signature</button>
-          {{ form.head_signature }}
-        </div>
-
-        <!-- Hidden inputs to receive base64 cropped images from modal -->
         <input type="hidden" name="logo_data" id="logo_data">
         <input type="hidden" name="stamp_data" id="stamp_data">
         <input type="hidden" name="signature_data" id="signature_data">
 
-        <div>
-          <button type="submit" class="btn btn-primary">Save</button>
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+          <button type="submit" class="btn-primary">Save Changes</button>
+          <button type="reset" class="btn-ghost">Reset</button>
         </div>
       </form>
     </div>
-    <div style="width:260px">
-      <h3>Current Details</h3>
-      <p><strong>Name:</strong> {{ school.name }}</p>
-      <p><strong>Motto:</strong> {{ school.motto }}</p>
-      <p><strong>Type:</strong> {{ school.school_type }}</p>
-      <p><strong>Category:</strong> {{ school.get_school_category_display }}</p>
-      <p><strong>Cambridge Grading:</strong> {{ school.get_cambridge_grading_system_display }}</p>
-      <p><strong>Cambridge Ranking:</strong> {% if school.cambridge_show_ranking %}Enabled{% else %}Disabled{% endif %}</p>
-      <p><strong>Address:</strong> {{ school.address }}</p>
-      <p><strong>Phone:</strong> {{ school.phone }}</p>
-      <p><strong>Email:</strong> {{ school.email }}</p>
+
+    <div class="card">
+      <h3 class="section-title">Current Summary</h3>
+      <div class="meta-list">
+        <div class="meta-item"><strong>Name</strong><span>{{ school.name }}</span></div>
+        <div class="meta-item"><strong>Motto</strong><span>{{ school.motto }}</span></div>
+        <div class="meta-item"><strong>Type</strong><span>{{ school.school_type }}</span></div>
+        <div class="meta-item"><strong>Category</strong><span>{{ school.get_school_category_display }}</span></div>
+        <div class="meta-item"><strong>Cambridge Grading</strong><span>{{ school.get_cambridge_grading_system_display }}</span></div>
+        <div class="meta-item"><strong>Cambridge Ranking</strong><span>{% if school.cambridge_show_ranking %}Enabled{% else %}Disabled{% endif %}</span></div>
+        <div class="meta-item"><strong>Address</strong><span>{{ school.address }}</span></div>
+        <div class="meta-item"><strong>Phone</strong><span>{{ school.phone }}</span></div>
+        <div class="meta-item"><strong>Email</strong><span>{{ school.email }}</span></div>
+      </div>
     </div>
   </div>
+</div>
 {% else %}
   <p>No school assigned to your account.</p>
 {% endif %}
 {% endblock %}
 
 <!-- IMAGE CROP MODAL -->
-<div id="imageModal" class="modal-bg" style="display:none;align-items:center;justify-content:center">
-  <div class="modal" style="max-width:800px">
+<div id="imageModal" class="modal-bg">
+  <div class="modal">
     <h3 id="modalTitle">Upload Image</h3>
-    <div style="display:flex;gap:12px">
-      <div style="flex:1">
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px">
         <input type="file" id="imageFileInput" accept="image/*">
         <div style="margin-top:8px">
           <canvas id="imageCanvas" style="max-width:100%;border:1px solid #ddd"></canvas>
         </div>
       </div>
-      <div style="width:220px">
+      <div style="width:240px">
         <p>Instructions:</p>
         <p>1. Choose an image file.</p>
         <p>2. Drag on the canvas to select a crop rectangle.</p>
         <p>3. Click <strong>Crop & Save</strong> to apply.</p>
-        <div style="margin-top:12px">
-          <button class="btn btn-primary" id="cropSaveBtn">Crop & Save</button>
-          <button class="btn" id="cancelCropBtn">Cancel</button>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-primary" id="cropSaveBtn">Crop & Save</button>
+          <button class="btn-ghost" id="cancelCropBtn">Cancel</button>
         </div>
       </div>
     </div>
@@ -148,7 +217,6 @@ fileInput.addEventListener('change', (e)=>{
   const f = e.target.files[0]; if(!f) return;
   const reader = new FileReader();
   reader.onload = function(ev){ img.onload = function(){
-    // fit canvas to image at max width 700
     const maxW = 700; const ratio = img.width / img.height;
     canvas.width = Math.min(maxW, img.width);
     canvas.height = Math.round(canvas.width / ratio);
@@ -159,24 +227,21 @@ fileInput.addEventListener('change', (e)=>{
 });
 
 canvas.addEventListener('mousedown', (e)=>{ const r=canvas.getBoundingClientRect(); startX = e.clientX - r.left; startY = e.clientY - r.top; dragging=true; });
-canvas.addEventListener('mousemove', (e)=>{ if(!dragging) return; const r=canvas.getBoundingClientRect(); const x = e.clientX - r.left; const y = e.clientY - r.top; selW = x - startX; selH = y - startY; // redraw
+canvas.addEventListener('mousemove', (e)=>{ if(!dragging) return; const r=canvas.getBoundingClientRect(); const x = e.clientX - r.left; const y = e.clientY - r.top; selW = x - startX; selH = y - startY;
   ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0,canvas.width,canvas.height); ctx.strokeStyle='red'; ctx.lineWidth=2; ctx.strokeRect(startX, startY, selW, selH);
 });
 canvas.addEventListener('mouseup', ()=>{ dragging=false; });
 
 document.getElementById('cropSaveBtn').addEventListener('click', ()=>{
-  // compute crop on original image scale
   if(!img.src) return alert('Load an image first');
   const sx = Math.round(Math.min(startX, startX+selW) * scale);
   const sy = Math.round(Math.min(startY, startY+selH) * scale);
   const sw = Math.round(Math.abs(selW) * scale);
   const sh = Math.round(Math.abs(selH) * scale);
-  // create offscreen canvas to draw cropped area
   const off = document.createElement('canvas'); off.width = sw || Math.round(canvas.width*scale); off.height = sh || Math.round(canvas.height*scale);
   const offCtx = off.getContext('2d');
   offCtx.drawImage(img, sx, sy, sw || img.width, sh || img.height, 0, 0, off.width, off.height);
   const dataUrl = off.toDataURL('image/png');
-  // set hidden input based on currentField
   if(currentField === 'logo'){
     document.getElementById('logo_data').value = dataUrl;
     document.getElementById('logoPreview').src = dataUrl;
@@ -190,8 +255,5 @@ document.getElementById('cropSaveBtn').addEventListener('click', ()=>{
   imageModal.style.display='none';
 });
 
-// On submit, if base64 inputs are set we leave them; otherwise form file inputs (fallback) will be used
-document.getElementById('schoolDetailsForm').addEventListener('submit', ()=>{
-  // nothing special needed; server handles base64 or files
-});
+document.getElementById('schoolDetailsForm').addEventListener('submit', ()=>{});
 </script>
