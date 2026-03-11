@@ -135,6 +135,10 @@ class StudentForm(forms.ModelForm):
             'classroom', 'stream', 'first_name', 'last_name', 'date_of_birth', 'gender',
             'admission_number', 'admission_date', 'parent_name', 'parent_phone', 'photo'
         ]
+        widgets = {
+            'date_of_birth': forms.DateInput(attrs={'type': 'date'}),
+            'admission_date': forms.DateInput(attrs={'type': 'date'}),
+        }
 
     def __init__(self, *args, **kwargs):
         school = kwargs.pop('school', None)

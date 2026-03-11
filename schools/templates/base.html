@@ -517,6 +517,15 @@
     })();
     </script>
 
+    <script>
+    (function () {
+      const inputs = document.querySelectorAll('input[type="text"][name$="date"], input[type="text"][name$="_date"], input[data-date="true"]');
+      inputs.forEach(inp => {
+        try { inp.type = 'date'; } catch (e) {}
+      });
+    })();
+    </script>
+
     {% if messages %}
     <script>
       (function () {
