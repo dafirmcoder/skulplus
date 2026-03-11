@@ -1,7 +1,7 @@
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 import io
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_http_methods
 @require_GET
 def export_merit_list_pdf(request):
     """
