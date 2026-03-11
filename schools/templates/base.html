@@ -238,6 +238,8 @@
             <a href="{% url 'bursar_dashboard' %}" style="display:block;width:100%;background:#084b6b;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;text-align:center;text-decoration:none"><i class="fas fa-house"></i>&nbsp;&nbsp;Dashboard</a>
           {% elif ACCESS_CAN_STUDENTS or ACCESS_CAN_TEACHERS or ACCESS_CAN_ACADEMICS %}
             <a href="{% url 'headteacher_dashboard' %}" style="display:block;width:100%;background:#084b6b;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;text-align:center;text-decoration:none"><i class="fas fa-house"></i>&nbsp;&nbsp;Dashboard</a>
+          {% elif IS_PARENT_USER %}
+            <a href="{% url 'parent_dashboard' %}" style="display:block;width:100%;background:#084b6b;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;text-align:center;text-decoration:none"><i class="fas fa-house"></i>&nbsp;&nbsp;Dashboard</a>
           {% elif request.user.teacher %}
             <a href="{% url 'teacher_dashboard' %}" style="display:block;width:100%;background:#084b6b;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;text-align:center;text-decoration:none"><i class="fas fa-house"></i>&nbsp;&nbsp;Dashboard</a>
           {% endif %}
@@ -276,6 +278,7 @@
         {% url 'expenditure' as expenditure_url %}
         {% url 'new_user' as new_user_url %}
         {% url 'user_updates' as user_updates_url %}
+        {% url 'parent_dashboard' as parent_dashboard_url %}
 
     <!-- Role-based Menu Items -->
     {% if ACCESS_CAN_STUDENTS or ACCESS_CAN_TEACHERS or ACCESS_CAN_ACADEMICS or ACCESS_CAN_FINANCE %}
@@ -368,6 +371,13 @@
     {% if request.user.teacher.is_class_teacher %}
     <li><a href="{{ entered_marks_url }}" class="{% if request.path == entered_marks_url %}active-link{% endif %}"><i class="fas fa-table-list"></i><span>Entered Marks</span></a></li>
     {% endif %}
+
+    {% elif IS_PARENT_USER %}
+    <li><a href="{% url 'parent_dashboard' %}" class="{% if request.path == parent_dashboard_url %}active-link{% endif %}"><i class="fas fa-house"></i><span>Overview</span></a></li>
+    <li><a href="{% url 'parent_dashboard' %}#fees" class=""><i class="fas fa-wallet"></i><span>Fees</span></a></li>
+    <li><a href="{% url 'parent_dashboard' %}#academics" class=""><i class="fas fa-graduation-cap"></i><span>Academics</span></a></li>
+    <li><a href="{% url 'parent_dashboard' %}#assignments" class=""><i class="fas fa-file-arrow-down"></i><span>Assignments</span></a></li>
+    <li><a href="{% url 'parent_dashboard' %}#announcements" class=""><i class="fas fa-bullhorn"></i><span>Announcements</span></a></li>
 
     <li class="has-submenu{% if request.path == merit_lists_url or request.path == subject_analysis_url or request.path == full_class_analysis_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
       <i class="fas fa-chart-bar"></i><span>My Reports</span>

@@ -2298,10 +2298,13 @@ def parent_dashboard(request):
         return 'Term 1', now.year
 
     student_cards = []
+    total_balance = 0
+    total_assignments = 0
     for student in students:
         school = student.school
         term, year = resolve_active_term_year(school)
         balance = student.balance(term, year)
+        total_balance += balance
 
         payments = list(
             Payment.objects.filter(student=student)
@@ -2395,6 +2398,7 @@ def parent_dashboard(request):
                 ).select_related('subject', 'teacher__user').order_by('subject__name')
             ) if student.classroom else [],
         })
+        total_assignments += len(student_cards[-1]['assignments'])
 
     announcements = Announcement.objects.filter(
         school_id__in={s.school_id for s in students}
@@ -2403,6 +2407,9 @@ def parent_dashboard(request):
     return render(request, 'schools/parent_dashboard.html', {
         'student_cards': student_cards,
         'announcements': announcements,
+        'total_balance': total_balance,
+        'total_assignments': total_assignments,
+        'announcement_count': announcements.count(),
     })
 
 

@@ -30,6 +30,13 @@ def user_access_flags(request):
 
     school = get_user_school(user)
     role = get_user_role(user, school)
+    try:
+        from .models import Student
+        is_parent = Student.objects.filter(parent_user=user).exists()
+        parent_student_count = Student.objects.filter(parent_user=user).count() if is_parent else 0
+    except Exception:
+        is_parent = False
+        parent_student_count = 0
     return {
         'ACCESS_ROLE': role or '',
         'ACCESS_CAN_FULL_DASHBOARD': has_full_headteacher_access(user, school),
@@ -37,4 +44,6 @@ def user_access_flags(request):
         'ACCESS_CAN_TEACHERS': user_has_permission(user, school, 'teachers'),
         'ACCESS_CAN_ACADEMICS': user_has_permission(user, school, 'academics'),
         'ACCESS_CAN_FINANCE': user_has_permission(user, school, 'finance'),
+        'IS_PARENT_USER': is_parent,
+        'PARENT_STUDENT_COUNT': parent_student_count,
     }
