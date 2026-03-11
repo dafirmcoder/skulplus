@@ -175,25 +175,28 @@ function filterSubjects(){
     const subjectPathway = opt.dataset.pathway || '';
 
     let visible = true;
-    if (schoolSystemType === 'CBE' && level) {
-      if (subjectLevel && subjectLevel !== level) {
-        visible = false;
-      }
-
-      if (level === 'Pre School' || level === 'Kindergarten') {
-        if (subjectLevel && !['Primary', 'Lower Primary', 'Upper Primary', 'Pre School', 'Kindergarten'].includes(subjectLevel)) {
-          visible = false;
+    if (level) {
+      if (schoolSystemType === 'CBE') {
+        if (level === 'Pre School' || level === 'Lower Primary' || level === 'Upper Primary') {
+          if (subjectLevel && !['Primary', 'Lower Primary', 'Upper Primary', 'Pre School'].includes(subjectLevel)) {
+            visible = false;
+          }
+        } else if (level === 'Junior') {
+          if (subjectLevel && subjectLevel !== 'Junior') visible = false;
+        } else if (level === 'Senior') {
+          if (subjectLevel && subjectLevel !== 'Senior') visible = false;
+          if (!allowPathways) {
+            visible = false;
+          } else if (!pathwayId) {
+            visible = false;
+          } else if (!subjectPathway || subjectPathway !== pathwayId) {
+            visible = false;
+          }
         } else {
-          visible = true;
+          if (subjectLevel && subjectLevel !== level) visible = false;
         }
-      }
-
-      if (level === 'Senior') {
-        if (!allowPathways) {
-          visible = false;
-        } else if (!pathwayId) {
-          visible = false;
-        } else if (!subjectPathway || subjectPathway !== pathwayId) {
+      } else {
+        if (subjectLevel && subjectLevel !== level) {
           visible = false;
         }
       }
