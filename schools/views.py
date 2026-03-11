@@ -191,6 +191,7 @@ from django.contrib.auth import login
 from django.utils import timezone
 from django.urls import reverse
 from django.core.exceptions import ValidationError
+from types import SimpleNamespace
 from .access import (
     get_user_role as resolve_user_role,
     get_user_school as resolve_user_school,
@@ -787,6 +788,16 @@ def _safe_filename(value: str) -> str:
     return cleaned or 'file'
 
 
+def _default_term_if_no_dates(school, term: str | None = None, year: int | None = None) -> tuple[str | None, int | None]:
+    if not school:
+        return term, year
+    if TermDate.objects.filter(school=school).exists():
+        return term, year
+    resolved_term = term or 'Term 1'
+    resolved_year = year or timezone.now().year
+    return resolved_term, resolved_year
+
+
 def _default_cambridge_bands(school) -> list[tuple[float, float, str, int]]:
     scheme = getattr(school, 'cambridge_grading_system', 'CAMB_9_1')
     if scheme == 'CAMB_A_G':
@@ -976,12 +987,14 @@ def teacher_dashboard(request):
                 'completion_percentage': round((published / total * 100)) if total > 0 else 0,
             })
     
-    # Get current term
+    # Get current term (fallback to Term 1 if no term dates configured)
     current_term = TermDate.objects.filter(
         school=school,
         start_date__lte=timezone.now().date(),
         end_date__gte=timezone.now().date()
     ).first()
+    if not current_term and not TermDate.objects.filter(school=school).exists():
+        current_term = SimpleNamespace(term='Term 1', year=timezone.now().year)
     
     # Get all classrooms this teacher is involved with
     all_classrooms = set()
@@ -2280,6 +2293,9 @@ def parent_dashboard(request):
     term_order = {'Term 1': 1, 'Term 2': 2, 'Term 3': 3}
 
     def resolve_active_term_year(school):
+        if not TermDate.objects.filter(school=school).exists():
+            now = timezone.now()
+            return 'Term 1', now.year
         latest_term = (
             TermDate.objects.filter(school=school)
             .order_by('-year', '-term')
@@ -2287,13 +2303,6 @@ def parent_dashboard(request):
         )
         if latest_term:
             return latest_term.term, latest_term.year
-        latest_exam = (
-            Exam.objects.filter(school=school)
-            .order_by('-year', '-term', '-start_date')
-            .first()
-        )
-        if latest_exam:
-            return latest_exam.term, latest_exam.year
         now = timezone.now()
         return 'Term 1', now.year
 

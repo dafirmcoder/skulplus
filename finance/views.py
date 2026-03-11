@@ -222,6 +222,8 @@ def _financial_period_range(school, period, term, year, anchor_date):
         return start_date, end_date, label, warning
 
     # Default / explicit term: use configured school term dates.
+    if not TermDate.objects.filter(school=school).exists():
+        term = 'Term 1'
     term_date = TermDate.objects.filter(school=school, year=year, term=term).first()
     if term_date:
         start_date = term_date.start_date
