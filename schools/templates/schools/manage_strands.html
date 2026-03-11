@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}Manage Strands{% endblock %}
 
@@ -8,59 +8,121 @@
 
 {% block content %}
   {% csrf_token %}
-  <div class="card" style="padding:16px;margin-bottom:16px">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --ink:#0f3057;
+      --sea:#0ea5e9;
+      --mint:#16a34a;
+      --sun:#f59e0b;
+      --rose:#dc2626;
+      --paper:#f4f7fb;
+      --card:#ffffff;
+      --border:#e2e8f0;
+      --shadow:0 18px 40px rgba(15,48,87,.12);
+    }
+    body{background:radial-gradient(1100px 300px at 20% -10%, #d9f2ff, transparent 70%), var(--paper); font-family:'Inter',sans-serif;}
+    .page-shell{display:grid;gap:16px;}
+    .hero{
+      background:linear-gradient(135deg,#0f3057 0%, #134e8a 35%, #2563eb 100%);
+      color:#fff;border-radius:18px;padding:18px 20px;box-shadow:var(--shadow);
+      display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+    }
+    .hero h1{font-family:'Playfair Display',serif;margin:0;font-size:26px;}
+    .hero p{margin:6px 0 0;color:#dbeafe;font-size:13px;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 8px 22px rgba(15,48,87,.08);}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
+    label{font-weight:600;color:#334155;font-size:13px;}
+    .input, select{
+      width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;
+      transition:box-shadow .15s ease,border-color .15s ease;
+    }
+    .input:focus, select:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 4px rgba(59,130,246,.12);}
+    .btn-primary{
+      background:linear-gradient(135deg,var(--mint),#22c55e);
+      color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;
+    }
+    .btn-ghost{
+      background:#fff;color:var(--ink);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-weight:600;
+    }
+    .chip{display:inline-flex;align-items:center;gap:6px;background:#e0f2fe;color:#075985;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;}
+    .strand-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;}
+    .strand-card{border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff;box-shadow:0 6px 18px rgba(15,48,87,.06);}
+    .strand-head{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+    .strand-title{font-weight:700;color:var(--ink);}
+    .btn-danger{background:#fee2e2;color:#b91c1c;border:none;border-radius:8px;padding:6px 10px;font-weight:700;}
+    .btn-add{background:#e0f2fe;color:#075985;border:none;border-radius:8px;padding:6px 10px;font-weight:700;}
+    .sub-list{margin:10px 0 0;padding-left:0;list-style:none;display:grid;gap:6px;}
+    .sub-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border:1px dashed #e5e7eb;border-radius:10px;background:#f8fafc;}
+    .muted{color:#64748b;font-size:12px;}
+    @media (max-width:768px){.hero h1{font-size:22px;}}
+  </style>
+
+  <div class="page-shell">
+    <div class="hero">
       <div>
-        <label>Level</label>
-        <select id="levelSelect" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
-          <option value="">Select level</option>
-          {% for lvl in levels %}
-            <option value="{{ lvl.id }}">{{ lvl.name }}</option>
-          {% endfor %}
-        </select>
+        <h1>Manage Strands</h1>
+        <p>Design learning strands and sub-strands with clear structure and fast updates.</p>
       </div>
-      <div>
-        <label>New Strand</label>
-        <input id="strandName" type="text" placeholder="e.g. Numeracy" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
-      </div>
-      <div style="display:flex;align-items:end">
-        <button class="btn btn-primary" onclick="createStrand()">Add Strand</button>
+      <span class="chip"><i class="fas fa-layer-group"></i> Curriculum Builder</span>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div>
+          <label>Level</label>
+          <select id="levelSelect">
+            <option value="">Select level</option>
+            {% for lvl in levels %}
+              <option value="{{ lvl.id }}">{{ lvl.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>New Strand</label>
+          <input id="strandName" class="input" type="text" placeholder="e.g. Numeracy">
+        </div>
+        <div style="display:flex;align-items:end;gap:8px">
+          <button class="btn-primary" onclick="createStrand()">Add Strand</button>
+          <button class="btn-ghost" type="button" onclick="document.getElementById('strandName').value=''">Clear</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="card" style="padding:16px">
-    <h3 style="margin:0 0 8px">Strands & Sub‑Strands</h3>
-    <div id="strandList">
-      {% for strand in strands %}
-        <div class="strand-card" style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <strong>{{ strand.name }}</strong>
-              <span style="margin-left:8px;color:#64748b;font-size:12px">{{ strand.education_level.name }}</span>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap">
+        <h3 style="margin:0;color:var(--ink);font-family:'Playfair Display',serif;">Strands & Sub-Strands</h3>
+        <span class="muted">Tip: add sub-strands per strand for finer assessment.</span>
+      </div>
+      <div id="strandList" class="strand-grid">
+        {% for strand in strands %}
+          <div class="strand-card">
+            <div class="strand-head">
+              <div>
+                <div class="strand-title">{{ strand.name }}</div>
+                <div class="muted">{{ strand.education_level.name }}</div>
+              </div>
+              <button class="btn-danger" onclick="deleteStrand({{ strand.id }})">Delete</button>
             </div>
-            <button class="btn btn-sm btn-danger" onclick="deleteStrand({{ strand.id }})">Delete</button>
-          </div>
-          <div style="margin-top:8px">
-            <div style="display:flex;gap:8px;align-items:center">
-              <input type="text" placeholder="New sub‑strand" id="subInput{{ strand.id }}" style="flex:1;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px">
-              <button class="btn btn-sm btn-success" onclick="createSubStrand({{ strand.id }})">Add</button>
+            <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+              <input type="text" class="input" placeholder="New sub-strand" id="subInput{{ strand.id }}">
+              <button class="btn-add" onclick="createSubStrand({{ strand.id }})">Add</button>
             </div>
-            <ul style="margin:8px 0 0;padding-left:18px">
+            <ul class="sub-list">
               {% for sub in strand.sub_strands.all %}
-                <li style="margin:4px 0;display:flex;justify-content:space-between;align-items:center">
+                <li class="sub-item">
                   <span>{{ sub.name }}</span>
-                  <button class="btn btn-xs btn-danger" onclick="deleteSubStrand({{ sub.id }})">Delete</button>
+                  <button class="btn-danger" onclick="deleteSubStrand({{ sub.id }})">Delete</button>
                 </li>
               {% empty %}
-                <li style="color:#94a3b8">No sub‑strands yet.</li>
+                <li class="muted">No sub-strands yet.</li>
               {% endfor %}
             </ul>
           </div>
-        </div>
-      {% empty %}
-        <div style="color:#64748b">No strands added yet.</div>
-      {% endfor %}
+        {% empty %}
+          <div class="muted">No strands added yet.</div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 
@@ -94,7 +156,7 @@ function createSubStrand(strandId){
   const input = document.getElementById('subInput' + strandId);
   const name = (input.value || '').trim();
   if (!name){
-    alert('Enter sub‑strand name.');
+    alert('Enter sub-strand name.');
     return;
   }
   fetch('{% url "create_sub_strand" %}', {
@@ -111,7 +173,7 @@ function createSubStrand(strandId){
 }
 
 function deleteStrand(id){
-  if (!confirm('Delete this strand and its sub‑strands?')) return;
+  if (!confirm('Delete this strand and its sub-strands?')) return;
   fetch('{% url "delete_strand" 0 %}'.replace('/0/', '/' + id + '/'), {
     method: 'POST',
     headers: {'X-CSRFToken': csrfToken()}
@@ -125,7 +187,7 @@ function deleteStrand(id){
 }
 
 function deleteSubStrand(id){
-  if (!confirm('Delete this sub‑strand?')) return;
+  if (!confirm('Delete this sub-strand?')) return;
   fetch('{% url "delete_sub_strand" 0 %}'.replace('/0/', '/' + id + '/'), {
     method: 'POST',
     headers: {'X-CSRFToken': csrfToken()}
