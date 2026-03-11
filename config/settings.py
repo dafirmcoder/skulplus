@@ -73,8 +73,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'cloudinary_storage',
-    'cloudinary',
     'schools',
     'finance',
     'payroll',
@@ -191,6 +189,12 @@ MEDIA_ROOT = Path(media_root_env) if media_root_env else BASE_DIR / 'media'
 
 # Cloudinary (Railway production uploads)
 cloudinary_url = os.environ.get('CLOUDINARY_URL', '').strip()
+if cloudinary_url:
+    INSTALLED_APPS += [
+        'cloudinary_storage',
+        'cloudinary',
+    ]
+
 if cloudinary_url:
     STORAGES = {
         'default': {
