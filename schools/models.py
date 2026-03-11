@@ -473,6 +473,26 @@ class TermDate(models.Model):
         return f"{self.school.name} {self.term} {self.year}: {self.start_date} - {self.end_date}"
 
 
+# 📆 SCHOOL CALENDAR EVENTS
+class SchoolCalendarEvent(models.Model):
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='calendar_events')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default='')
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    color = models.CharField(max_length=7, default='#f59e0b')
+    send_to_parents = models.BooleanField(default=False)
+    send_to_teachers = models.BooleanField(default=False)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_calendar_events')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['start_date', 'end_date', 'title']
+
+    def __str__(self):
+        return f"{self.school.name} - {self.title} ({self.start_date})"
+
+
 # Site-level configuration (singleton pattern not enforced here; admin can keep one active entry)
 class SiteConfig(models.Model):
     """Holds site-wide assets such as the logo uploaded by a superuser/admin.

@@ -132,6 +132,7 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from schools.models import ClassRoom, Subject, TeacherAssignment, GradeScale
 import datetime
+import calendar
 
 @login_required
 def load_subjects_for_class(request):
@@ -173,7 +174,7 @@ from finance.models import FeePayment as Payment, FeeStructure
 from payroll.models import Staff
 from schools.models import (
     School, ClassRoom, StreamClassTeacher, TeacherAssignment, Exam, TermDate, MarkSheet, Announcement, Stream, Subject, PromotionLog, EducationLevel, SubjectAllocation, HeadTeacher, SchoolUserAccess,
-    LearningStrand, SubStrand, StudentCompetency, Assignment
+    LearningStrand, SubStrand, StudentCompetency, Assignment, SchoolCalendarEvent
 )
 from schools.models import StudentMark
 from schools.forms import StudentForm, AnnouncementForm, ClassRoomForm
@@ -189,6 +190,8 @@ from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login
 from django.utils import timezone
+from django.utils.dateparse import parse_date
+from django.db.models import Q
 from django.urls import reverse
 from django.core.exceptions import ValidationError
 from types import SimpleNamespace
@@ -1023,6 +1026,7 @@ def teacher_dashboard(request):
         overall_completion = int(sum(es['completion_percentage'] for es in exam_status) / len(exam_status))
     
     quick_entry_exam = Exam.objects.filter(school=school).order_by('-year', '-id').first()
+    calendar_events = _get_upcoming_calendar_events(school, 'teachers', limit=10)
 
     context = {
         'teacher': teacher,
@@ -1040,6 +1044,7 @@ def teacher_dashboard(request):
         'total_students': total_students,
         'overall_completion': overall_completion,
         'quick_entry_exam': quick_entry_exam,
+        'calendar_events': calendar_events,
     }
     
     return render(request, 'schools/teacher_dashboard.html', context)
@@ -1177,6 +1182,275 @@ def term_dates(request):
     # render page with existing term dates
     dates = TermDate.objects.filter(school=school).order_by('-year', 'term')
     return render(request, 'schools/term_dates.html', {'dates': dates})
+
+
+def _calendar_access_allowed(user, school) -> bool:
+    role = resolve_user_role(user, school)
+    return role in ('SUPERUSER', 'HEADTEACHER', SchoolUserAccess.ROLE_DEPUTY, SchoolUserAccess.ROLE_DEAN)
+
+
+def _require_calendar_access(request):
+    school = resolve_user_school(request.user)
+    if not school:
+        return None, HttpResponseForbidden('No school is linked to this account.')
+    if _calendar_access_allowed(request.user, school):
+        return school, None
+    return school, HttpResponseForbidden()
+
+
+def _parse_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _get_upcoming_calendar_events(school, audience: str, limit: int = 8):
+    if not school:
+        return []
+    today = timezone.now().date()
+    qs = SchoolCalendarEvent.objects.filter(school=school)
+    if audience == 'parents':
+        qs = qs.filter(send_to_parents=True)
+    elif audience == 'teachers':
+        qs = qs.filter(send_to_teachers=True)
+    qs = qs.filter(Q(start_date__gte=today) | Q(end_date__gte=today))
+    return list(qs.order_by('start_date', 'end_date', 'title')[:limit])
+
+
+@login_required
+def school_calendar(request):
+    school, denied = _require_calendar_access(request)
+    if denied:
+        return denied
+    events = SchoolCalendarEvent.objects.filter(school=school).order_by('-start_date', '-id')
+    return render(request, 'schools/school_calendar.html', {'school': school, 'events': events})
+
+
+@login_required
+@require_POST
+def create_school_calendar_event(request):
+    school, denied = _require_calendar_access(request)
+    if denied:
+        return denied
+    try:
+        try:
+            data = json.loads(request.body) if request.body else request.POST
+        except Exception:
+            data = request.POST
+        title = (data.get('title') or '').strip()
+        description = (data.get('description') or '').strip()
+        start_date = parse_date(data.get('start_date') or data.get('start'))
+        end_date = parse_date(data.get('end_date') or data.get('end'))
+        color = (data.get('color') or '#f59e0b').strip()
+        send_to_parents = _parse_bool(data.get('send_to_parents'))
+        send_to_teachers = _parse_bool(data.get('send_to_teachers'))
+
+        if not title:
+            return JsonResponse({'success': False, 'error': 'Title is required'})
+        if not start_date:
+            return JsonResponse({'success': False, 'error': 'Start date is required'})
+        if end_date and end_date < start_date:
+            return JsonResponse({'success': False, 'error': 'End date cannot be before start date'})
+
+        event = SchoolCalendarEvent.objects.create(
+            school=school,
+            title=title,
+            description=description,
+            start_date=start_date,
+            end_date=end_date,
+            color=color,
+            send_to_parents=send_to_parents,
+            send_to_teachers=send_to_teachers,
+            created_by=request.user,
+        )
+        e_any = cast(Any, event)
+        return JsonResponse({
+            'success': True,
+            'event': {
+                'id': e_any.id,
+                'title': e_any.title,
+                'description': e_any.description,
+                'start_date': e_any.start_date.isoformat(),
+                'end_date': e_any.end_date.isoformat() if e_any.end_date else '',
+                'color': e_any.color,
+                'send_to_parents': e_any.send_to_parents,
+                'send_to_teachers': e_any.send_to_teachers,
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@require_POST
+def edit_school_calendar_event(request, pk):
+    school, denied = _require_calendar_access(request)
+    if denied:
+        return denied
+    try:
+        event = get_object_or_404(SchoolCalendarEvent, pk=pk, school=school)
+        try:
+            data = json.loads(request.body) if request.body else request.POST
+        except Exception:
+            data = request.POST
+        title = (data.get('title') or event.title).strip()
+        description = (data.get('description') or event.description or '').strip()
+        start_date = parse_date(data.get('start_date') or data.get('start')) or event.start_date
+        end_date_input = data.get('end_date') or data.get('end')
+        end_date = parse_date(end_date_input) if end_date_input not in (None, '') else None
+        color = (data.get('color') or event.color or '#f59e0b').strip()
+        send_to_parents = _parse_bool(data.get('send_to_parents'))
+        send_to_teachers = _parse_bool(data.get('send_to_teachers'))
+
+        if not title:
+            return JsonResponse({'success': False, 'error': 'Title is required'})
+        if not start_date:
+            return JsonResponse({'success': False, 'error': 'Start date is required'})
+        if end_date and end_date < start_date:
+            return JsonResponse({'success': False, 'error': 'End date cannot be before start date'})
+
+        event.title = title
+        event.description = description
+        event.start_date = start_date
+        event.end_date = end_date
+        event.color = color
+        event.send_to_parents = send_to_parents
+        event.send_to_teachers = send_to_teachers
+        event.save()
+        e_any = cast(Any, event)
+        return JsonResponse({
+            'success': True,
+            'event': {
+                'id': e_any.id,
+                'title': e_any.title,
+                'description': e_any.description,
+                'start_date': e_any.start_date.isoformat(),
+                'end_date': e_any.end_date.isoformat() if e_any.end_date else '',
+                'color': e_any.color,
+                'send_to_parents': e_any.send_to_parents,
+                'send_to_teachers': e_any.send_to_teachers,
+            }
+        })
+    except SchoolCalendarEvent.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Event not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@require_POST
+def delete_school_calendar_event(request, pk):
+    school, denied = _require_calendar_access(request)
+    if denied:
+        return denied
+    try:
+        event = get_object_or_404(SchoolCalendarEvent, pk=pk, school=school)
+        event.delete()
+        return JsonResponse({'success': True})
+    except SchoolCalendarEvent.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Event not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+def school_calendar_print(request):
+    school, denied = _require_calendar_access(request)
+    if denied:
+        return denied
+
+    range_from = parse_date(request.GET.get('from') or '')
+    range_to = parse_date(request.GET.get('to') or '')
+    audience = (request.GET.get('audience') or 'all').strip().lower()
+
+    events = SchoolCalendarEvent.objects.filter(school=school)
+    if audience == 'parents':
+        events = events.filter(send_to_parents=True)
+    elif audience == 'teachers':
+        events = events.filter(send_to_teachers=True)
+
+    today = timezone.now().date()
+    event_min_start = None
+    event_max_end = None
+    for ev in events:
+        ev_start = ev.start_date
+        ev_end = ev.end_date or ev.start_date
+        if event_min_start is None or ev_start < event_min_start:
+            event_min_start = ev_start
+        if event_max_end is None or ev_end > event_max_end:
+            event_max_end = ev_end
+
+    if range_from and range_to:
+        start = range_from
+        end = range_to
+    elif range_from and not range_to:
+        start = range_from
+        end = event_max_end if event_max_end and event_max_end > range_from else datetime.date(range_from.year, 12, 31)
+    elif range_to and not range_from:
+        end = range_to
+        start = event_min_start if event_min_start and event_min_start < range_to else datetime.date(range_to.year, 1, 1)
+    else:
+        if event_min_start and event_max_end:
+            start = event_min_start
+            end = event_max_end
+        else:
+            start = datetime.date(today.year, 1, 1)
+            end = datetime.date(today.year, 12, 31)
+
+    events = events.filter(
+        Q(start_date__lte=end) & (
+            Q(end_date__isnull=True, start_date__gte=start) | Q(end_date__gte=start)
+        )
+    ).order_by('start_date', 'end_date', 'title')
+
+    event_list = list(events)
+    event_map = {}
+    for ev in event_list:
+        ev_start = ev.start_date
+        ev_end = ev.end_date or ev.start_date
+        current = max(ev_start, start)
+        ev_end = min(ev_end, end)
+        while current <= ev_end:
+            event_map.setdefault(current, []).append({
+                'title': ev.title,
+                'color': ev.color,
+            })
+            current += datetime.timedelta(days=1)
+
+    months = []
+    y, m = start.year, start.month
+    while (y, m) <= (end.year, end.month):
+        cal = calendar.monthcalendar(y, m)
+        weeks = []
+        for week in cal:
+            days = []
+            for d in week:
+                if d == 0:
+                    days.append({'date': None, 'events': []})
+                else:
+                    date_obj = datetime.date(y, m, d)
+                    days.append({'date': date_obj, 'events': event_map.get(date_obj, [])})
+            weeks.append(days)
+        months.append({
+            'year': y,
+            'month': m,
+            'label': f"{calendar.month_name[m]} {y}",
+            'weeks': weeks,
+        })
+        if m == 12:
+            y += 1
+            m = 1
+        else:
+            m += 1
+
+    return render(request, 'schools/school_calendar_print.html', {
+        'school': school,
+        'events': event_list,
+        'range_from': range_from,
+        'range_to': range_to,
+        'audience': audience,
+        'calendar_months': months,
+    })
 
 
 @login_required
@@ -1386,6 +1660,7 @@ def headteacher_dashboard(request):
         .annotate(avg_score=Avg('score'))
         .order_by('marksheet__subject__name')
     )
+    calendar_events = _get_upcoming_calendar_events(school, 'teachers', limit=10)
 
     context = {
         'school': school,
@@ -1396,6 +1671,7 @@ def headteacher_dashboard(request):
         'recent_announcements': recent_announcements,
         'debtors': debtors,
         'subject_performance': subject_performance,
+        'calendar_events': calendar_events,
     }
 
     return render(request, 'schools/headteacher_dashboard.html', context)
@@ -1406,7 +1682,8 @@ def bursar_dashboard(request):
     school, denied = _require_school_permission(request, 'finance')
     if denied:
         return denied
-    return render(request, 'schools/bursar_dashboard.html', {'school': school})
+    calendar_events = _get_upcoming_calendar_events(school, 'teachers', limit=10)
+    return render(request, 'schools/bursar_dashboard.html', {'school': school, 'calendar_events': calendar_events})
 
 
 
@@ -2412,6 +2689,16 @@ def parent_dashboard(request):
     announcements = Announcement.objects.filter(
         school_id__in={s.school_id for s in students}
     ).order_by('-created_at')[:20]
+    today = timezone.now().date()
+    parent_calendar_events = (
+        SchoolCalendarEvent.objects.filter(
+            school_id__in={s.school_id for s in students},
+            send_to_parents=True,
+        )
+        .filter(Q(start_date__gte=today) | Q(end_date__gte=today))
+        .select_related('school')
+        .order_by('start_date', 'end_date', 'title')[:12]
+    )
 
     return render(request, 'schools/parent_dashboard.html', {
         'student_cards': student_cards,
@@ -2419,6 +2706,7 @@ def parent_dashboard(request):
         'total_balance': total_balance,
         'total_assignments': total_assignments,
         'announcement_count': announcements.count(),
+        'calendar_events': parent_calendar_events,
     })
 
 

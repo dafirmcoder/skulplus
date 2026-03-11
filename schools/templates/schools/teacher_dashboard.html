@@ -258,6 +258,38 @@ body { background: var(--light); font-family: 'Segoe UI', Tahoma, Geneva, Verdan
   </div>
 {% endif %}
 
+{% if calendar_events %}
+  <div class="card">
+    <div class="section-title"><i class="fas fa-calendar-check"></i> School Calendar</div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Event</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in calendar_events %}
+          <tr>
+            <td>
+              <strong>{{ ev.start_date }}</strong>
+              {% if ev.end_date %}
+                <div style="font-size:11px;color:#64748b">to {{ ev.end_date }}</div>
+              {% endif %}
+            </td>
+            <td>
+              <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ ev.color }};margin-right:6px;"></span>
+              {{ ev.title }}
+            </td>
+            <td>{{ ev.description|default:"-" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
 <!-- Classes & Assignments -->
 <div class="two-column">
   <!-- Classes as Class Teacher -->

@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+:root { --blue:#0f3057; --green:#16a34a; --orange:#f59e0b; --light:#f4f7fb; --card:#ffffff; --border:#e6ecf2; }
+body { background:var(--light); font-family:'Poppins',sans-serif; }
+.page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; gap:12px; flex-wrap:wrap; }
+.btn-add { background:linear-gradient(135deg,var(--green),#22c55e); color:#fff; padding:10px 16px; border-radius:8px; border:none; font-weight:600; }
+.btn-print { background:linear-gradient(135deg,#0f3057,#2563eb); color:#fff; padding:10px 14px; border-radius:8px; border:none; font-weight:600; }
+.card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.05); }
+.filters { display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-bottom:14px; }
+.filters .form-group { margin:0; }
+table { width:100%; border-collapse:collapse; }
+th, td { padding:12px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+th { color:#777; font-size:13px; }
+.actions i { margin-right:10px; cursor:pointer; }
+.edit{color:var(--blue)} .delete{color:#dc2626} .view{color:var(--green)}
+.badge { padding:5px 10px; border-radius:20px; background:rgba(245,158,11,0.15); color:var(--orange); font-size:11px; font-weight:700; text-transform:uppercase; }
+.badge-green { background:rgba(22,163,74,0.15); color:#16a34a; }
+.badge-blue { background:rgba(37,99,235,0.15); color:#2563eb; }
+.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none; align-items:center; justify-content:center; z-index:1000; }
+.modal { background:#fff; width:95%; max-width:640px; border-radius:14px; padding:25px; }
+.form-group { margin-bottom:12px; }
+.form-control { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border); }
+.modal-actions { text-align:right; margin-top:12px; }
+.btn-save { background:linear-gradient(135deg,var(--blue),#1a73e8); color:#fff; border:none; padding:8px 14px; border-radius:6px; }
+.btn-cancel { background:#eee; border:none; padding:8px 12px; border-radius:6px; margin-right:6px; }
+.checkbox-row { display:flex; gap:16px; align-items:center; }
+.checkbox-row label { display:flex; gap:8px; align-items:center; font-weight:600; color:#334155; }
+.muted { color:#64748b; font-size:12px; }
+</style>
+
+<div class="page-header">
+  <h1><i class="fas fa-calendar"></i> School Calendar</h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn-print" id="open-print"><i class="fas fa-print"></i> Print Calendar</button>
+    <button class="btn-add" id="open-create"><i class="fas fa-plus"></i> New Event</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="filters">
+    <div class="form-group">
+      <label for="filter_from">From</label>
+      <input class="form-control" id="filter_from" type="date">
+    </div>
+    <div class="form-group">
+      <label for="filter_to">To</label>
+      <input class="form-control" id="filter_to" type="date">
+    </div>
+    <div class="form-group">
+      <label for="filter_audience">Audience</label>
+      <select class="form-control" id="filter_audience">
+        <option value="all">All</option>
+        <option value="parents">Parents</option>
+        <option value="teachers">Teachers/Staff</option>
+      </select>
+    </div>
+    <div class="muted">Use filters to print a customized calendar.</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Title</th><th>Audience</th><th>Notes</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td>
+          <strong>{{ e.start_date }}</strong>
+          {% if e.end_date %}
+            <div class="muted">to {{ e.end_date }}</div>
+          {% endif %}
+        </td>
+        <td><strong>{{ e.title }}</strong></td>
+        <td>
+          {% if e.send_to_parents %}<span class="badge badge-green">Parents</span>{% endif %}
+          {% if e.send_to_teachers %}<span class="badge badge-blue">Teachers</span>{% endif %}
+          {% if not e.send_to_parents and not e.send_to_teachers %}<span class="badge">Internal</span>{% endif %}
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:{{ e.color }};"></span>
+            <span>{{ e.description|default:"-" }}</span>
+          </div>
+        </td>
+        <td class="actions">
+          <i class="fas fa-edit edit"
+             data-url="{% url 'edit_school_calendar_event' e.id %}"
+             data-title="{{ e.title|escapejs }}"
+             data-description="{{ e.description|default:''|escapejs }}"
+             data-start="{{ e.start_date }}"
+             data-end="{{ e.end_date|default:'' }}"
+             data-color="{{ e.color|default:'#f59e0b' }}"
+             data-parents="{{ e.send_to_parents|yesno:'true,false' }}"
+             data-teachers="{{ e.send_to_teachers|yesno:'true,false' }}"></i>
+          <i class="fas fa-trash delete delete-btn" data-url="{% url 'delete_school_calendar_event' e.id %}"></i>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="text-align:center;color:#888">No calendar events yet</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div id="notif" style="position:fixed;right:20px;top:20px;display:none;background:#16a34a;color:#fff;padding:10px 14px;border-radius:8px;z-index:1200"></div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="calendarModal">
+  <div class="modal">
+    <h2 id="modalTitle">Create Event</h2>
+    <form id="calendarForm" method="post">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="id_title">Title</label>
+        <input class="form-control" id="id_title" name="title" type="text" />
+      </div>
+      <div class="form-group">
+        <label for="id_description">Description</label>
+        <textarea class="form-control" id="id_description" name="description" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="id_start">Start Date</label>
+        <input class="form-control" id="id_start" name="start_date" type="date" />
+      </div>
+      <div class="form-group">
+        <label for="id_end">End Date (optional)</label>
+        <input class="form-control" id="id_end" name="end_date" type="date" />
+      </div>
+      <div class="form-group">
+        <label for="id_color">Highlight Color</label>
+        <input class="form-control" id="id_color" name="color" type="color" value="#f59e0b" />
+      </div>
+      <div class="form-group checkbox-row">
+        <label><input type="checkbox" id="id_send_parents" name="send_to_parents"> Send to parents</label>
+        <label><input type="checkbox" id="id_send_teachers" name="send_to_teachers"> Send to teachers/dean/bursar</label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-save">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModal(){
+  document.getElementById('modalTitle').textContent = 'Create Event';
+  document.getElementById('calendarForm').dataset.action = '';
+  document.getElementById('id_title').value = '';
+  document.getElementById('id_description').value = '';
+  document.getElementById('id_start').value = '';
+  document.getElementById('id_end').value = '';
+  document.getElementById('id_color').value = '#f59e0b';
+  document.getElementById('id_send_parents').checked = false;
+  document.getElementById('id_send_teachers').checked = false;
+  document.getElementById('calendarModal').style.display = 'flex';
+}
+function closeModal(){ document.getElementById('calendarModal').style.display = 'none'; }
+
+function getCookie(name){ const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'); return v ? v.pop() : ''; }
+
+const calendarForm = document.getElementById('calendarForm');
+if(calendarForm){
+  calendarForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    const fd = new FormData(this);
+    const obj = Object.fromEntries(fd.entries());
+    obj.send_to_parents = document.getElementById('id_send_parents').checked;
+    obj.send_to_teachers = document.getElementById('id_send_teachers').checked;
+    obj.color = document.getElementById('id_color').value;
+    const csrftoken = getCookie('csrftoken');
+    const actionUrl = this.dataset.action || '{% url "create_school_calendar_event" %}';
+    fetch(actionUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(obj)
+    }).then(r=>r.json()).then(d=>{
+      if(d.success){
+        if(d.event){
+          const e = d.event;
+          const tbody = document.querySelector('table tbody');
+          const action = this.dataset.action || '';
+          if(action){
+            const existing = tbody.querySelector(`.edit[data-url="${action}"]`);
+            if(existing){
+              const tr = existing.closest('tr');
+              tr.querySelector('td:nth-child(1) strong').textContent = e.start_date;
+              const dateCell = tr.querySelector('td:nth-child(1)');
+              const endLine = dateCell.querySelector('.muted');
+              if(e.end_date){
+                if(endLine){ endLine.textContent = 'to ' + e.end_date; }
+                else { dateCell.insertAdjacentHTML('beforeend', `<div class="muted">to ${e.end_date}</div>`); }
+              } else if(endLine){
+                endLine.remove();
+              }
+              tr.querySelector('td:nth-child(2) strong').textContent = e.title;
+              const descCell = tr.querySelector('td:nth-child(4)');
+              descCell.innerHTML = `<div style="display:flex;align-items:center;gap:8px;">
+                <span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${e.color || '#f59e0b'};"></span>
+                <span>${e.description || '-'}</span>
+              </div>`;
+              const badgeCell = tr.querySelector('td:nth-child(3)');
+              badgeCell.innerHTML = '';
+              if(e.send_to_parents){ badgeCell.insertAdjacentHTML('beforeend', '<span class="badge badge-green">Parents</span> '); }
+              if(e.send_to_teachers){ badgeCell.insertAdjacentHTML('beforeend', '<span class="badge badge-blue">Teachers</span> '); }
+              if(!e.send_to_parents && !e.send_to_teachers){ badgeCell.insertAdjacentHTML('beforeend', '<span class="badge">Internal</span>'); }
+              existing.dataset.title = e.title;
+              existing.dataset.description = e.description || '';
+              existing.dataset.start = e.start_date;
+              existing.dataset.end = e.end_date || '';
+              existing.dataset.color = e.color || '#f59e0b';
+              existing.dataset.parents = e.send_to_parents ? 'true' : 'false';
+              existing.dataset.teachers = e.send_to_teachers ? 'true' : 'false';
+            }
+          } else {
+            const row = document.createElement('tr');
+            const editUrlNew = '{% url "edit_school_calendar_event" 0 %}'.replace('/0/', `/${e.id}/`);
+            const deleteUrlNew = '{% url "delete_school_calendar_event" 0 %}'.replace('/0/', `/${e.id}/`);
+            const audienceBadges = `
+              ${e.send_to_parents ? '<span class="badge badge-green">Parents</span> ' : ''}
+              ${e.send_to_teachers ? '<span class="badge badge-blue">Teachers</span> ' : ''}
+              ${(!e.send_to_parents && !e.send_to_teachers) ? '<span class="badge">Internal</span>' : ''}
+            `;
+            row.innerHTML = `
+              <td><strong>${e.start_date}</strong>${e.end_date ? `<div class="muted">to ${e.end_date}</div>` : ''}</td>
+              <td><strong>${e.title}</strong></td>
+              <td>${audienceBadges}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${e.color || '#f59e0b'};"></span>
+                  <span>${e.description || '-'}</span>
+                </div>
+              </td>
+              <td class="actions">
+                <i class="fas fa-edit edit" data-url="${editUrlNew}" data-title="${e.title}" data-description="${e.description || ''}" data-start="${e.start_date}" data-end="${e.end_date || ''}" data-color="${e.color || '#f59e0b'}" data-parents="${e.send_to_parents ? 'true' : 'false'}" data-teachers="${e.send_to_teachers ? 'true' : 'false'}"></i>
+                <i class="fas fa-trash delete delete-btn" data-url="${deleteUrlNew}"></i>
+              </td>
+            `;
+            tbody.prepend(row);
+            attachRowHandlers(row);
+          }
+          closeModal();
+          const n = document.getElementById('notif'); n.textContent = 'Saved'; n.style.display = 'block'; setTimeout(()=>n.style.display='none',2000);
+          return;
+        }
+        location.reload();
+      } else { alert(d.error || 'Failed'); }
+    }).catch(err=>{ console.error(err); alert('Network error'); });
+  });
+}
+
+document.querySelectorAll('.edit').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    const url = this.dataset.url;
+    document.getElementById('modalTitle').textContent = 'Edit Event';
+    document.getElementById('calendarForm').dataset.action = url;
+    document.getElementById('id_title').value = this.dataset.title || '';
+    document.getElementById('id_description').value = this.dataset.description || '';
+    document.getElementById('id_start').value = this.dataset.start || '';
+    document.getElementById('id_end').value = this.dataset.end || '';
+    document.getElementById('id_color').value = this.dataset.color || '#f59e0b';
+    document.getElementById('id_send_parents').checked = this.dataset.parents === 'true';
+    document.getElementById('id_send_teachers').checked = this.dataset.teachers === 'true';
+    document.getElementById('calendarModal').style.display = 'flex';
+  });
+});
+
+document.querySelectorAll('.delete-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    if(!confirm('Delete this event?')) return;
+    const url = this.dataset.url;
+    fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(resp => { if(resp.ok) return resp.json().catch(()=>({success:true})); throw new Error('Delete failed'); })
+      .then(data => { if(data && data.success === false){ alert(data.error || 'Delete failed'); return; } location.reload(); })
+      .catch(err => { console.error(err); alert('Could not delete event'); });
+  });
+});
+
+// Open-create button binding
+const openCreateBtn = document.getElementById('open-create');
+if(openCreateBtn){ openCreateBtn.addEventListener('click', openModal); }
+
+// Print button
+const openPrintBtn = document.getElementById('open-print');
+if(openPrintBtn){
+  openPrintBtn.addEventListener('click', function(){
+    const from = document.getElementById('filter_from').value;
+    const to = document.getElementById('filter_to').value;
+    const audience = document.getElementById('filter_audience').value;
+    const params = new URLSearchParams();
+    if(from) params.set('from', from);
+    if(to) params.set('to', to);
+    if(audience) params.set('audience', audience);
+    const url = '{% url "school_calendar_print" %}' + (params.toString() ? `?${params.toString()}` : '');
+    if (window.SkulPlusPrint && typeof window.SkulPlusPrint.printUrl === 'function') {
+      window.SkulPlusPrint.printUrl(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  });
+}
+
+// Helper to attach handlers to a newly inserted row
+function attachRowHandlers(row){
+  const editBtn = row.querySelector('.edit');
+  const delBtn = row.querySelector('.delete-btn');
+  if(editBtn){
+    editBtn.addEventListener('click', function(){
+      const url = this.dataset.url;
+      document.getElementById('modalTitle').textContent = 'Edit Event';
+      document.getElementById('calendarForm').dataset.action = url;
+      document.getElementById('id_title').value = this.dataset.title || '';
+      document.getElementById('id_description').value = this.dataset.description || '';
+      document.getElementById('id_start').value = this.dataset.start || '';
+      document.getElementById('id_end').value = this.dataset.end || '';
+      document.getElementById('id_color').value = this.dataset.color || '#f59e0b';
+      document.getElementById('id_send_parents').checked = this.dataset.parents === 'true';
+      document.getElementById('id_send_teachers').checked = this.dataset.teachers === 'true';
+      document.getElementById('calendarModal').style.display = 'flex';
+    });
+  }
+  if(delBtn){
+    delBtn.addEventListener('click', function(){
+      if(!confirm('Delete this event?')) return;
+      const url = this.dataset.url;
+      fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(resp => { if(resp.ok) return resp.json().catch(()=>({success:true})); throw new Error('Delete failed'); })
+        .then(data => { if(data && data.success === false){ alert(data.error || 'Delete failed'); return; } location.reload(); })
+        .catch(err => { console.error(err); alert('Could not delete event'); });
+    });
+  }
+}
+</script>
+
+{% endblock %}

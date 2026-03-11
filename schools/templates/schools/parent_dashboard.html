@@ -206,4 +206,22 @@
       {% endfor %}
     </div>
   </div>
+
+  <div class="section-card" id="calendar">
+    <div class="section-title"><i class="fas fa-calendar-check" style="color:#0ea5e9"></i> School Calendar</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      {% for ev in calendar_events %}
+        <div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;display:flex;gap:10px;align-items:flex-start">
+          <span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:{{ ev.color }};margin-top:4px;"></span>
+          <div>
+            <div style="font-weight:700">{{ ev.title }}</div>
+            <div style="color:#475569;font-size:13px;margin-top:4px">{{ ev.description|default:"-" }}</div>
+            <div style="color:#94a3b8;font-size:12px;margin-top:6px">{{ ev.start_date }}{% if ev.end_date %} to {{ ev.end_date }}{% endif %}</div>
+          </div>
+        </div>
+      {% empty %}
+        <div style="color:#64748b">No upcoming calendar events.</div>
+      {% endfor %}
+    </div>
+  </div>
 {% endblock %}
