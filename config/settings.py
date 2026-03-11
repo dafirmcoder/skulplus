@@ -73,6 +73,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'cloudinary_storage',
+    'cloudinary',
     'schools',
     'finance',
     'payroll',
@@ -186,3 +188,15 @@ LOGOUT_REDIRECT_URL = '/login/'
 MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
 media_root_env = os.environ.get('MEDIA_ROOT', '').strip()
 MEDIA_ROOT = Path(media_root_env) if media_root_env else BASE_DIR / 'media'
+
+# Cloudinary (Railway production uploads)
+cloudinary_url = os.environ.get('CLOUDINARY_URL', '').strip()
+if cloudinary_url:
+    STORAGES = {
+        'default': {
+            'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
