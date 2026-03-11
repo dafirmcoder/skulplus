@@ -63,7 +63,13 @@
     </div>
 
     <aside class="side-panel">
-      <div class="side-icon"><i class="fa-solid fa-shield-heart"></i></div>
+      <div class="side-icon">
+        {% if SITE_LOGO_URL %}
+          <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="SkulPlus" style="width:36px;height:36px;object-fit:contain;">
+        {% else %}
+          <img src="{% static 'images/skulplus_logo.png' %}" alt="SkulPlus" style="width:36px;height:36px;object-fit:contain;">
+        {% endif %}
+      </div>
       <h2>Your child, always in focus</h2>
       <p>Access attendance, fees, assignments, and announcements instantly—stay connected to every milestone.</p>
       <div class="side-ill"></div>
