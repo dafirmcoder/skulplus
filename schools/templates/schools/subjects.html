@@ -1,141 +1,140 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load static %}
 
 {% block content %}
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
 <style>
-:root {
-  --blue:#0f3057;
-  --green:#16a34a;
-  --orange:#f59e0b;
-  --light:#f4f7fb;
+:root{
+  --ink:#0f3057;
+  --sea:#0ea5e9;
+  --mint:#16a34a;
+  --sun:#f59e0b;
+  --rose:#dc2626;
+  --paper:#f4f7fb;
   --card:#ffffff;
-  --border:#e6ecf2;
+  --border:#e2e8f0;
+  --shadow:0 18px 40px rgba(15,48,87,.12);
 }
-
-body { background:var(--light); font-family:'Poppins',sans-serif; }
-
-.page-header {
-  display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;
+body{background:radial-gradient(1100px 300px at 20% -10%, #d9f2ff, transparent 70%), var(--paper); font-family:'Inter',sans-serif;}
+.page-shell{display:grid;gap:16px;}
+.hero{
+  background:linear-gradient(135deg,#0f3057 0%, #134e8a 35%, #2563eb 100%);
+  color:#fff;border-radius:18px;padding:18px 20px;box-shadow:var(--shadow);
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
 }
-
-.btn-add {
-  background:linear-gradient(135deg,var(--green),#22c55e);
-  color:#fff; padding:10px 16px; border-radius:8px; border:none;
-  font-weight:600; cursor:pointer;
+.hero h1{font-family:'Playfair Display',serif;margin:0;font-size:26px;}
+.hero p{margin:6px 0 0;color:#dbeafe;font-size:13px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 8px 22px rgba(15,48,87,.08);} 
+.table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff;}
+table{width:100%;border-collapse:collapse;}
+th,td{padding:12px 10px;border-bottom:1px solid #eef2f7;}
+th{color:#334155;font-size:12px;text-transform:uppercase;letter-spacing:.4px;text-align:left;background:#f8fafc;}
+.badge{padding:5px 10px;border-radius:20px;background:rgba(245,158,11,0.15);color:var(--sun);font-size:12px;font-weight:700;}
+.badge-core{background:#e0f2fe;color:#075985;}
+.actions i{margin-right:12px;cursor:pointer;}
+.edit{color:var(--ink)} .delete{color:var(--rose)} .view{color:var(--mint)}
+.btn-add{
+  background:linear-gradient(135deg,var(--mint),#22c55e);
+  color:#fff;padding:10px 16px;border-radius:10px;border:none;font-weight:700;cursor:pointer;
 }
-
-.card {
-  background:#fff; border-radius:14px; padding:20px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.05);
-}
-
-table { width:100%; border-collapse:collapse; }
-th, td { padding:12px 10px; border-bottom:1px solid var(--border); }
-th { color:#777; font-size:13px; text-align:left; }
-
-.actions i { margin-right:12px; cursor:pointer; }
-.edit{color:var(--blue)} .delete{color:#dc2626} .view{color:var(--green)}
-
-.badge {
-  padding:5px 10px; border-radius:20px;
-  background:rgba(245,158,11,0.15); color:var(--orange); font-size:12px;
-}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#e0f2fe;color:#075985;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;}
 
 /* MODAL */
-.modal-bg {
-  position:fixed; inset:0; background:rgba(0,0,0,0.45);
-  display:none; align-items:center; justify-content:center; z-index:1000;
-}
-.modal {
-  background:#fff; width:95%; max-width:520px; border-radius:14px; padding:25px;
-}
-.form-group { margin-bottom:14px; }
-.form-group label { font-weight:600; font-size:13px; margin-bottom:6px; display:block; }
-.form-group input, .form-group select {
-  width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border);
-}
-.modal-actions { text-align:right; margin-top:12px; }
-.btn-save { background:linear-gradient(135deg,var(--blue),#1a73e8); color:#fff; border:none; padding:8px 14px; border-radius:6px; }
-.btn-cancel { background:#eee; border:none; padding:8px 12px; border-radius:6px; margin-right:6px; }
-.error { color:#dc2626; font-size:12px; }
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;z-index:1000;}
+.modal{background:#fff;width:95%;max-width:560px;border-radius:16px;padding:22px;box-shadow:var(--shadow);} 
+.form-group{margin-bottom:14px;}
+.form-group label{font-weight:600;font-size:13px;margin-bottom:6px;display:block;color:#334155;}
+.form-group input,.form-group select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);}
+.modal-actions{text-align:right;margin-top:12px;}
+.btn-save{background:linear-gradient(135deg,var(--ink),#1a73e8);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:700;}
+.btn-cancel{background:#eef2f7;border:none;padding:8px 12px;border-radius:8px;margin-right:6px;}
+.error{color:var(--rose);font-size:12px;}
 </style>
 
+<div class="page-shell">
+  <div class="hero">
+    <div>
+      <h1>Subjects Management</h1>
+      <p>Manage subject codes, levels, and allocations across classes.</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span class="chip"><i class="fas fa-book"></i> Curriculum</span>
+      <button class="btn-add" onclick="openModal()"><i class="fas fa-plus"></i> Add Subject</button>
+    </div>
+  </div>
 
-<div class="page-header">
-  <h1><i class="fas fa-book"></i> Subjects Management</h1>
-  <button class="btn-add" onclick="openModal()"><i class="fas fa-plus"></i> Add Subject</button>
-</div>
-
-<div class="card">
-  <table>
-    <thead>
-      <tr>
-        <th>Code</th>
-        <th>Name</th>
-        <th>Short Name</th>
-        <th>Category</th>
-        <th>Level</th>
-        {% if allow_pathways %}
-        <th>Pathway</th>
-        {% endif %}
-        <th>Classes Using</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for subject in subjects %}
-      <tr data-subject-id="{{ subject.id }}" data-subject-code="{{ subject.code }}" data-subject-name="{{ subject.name }}" data-subject-short="{{ subject.short_name }}" data-subject-category="{{ subject.subject_category }}" data-subject-level="{{ subject.education_level_id|default:'' }}">
-        <td><span class="badge">{{ subject.code }}</span></td>
-        <td><strong>{{ subject.name }}</strong></td>
-        <td>{{ subject.short_name }}</td>
-        <td>
-          {% if subject.subject_category %}
-            {{ subject.get_subject_category_display }}
-          {% else %}
-            <span style="color:#9ca3af">—</span>
-          {% endif %}
-        </td>
-                <td>
-          {% if subject.education_level %}
-            {{ subject.education_level.name }}
-          {% else %}
-            <span style="color:#9ca3af">—</span>
-          {% endif %}
-        </td>{% if allow_pathways %}
-          <td>
-            {% if subject.education_level and subject.education_level.name == 'Senior' %}
-              {% if subject.pathway %}
-                <span class="badge badge-{{ subject.pathway.code|lower }}">{{ subject.pathway.code }}</span>
-              {% else %}
-                <span class="badge badge-core">CORE</span>
-              {% endif %}
-            {% else %}
-              <span style="color:#9ca3af">—</span>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Short Name</th>
+            <th>Category</th>
+            <th>Level</th>
+            {% if allow_pathways %}
+            <th>Pathway</th>
             {% endif %}
-          </td>
-        {% endif %}
-        <td>{{ subject.class_count }}</td>
-        <td class="actions">
-          <i class="fas fa-eye view" title="View"></i>
-          <i class="fas fa-edit edit" title="Edit" onclick="openEdit({{ subject.id }})"></i>
-          <i class="fas fa-trash delete" title="Delete" onclick="confirmDelete({{ subject.id }})"></i>
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="{% if allow_pathways %}8{% else %}7{% endif %}" style="text-align:center;color:#888">No subjects added yet</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+            <th>Classes Using</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for subject in subjects %}
+          <tr data-subject-id="{{ subject.id }}" data-subject-code="{{ subject.code }}" data-subject-name="{{ subject.name }}" data-subject-short="{{ subject.short_name }}" data-subject-category="{{ subject.subject_category }}" data-subject-level="{{ subject.education_level_id|default:'' }}">
+            <td><span class="badge">{{ subject.code }}</span></td>
+            <td><strong>{{ subject.name }}</strong></td>
+            <td>{{ subject.short_name }}</td>
+            <td>
+              {% if subject.subject_category %}
+                {{ subject.get_subject_category_display }}
+              {% else %}
+                <span style="color:#9ca3af">-</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if subject.education_level %}
+                {{ subject.education_level.name }}
+              {% else %}
+                <span style="color:#9ca3af">-</span>
+              {% endif %}
+            </td>
+            {% if allow_pathways %}
+              <td>
+                {% if subject.education_level and subject.education_level.name == 'Senior' %}
+                  {% if subject.pathway %}
+                    <span class="badge badge-{{ subject.pathway.code|lower }}">{{ subject.pathway.code }}</span>
+                  {% else %}
+                    <span class="badge badge-core">CORE</span>
+                  {% endif %}
+                {% else %}
+                  <span style="color:#9ca3af">-</span>
+                {% endif %}
+              </td>
+            {% endif %}
+            <td>{{ subject.class_count }}</td>
+            <td class="actions">
+              <i class="fas fa-eye view" title="View"></i>
+              <i class="fas fa-edit edit" title="Edit" onclick="openEdit({{ subject.id }})"></i>
+              <i class="fas fa-trash delete" title="Delete" onclick="confirmDelete({{ subject.id }})"></i>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="{% if allow_pathways %}8{% else %}7{% endif %}" style="text-align:center;color:#888">No subjects added yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
-
 
 <!-- MODAL -->
 <div class="modal-bg" id="subjectModal">
   <div class="modal">
-    <h2><i class="fas fa-book-medical"></i> Add Subject</h2>
+    <h2 style="margin:0 0 10px;color:var(--ink)"><i class="fas fa-book-medical"></i> Add Subject</h2>
 
     <form method="post" id="subject-form">
       {% csrf_token %}
@@ -196,7 +195,6 @@ document.getElementById("subject-form").addEventListener("submit", function(e){
   let form = this;
   let data = new FormData(form);
 
-  // if editing, submit to edit URL
   const editUrl = form.dataset.editUrl || '';
   const url = editUrl || '';
   const method = editUrl ? 'POST' : 'POST';
@@ -267,4 +265,3 @@ function confirmDelete(id){
 </script>
 
 {% endblock %}
-
