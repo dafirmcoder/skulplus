@@ -375,6 +375,9 @@
 
     <li><a href="{% url 'class_lists' %}"><i class="fas fa-list"></i><span>Class Lists</span></a></li>
     <li><a href="{{ enter_marks_url }}" class="{% if request.path == enter_marks_url %}active-link{% endif %}"><i class="fas fa-clipboard-check"></i><span>Marks Entry</span></a></li>
+    {% if ACCESS_CAN_COMPETENCIES %}
+    <li><a href="{{ competencies_entry_url }}" class="{% if request.path == competencies_entry_url %}active-link{% endif %}"><i class="fas fa-clipboard-list"></i><span>Competencies</span></a></li>
+    {% endif %}
     <li><a href="{{ assignments_upload_url }}" class="{% if request.path == assignments_upload_url %}active-link{% endif %}"><i class="fas fa-file-pdf"></i><span>Assignments</span></a></li>
     {% if request.user.teacher.is_class_teacher %}
     <li><a href="{{ entered_marks_url }}" class="{% if request.path == entered_marks_url %}active-link{% endif %}"><i class="fas fa-table-list"></i><span>Entered Marks</span></a></li>
