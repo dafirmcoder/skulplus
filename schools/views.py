@@ -8396,7 +8396,10 @@ def manage_strands(request):
     if not (has_full_headteacher_access(request.user, school) or user_has_permission(request.user, school, 'academics')):
         return HttpResponseForbidden()
 
-    levels = EducationLevel.objects.filter(name__in=['Pre School', 'Kindergarten']).order_by('name')
+    if getattr(school, 'school_type', '') == 'CAMBRIDGE':
+        levels = EducationLevel.objects.filter(name__in=['Kindergarten']).order_by('name')
+    else:
+        levels = EducationLevel.objects.filter(name__in=['Pre School']).order_by('name')
     strands = LearningStrand.objects.filter(school=school).select_related('education_level').prefetch_related('sub_strands').order_by('education_level__name', 'name')
 
     return render(request, 'schools/manage_strands.html', {
