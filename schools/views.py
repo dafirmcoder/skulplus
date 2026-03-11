@@ -174,7 +174,7 @@ from finance.models import FeePayment as Payment, FeeStructure
 from payroll.models import Staff
 from schools.models import (
     School, ClassRoom, StreamClassTeacher, TeacherAssignment, Exam, TermDate, MarkSheet, Announcement, Stream, Subject, PromotionLog, EducationLevel, SubjectAllocation, HeadTeacher, SchoolUserAccess,
-    LearningStrand, SubStrand, StudentCompetency, Assignment, SchoolCalendarEvent
+    LearningStrand, SubStrand, StudentCompetency, StudentCompetencySummary, Assignment, SchoolCalendarEvent
 )
 from schools.models import StudentMark
 from schools.forms import StudentForm, AnnouncementForm, ClassRoomForm
@@ -7531,6 +7531,7 @@ def report_cards_data(request):
         comment_map[key] = (sm_any.comment_text or '').strip()
 
     competency_by_student: dict[int, dict[str, list[dict[str, str]]]] = defaultdict(lambda: defaultdict(list))
+    competency_list_by_student: dict[int, list[StudentCompetency]] = defaultdict(list)
     class_level = classroom.level.name if classroom.level else None
     if _is_early_years_level(class_level):
         competency_qs = StudentCompetency.objects.filter(
@@ -7543,6 +7544,29 @@ def report_cards_data(request):
                 'sub_strand': comp.sub_strand.name,
                 'level': comp.get_level_display(),
             })
+            competency_list_by_student[comp.student_id].append(comp)
+
+    competency_overall_map = {}
+    if _is_early_years_level(class_level):
+        summary_qs = StudentCompetencySummary.objects.filter(
+            student_id__in=student_ids,
+            exam_id=cast(Any, exam).id,
+        )
+        summary_map = {sc.student_id: sc for sc in summary_qs}
+        for s in students:
+            s_any = cast(Any, s)
+            sid = s_any.id
+            summary = summary_map.get(sid)
+            if summary and summary.overall_comment:
+                competency_overall_map[sid] = summary.overall_comment
+            else:
+                seed_key = f'overall:{sid}:{cast(Any, exam).id}'
+                competency_overall_map[sid] = _overall_competency_comment(
+                    school,
+                    f"{s_any.first_name} {s_any.last_name}".strip(),
+                    competency_list_by_student.get(sid, []),
+                    seed_key,
+                )
 
     # Exam ranking maps
     class_rank_by_exam: dict[tuple[int, int], int] = {}
@@ -7885,6 +7909,7 @@ def report_cards_data(request):
                 'overall_level': overall_level,
             },
             'competencies': competency_by_student.get(sid, {}),
+            'competency_overall_comment': competency_overall_map.get(sid, ''),
             'pathway': {
                 'priority': best_pathway,
                 'scores': pathway_scores,
@@ -8534,6 +8559,175 @@ def _user_can_manage_competencies(user, school, classroom=None) -> bool:
     return False
 
 
+def _is_cambridge_school(school) -> bool:
+    return bool(school and getattr(school, 'school_type', '') == 'CAMBRIDGE')
+
+
+def _competency_level_choices_for_school(school):
+    if _is_cambridge_school(school):
+        return [
+            (StudentCompetency.LEVEL_CAM_BEGINNING, 'Beginning'),
+            (StudentCompetency.LEVEL_CAM_DEVELOPING, 'Developing'),
+            (StudentCompetency.LEVEL_CAM_SECURE, 'Secure'),
+            (StudentCompetency.LEVEL_CAM_ADVANCED, 'Advanced'),
+            (StudentCompetency.LEVEL_CAM_MASTERY, 'Mastery'),
+        ]
+    return [
+        (StudentCompetency.LEVEL_CBC_EMERGING, 'Emerging'),
+        (StudentCompetency.LEVEL_CBC_DEVELOPING, 'Developing'),
+        (StudentCompetency.LEVEL_CBC_APPROACHING, 'Approaching Expectation'),
+        (StudentCompetency.LEVEL_CBC_MEETING, 'Meeting Expectation'),
+        (StudentCompetency.LEVEL_CBC_EXCEEDING, 'Exceeding Expectation'),
+    ]
+
+
+def _competency_level_order_map(school):
+    return {val: idx for idx, (val, _label) in enumerate(_competency_level_choices_for_school(school), start=1)}
+
+
+def _competency_comment_variants(strand_name: str, level_label: str) -> list[str]:
+    openers = [
+        "Shows", "Demonstrates", "Displays", "Continues to show",
+        "Has shown", "Is showing", "Has begun to show",
+    ]
+    verbs = [
+        "understanding of", "confidence in", "competence in",
+        "progress in", "skill in",
+    ]
+
+    strength_map = {
+        'Emerging': [
+            "early signs of engagement", "initial awareness", "a basic attempt",
+            "beginning participation", "early understanding", "a starting point", "emerging ability",
+        ],
+        'Developing': [
+            "growing confidence", "steady improvement", "developing understanding",
+            "increasing skill", "noticeable progress", "improving application", "rising competence",
+        ],
+        'Approaching Expectation': [
+            "near-expected performance", "almost meeting expectations", "gaining consistency",
+            "better accuracy", "improving mastery", "good progress toward expectations", "more reliable application",
+        ],
+        'Meeting Expectation': [
+            "solid performance", "consistent achievement", "expected competence",
+            "reliable understanding", "steady mastery", "confident application", "good consistency",
+        ],
+        'Exceeding Expectation': [
+            "excellent performance", "advanced understanding", "exceptional competence",
+            "highly confident application", "outstanding mastery", "strong independence", "excellent consistency",
+        ],
+        'Beginning': [
+            "early engagement", "initial effort", "a starting understanding",
+            "basic participation", "first steps", "early grasp", "emerging confidence",
+        ],
+        'Developing (Cambridge)': [
+            "growing confidence", "developing understanding", "steady improvement",
+            "improving skill", "increasing accuracy", "rising competence", "better consistency",
+        ],
+        'Secure': [
+            "secure understanding", "reliable performance", "confident application",
+            "solid mastery", "steady competence", "consistent accuracy", "dependable skill",
+        ],
+        'Advanced': [
+            "advanced understanding", "strong independence", "high-level application",
+            "excellent consistency", "very strong performance", "skilled execution", "high confidence",
+        ],
+        'Mastery': [
+            "mastery and precision", "exceptional confidence", "outstanding execution",
+            "deep understanding", "expert application", "consistently excellent work", "highly refined skill",
+        ],
+    }
+
+    strengths = strength_map.get(level_label, ["progress"])
+
+    endings = [
+        "with continued practice.",
+        "during classroom tasks.",
+        "in lesson activities.",
+        "in daily class work.",
+        "across class activities.",
+    ]
+
+    variants = []
+    for o in openers:
+        for s in strengths:
+            for v in verbs:
+                variants.append(f"{o} {s} {v} {strand_name} {endings[len(variants) % len(endings)]}")
+    # Deduplicate while preserving order
+    seen = set()
+    uniq = []
+    for c in variants:
+        if c not in seen:
+            uniq.append(c)
+            seen.add(c)
+    # Deterministic pick of 35 based on strand+level
+    seed = abs(hash(f"{strand_name}|{level_label}"))
+    step = max(1, len(uniq) // 35)
+    picked = []
+    idx = seed % len(uniq)
+    while len(picked) < 35 and uniq:
+        picked.append(uniq[idx % len(uniq)])
+        idx += step
+    return picked[:35]
+
+
+def _suggest_competency_comment(strand_name: str, level_label: str, seed_key: str) -> str:
+    variants = _competency_comment_variants(strand_name, level_label)
+    if not variants:
+        return ''
+    idx = abs(hash(seed_key)) % len(variants)
+    return variants[idx]
+
+
+def _overall_competency_comment(school, student_name: str, competencies: list[StudentCompetency], seed_key: str) -> str:
+    if not competencies:
+        return ''
+    level_order = _competency_level_order_map(school)
+    if not level_order:
+        return ''
+
+    strand_scores: dict[str, list[int]] = {}
+    overall_scores = []
+    for comp in competencies:
+        lvl = comp.level
+        score = level_order.get(lvl)
+        if not score:
+            continue
+        strand_scores.setdefault(comp.learning_strand.name, []).append(score)
+        overall_scores.append(score)
+
+    if not overall_scores:
+        return ''
+
+    avg_score = sum(overall_scores) / len(overall_scores)
+    ordered_levels = list(level_order.keys())
+    band_index = min(len(ordered_levels) - 1, max(0, int(round(avg_score)) - 1))
+    dominant_level_value = ordered_levels[band_index]
+    label_map = {v: l for v, l in _competency_level_choices_for_school(school)}
+    dominant_label = label_map.get(dominant_level_value, '')
+
+    strand_avgs = [(s, sum(vals) / len(vals)) for s, vals in strand_scores.items()]
+    strand_avgs.sort(key=lambda t: t[1], reverse=True)
+    strengths = [s for s, _ in strand_avgs[:2]]
+    focus = [s for s, _ in strand_avgs[-2:]] if len(strand_avgs) > 1 else []
+
+    templates = [
+        f"{student_name} is working at a {dominant_label.lower()} level overall, showing notable progress in {', '.join(strengths) or 'key strands'}.",
+        f"Overall performance is {dominant_label.lower()}, with strengths seen in {', '.join(strengths) or 'several strands'}.",
+        f"{student_name} demonstrates {dominant_label.lower()} competence overall, especially in {', '.join(strengths) or 'key areas'}.",
+        f"The learner is currently {dominant_label.lower()} overall, with strong engagement in {', '.join(strengths) or 'core strands'}.",
+    ]
+    if focus:
+        templates.extend([
+            f"To improve further, focus on {', '.join(focus)} while maintaining strengths in {', '.join(strengths) or 'other strands'}.",
+            f"Next steps include targeted support in {', '.join(focus)} to raise overall performance.",
+        ])
+
+    templates = list(dict.fromkeys(templates))
+    idx = abs(hash(seed_key)) % len(templates)
+    return templates[idx]
+
+
 @login_required
 def competencies_entry(request):
     school = get_user_school(request.user)
@@ -8553,7 +8747,7 @@ def competencies_entry(request):
         'school': school,
         'classes': classes_qs,
         'exams': exams,
-        'level_choices': StudentCompetency.LEVEL_CHOICES,
+        'level_choices': _competency_level_choices_for_school(school),
     })
 
 
@@ -8879,12 +9073,16 @@ def load_competency_students(request):
     ).prefetch_related('sub_strands').order_by('name')
 
     competency_map = {}
+    competency_comment_map = {}
+    competency_manual_map = {}
     existing = StudentCompetency.objects.filter(
         student_id__in=student_ids,
         exam=exam,
     ).select_related('sub_strand')
     for c in existing:
         competency_map[(c.student_id, c.sub_strand_id)] = c.level
+        competency_comment_map[(c.student_id, c.sub_strand_id)] = (c.comment_text or '').strip()
+        competency_manual_map[(c.student_id, c.sub_strand_id)] = bool(c.comment_manual)
 
     payload_strands = []
     for strand in strands:
@@ -8904,11 +9102,65 @@ def load_competency_students(request):
             'admission': s_any.admission_number,
         })
 
+    level_choices = _competency_level_choices_for_school(school)
+    label_map = {v: l for v, l in level_choices}
+    comment_variants = {}
+    for strand in strands:
+        for val, label in level_choices:
+            key = f'{strand.id}:{val}'
+            comment_variants[key] = _competency_comment_variants(strand.name, label)
+
+    entries_payload = {}
+    for (sid, sub_id), level in competency_map.items():
+        entries_payload[f'{sid}:{sub_id}'] = {
+            'level': level,
+            'comment_text': competency_comment_map.get((sid, sub_id), ''),
+            'comment_manual': competency_manual_map.get((sid, sub_id), False),
+            'suggested_comment': '',
+        }
+
+    for strand in strands:
+        for ss in strand.sub_strands.all():
+            for s in students:
+                sid = cast(Any, s).id
+                key = f'{sid}:{ss.id}'
+                entry = entries_payload.get(key, {'level': '', 'comment_text': '', 'comment_manual': False})
+                level = entry.get('level') or ''
+                if level:
+                    label = label_map.get(level, '')
+                    seed_key = f'{sid}:{ss.id}:{exam.id}'
+                    suggested = _suggest_competency_comment(strand.name, label, seed_key)
+                else:
+                    suggested = ''
+                entry['suggested_comment'] = suggested
+                entries_payload[key] = entry
+
+    # Overall comments per student
+    existing_summaries = {
+        (sc.student_id): sc
+        for sc in StudentCompetencySummary.objects.filter(student_id__in=student_ids, exam=exam)
+    }
+    overall_payload = {}
+    for s in students:
+        sid = cast(Any, s).id
+        student_name = f'{s.first_name} {s.last_name}'
+        student_comps = [c for c in existing if c.student_id == sid]
+        seed_key = f'overall:{sid}:{exam.id}'
+        suggested_overall = _overall_competency_comment(school, student_name, student_comps, seed_key)
+        existing_summary = existing_summaries.get(sid)
+        overall_payload[str(sid)] = {
+            'comment_text': (existing_summary.overall_comment if existing_summary else ''),
+            'comment_manual': bool(existing_summary.comment_manual) if existing_summary else False,
+            'suggested_comment': suggested_overall,
+        }
+
     return JsonResponse({
         'students': student_payload,
         'strands': payload_strands,
-        'levels': [{'value': v, 'label': l} for v, l in StudentCompetency.LEVEL_CHOICES],
-        'entries': {f'{sid}:{sub_id}': level for (sid, sub_id), level in competency_map.items()},
+        'levels': [{'value': v, 'label': l} for v, l in level_choices],
+        'entries': entries_payload,
+        'comment_variants': comment_variants,
+        'overall_comments': overall_payload,
     })
 
 
@@ -8944,7 +9196,7 @@ def save_competencies(request):
     if not exam:
         return JsonResponse({'success': False, 'error': 'Exam not found.'}, status=404)
 
-    valid_levels = {c[0] for c in StudentCompetency.LEVEL_CHOICES}
+    valid_levels = {c[0] for c in _competency_level_choices_for_school(school)}
     student_ids = set(Student.objects.filter(school=school, classroom=classroom).values_list('id', flat=True))
     sub_strands = SubStrand.objects.filter(
         learning_strand__school=school,
@@ -8960,6 +9212,8 @@ def save_competencies(request):
         except Exception:
             continue
         level = (entry.get('level') or '').strip()
+        comment_text = (entry.get('comment_text') or '').strip()
+        comment_manual = bool(entry.get('comment_manual'))
         if student_id not in student_ids:
             continue
         sub_strand = sub_strand_map.get(sub_strand_id)
@@ -8983,12 +9237,39 @@ def save_competencies(request):
             defaults={
                 'learning_strand': sub_strand.learning_strand,
                 'level': level,
+                'comment_text': comment_text,
+                'comment_manual': comment_manual,
                 'recorded_by': request.user,
             },
         )
         updates += 1
 
-    return JsonResponse({'success': True, 'updated': updates})
+    # Overall comments
+    overall_comments = data.get('overall_comments') or []
+    overall_updates = 0
+    for row in overall_comments:
+        try:
+            student_id = int(row.get('student_id'))
+        except Exception:
+            continue
+        if student_id not in student_ids:
+            continue
+        comment_text = (row.get('comment_text') or '').strip()
+        comment_manual = bool(row.get('comment_manual'))
+        if not comment_text:
+            StudentCompetencySummary.objects.filter(student_id=student_id, exam=exam).delete()
+            continue
+        StudentCompetencySummary.objects.update_or_create(
+            student_id=student_id,
+            exam=exam,
+            defaults={
+                'overall_comment': comment_text,
+                'comment_manual': comment_manual,
+            },
+        )
+        overall_updates += 1
+
+    return JsonResponse({'success': True, 'updated': updates, 'overall_updated': overall_updates})
 
 
 @login_required

@@ -595,15 +595,30 @@ class SubStrand(models.Model):
 
 
 class StudentCompetency(models.Model):
-    LEVEL_NOT_YET = 'NOT_YET'
-    LEVEL_DEVELOPING = 'DEVELOPING'
-    LEVEL_ACHIEVED = 'ACHIEVED'
-    LEVEL_EXCEEDS = 'EXCEEDS'
+    # CBC (Kenyan CBE) levels
+    LEVEL_CBC_EMERGING = 'CBC_EMERGING'
+    LEVEL_CBC_DEVELOPING = 'CBC_DEVELOPING'
+    LEVEL_CBC_APPROACHING = 'CBC_APPROACHING'
+    LEVEL_CBC_MEETING = 'CBC_MEETING'
+    LEVEL_CBC_EXCEEDING = 'CBC_EXCEEDING'
+    # Cambridge levels
+    LEVEL_CAM_BEGINNING = 'CAM_BEGINNING'
+    LEVEL_CAM_DEVELOPING = 'CAM_DEVELOPING'
+    LEVEL_CAM_SECURE = 'CAM_SECURE'
+    LEVEL_CAM_ADVANCED = 'CAM_ADVANCED'
+    LEVEL_CAM_MASTERY = 'CAM_MASTERY'
+
     LEVEL_CHOICES = (
-        (LEVEL_NOT_YET, 'Not Yet'),
-        (LEVEL_DEVELOPING, 'Developing'),
-        (LEVEL_ACHIEVED, 'Achieved'),
-        (LEVEL_EXCEEDS, 'Exceeds'),
+        (LEVEL_CBC_EMERGING, 'Emerging'),
+        (LEVEL_CBC_DEVELOPING, 'Developing'),
+        (LEVEL_CBC_APPROACHING, 'Approaching Expectation'),
+        (LEVEL_CBC_MEETING, 'Meeting Expectation'),
+        (LEVEL_CBC_EXCEEDING, 'Exceeding Expectation'),
+        (LEVEL_CAM_BEGINNING, 'Beginning'),
+        (LEVEL_CAM_DEVELOPING, 'Developing'),
+        (LEVEL_CAM_SECURE, 'Secure'),
+        (LEVEL_CAM_ADVANCED, 'Advanced'),
+        (LEVEL_CAM_MASTERY, 'Mastery'),
     )
 
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='competencies')
@@ -611,11 +626,24 @@ class StudentCompetency(models.Model):
     learning_strand = models.ForeignKey(LearningStrand, on_delete=models.CASCADE)
     sub_strand = models.ForeignKey(SubStrand, on_delete=models.CASCADE)
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES)
+    comment_text = models.TextField(blank=True, default='')
+    comment_manual = models.BooleanField(default=False)
     recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ('student', 'exam', 'sub_strand')
+
+
+class StudentCompetencySummary(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='competency_summaries')
+    exam = models.ForeignKey('Exam', on_delete=models.CASCADE, related_name='competency_summaries')
+    overall_comment = models.TextField(blank=True, default='')
+    comment_manual = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('student', 'exam')
 
 
 def _validate_pdf_size(file_obj):

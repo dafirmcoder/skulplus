@@ -38,6 +38,10 @@
   <div class="card" style="padding:16px">
     <div id="competencyTableWrap" style="overflow:auto"></div>
   </div>
+  <div class="card" style="padding:16px;margin-top:12px">
+    <h3 style="margin:0 0 8px">Overall Competency Comments</h3>
+    <div id="overallCommentsWrap"></div>
+  </div>
 
 <script>
 const loadBtn = document.getElementById('loadBtn');
@@ -45,6 +49,7 @@ const saveBtn = document.getElementById('saveBtn');
 const classSelect = document.getElementById('classSelect');
 const examSelect = document.getElementById('examSelect');
 const tableWrap = document.getElementById('competencyTableWrap');
+const overallWrap = document.getElementById('overallCommentsWrap');
 
 function csrfToken(){
   const el = document.querySelector('input[name=csrfmiddlewaretoken]');
@@ -56,6 +61,7 @@ function renderTable(payload){
   const strands = payload.strands || [];
   const levels = payload.levels || [];
   const entries = payload.entries || {};
+  const overallComments = payload.overall_comments || {};
 
   if (!students.length || !strands.length){
     tableWrap.innerHTML = '<div style="color:#64748b">No students or strands configured.</div>';
@@ -81,7 +87,10 @@ function renderTable(payload){
     strands.forEach(strand => {
       (strand.sub_strands || []).forEach(ss => {
         const key = `${stu.id}:${ss.id}`;
-        const current = entries[key] || '';
+        const entry = entries[key] || {};
+        const current = entry.level || '';
+        const commentText = entry.comment_text || entry.suggested_comment || '';
+        const suggested = entry.suggested_comment || '';
         let options = '<option value=""></option>';
         levels.forEach(l => {
           const sel = (l.value === current) ? 'selected' : '';
@@ -91,6 +100,7 @@ function renderTable(payload){
           <select data-student-id="${stu.id}" data-sub-strand-id="${ss.id}" style="width:100%;padding:6px;border:1px solid #e2e8f0;border-radius:6px">
             ${options}
           </select>
+          <textarea data-student-id="${stu.id}" data-sub-strand-id="${ss.id}" data-suggested="${suggested.replace(/"/g,'&quot;')}" rows="2" style="width:100%;margin-top:6px;padding:6px;border:1px solid #e2e8f0;border-radius:6px" placeholder="Comment">${commentText}</textarea>
         </td>`;
       });
     });
@@ -102,7 +112,38 @@ function renderTable(payload){
       <thead>${headerTop}${headerBottom}</thead>
       <tbody>${body}</tbody>
     </table>`;
+  renderOverall(overallComments, students);
+  wireManualFlags();
   saveBtn.disabled = false;
+}
+
+function renderOverall(overallComments, students){
+  if (!students.length){
+    overallWrap.innerHTML = '<div style="color:#64748b">No students loaded.</div>';
+    return;
+  }
+  let html = '';
+  students.forEach(stu => {
+    const entry = overallComments[String(stu.id)] || {};
+    const commentText = entry.comment_text || entry.suggested_comment || '';
+    const suggested = entry.suggested_comment || '';
+    html += `
+      <div style="margin-bottom:10px;">
+        <div style="font-weight:600;margin-bottom:4px;">${stu.name}</div>
+        <textarea data-overall-student-id="${stu.id}" data-suggested="${suggested.replace(/"/g,'&quot;')}" rows="3" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px" placeholder="Overall comment">${commentText}</textarea>
+      </div>
+    `;
+  });
+  overallWrap.innerHTML = html;
+}
+
+function wireManualFlags(){
+  tableWrap.querySelectorAll('textarea[data-student-id]').forEach(t => {
+    t.addEventListener('input', () => { t.dataset.manual = 'true'; });
+  });
+  overallWrap.querySelectorAll('textarea[data-overall-student-id]').forEach(t => {
+    t.addEventListener('input', () => { t.dataset.manual = 'true'; });
+  });
 }
 
 loadBtn.addEventListener('click', () => {
@@ -133,10 +174,28 @@ saveBtn.addEventListener('click', () => {
   }
   const entries = [];
   tableWrap.querySelectorAll('select[data-student-id]').forEach(sel => {
+    const textarea = tableWrap.querySelector(`textarea[data-student-id="${sel.dataset.studentId}"][data-sub-strand-id="${sel.dataset.subStrandId}"]`);
+    const suggested = (textarea && textarea.dataset.suggested) ? textarea.dataset.suggested : '';
+    const commentText = textarea ? textarea.value : '';
+    const manualFlag = textarea ? (textarea.dataset.manual === 'true' || commentText.trim() !== (suggested || '').trim()) : false;
     entries.push({
       student_id: sel.dataset.studentId,
       sub_strand_id: sel.dataset.subStrandId,
-      level: sel.value
+      level: sel.value,
+      comment_text: commentText,
+      comment_manual: manualFlag
+    });
+  });
+
+  const overall_comments = [];
+  overallWrap.querySelectorAll('textarea[data-overall-student-id]').forEach(t => {
+    const suggested = t.dataset.suggested || '';
+    const commentText = t.value || '';
+    const manualFlag = t.dataset.manual === 'true' || commentText.trim() !== suggested.trim();
+    overall_comments.push({
+      student_id: t.dataset.overallStudentId,
+      comment_text: commentText,
+      comment_manual: manualFlag
     });
   });
   fetch(`{% url 'save_competencies' %}`, {
@@ -145,7 +204,7 @@ saveBtn.addEventListener('click', () => {
       'Content-Type': 'application/json',
       'X-CSRFToken': csrfToken()
     },
-    body: JSON.stringify({ class_id: classId, exam_id: examId, entries })
+    body: JSON.stringify({ class_id: classId, exam_id: examId, entries, overall_comments })
   })
   .then(r => r.json())
   .then(data => {
