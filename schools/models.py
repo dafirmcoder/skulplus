@@ -48,6 +48,7 @@ class School(models.Model):
     address = models.TextField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
+    student_limit = models.PositiveIntegerField(default=0)
     logo = models.ImageField(upload_to='school_logos/', blank=True, null=True)
     stamp = models.ImageField(upload_to='school_stamps/', blank=True, null=True)
     head_signature = models.ImageField(upload_to='head_signatures/', blank=True, null=True)
@@ -140,6 +141,14 @@ class Pathway(models.Model):
 
     def __str__(self):
         return f"{self.code} - {self.name}"
+
+
+class SchoolTypePricing(models.Model):
+    school_type = models.CharField(max_length=20, choices=School.SCHOOL_TYPES, unique=True)
+    price_per_student = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"{self.get_school_type_display()} @ {self.price_per_student}"
 
 
 # 👨‍🏫 TEACHER MODEL
@@ -654,6 +663,14 @@ def _validate_pdf_size(file_obj):
         raise ValidationError('PDF must not exceed 5MB.')
 
 
+def _validate_resource_size(file_obj):
+    if not file_obj:
+        return
+    max_size = 10 * 1024 * 1024
+    if file_obj.size > max_size:
+        raise ValidationError('Resource file must not exceed 10MB.')
+
+
 class Assignment(models.Model):
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='assignments')
     classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, related_name='assignments')
@@ -679,5 +696,64 @@ class Assignment(models.Model):
         super().clean()
         if self.document and not self.document.name.lower().endswith('.pdf'):
             raise ValidationError({'document': 'Only PDF files are allowed.'})
+
+
+class LearningResource(models.Model):
+    CURRICULUM_CBE = 'CBE'
+    CURRICULUM_CAMBRIDGE = 'CAMBRIDGE'
+    CURRICULUM_CHOICES = (
+        (CURRICULUM_CBE, 'CBE'),
+        (CURRICULUM_CAMBRIDGE, 'Cambridge'),
+    )
+
+    RESOURCE_EXAM = 'EXAM'
+    RESOURCE_NOTES = 'NOTES'
+    RESOURCE_REVISION = 'REVISION'
+    RESOURCE_SCHEME = 'SCHEME'
+    RESOURCE_PAST_PAPER = 'PAST_PAPER'
+    RESOURCE_OTHER = 'OTHER'
+    RESOURCE_TYPE_CHOICES = (
+        (RESOURCE_EXAM, 'Exam'),
+        (RESOURCE_NOTES, 'Notes'),
+        (RESOURCE_REVISION, 'Revision'),
+        (RESOURCE_SCHEME, 'Scheme of Work'),
+        (RESOURCE_PAST_PAPER, 'Past Paper'),
+        (RESOURCE_OTHER, 'Other'),
+    )
+
+    curriculum = models.CharField(max_length=20, choices=CURRICULUM_CHOICES)
+    education_level = models.ForeignKey(EducationLevel, null=True, blank=True, on_delete=models.SET_NULL)
+    class_name = models.CharField(max_length=60, blank=True, default='')
+    subject_name = models.CharField(max_length=120, blank=True, default='')
+    resource_type = models.CharField(max_length=20, choices=RESOURCE_TYPE_CHOICES, default=RESOURCE_OTHER)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default='')
+    file = models.FileField(
+        upload_to='resources/',
+        validators=[FileExtensionValidator(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']), _validate_resource_size],
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['education_level__name', 'class_name', 'subject_name', 'title']
+
+    def __str__(self):
+        return f"{self.title} ({self.get_curriculum_display()})"
+
+    @staticmethod
+    def allowed_level_names(curriculum: str) -> list[str]:
+        if curriculum == LearningResource.CURRICULUM_CBE:
+            return ['Pre School', 'Lower Primary', 'Upper Primary', 'Junior', 'Senior']
+        if curriculum == LearningResource.CURRICULUM_CAMBRIDGE:
+            return ['Kindergarten', 'Lower Secondary', 'Upper Secondary (IGCSE)', 'A Level']
+        return []
+
+    def clean(self):
+        super().clean()
+        if self.education_level_id:
+            allowed = self.allowed_level_names(self.curriculum)
+            if allowed and self.education_level and self.education_level.name not in allowed:
+                raise ValidationError({'education_level': 'Selected education level is not valid for this curriculum.'})
 
 

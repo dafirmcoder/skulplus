@@ -1,312 +1,363 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>SkulPlus - The Smart Way to Run Your School</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% if SITE_FAVICON_URL %}
-    <link rel="icon" type="image/x-icon" href="{{ SITE_FAVICON_URL }}">
-    {% else %}
-    <link rel="icon" type="image/png" href="{% static 'images/skulplus_logo.png' %}">
-    {% endif %}
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/landing_auth_modal.css' %}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <script defer src="{% static 'js/newlogin.js' %}"></script>
+  <meta charset="UTF-8">
+  <title>SkulPlus - The Smart Way to Run Your School</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {% if SITE_FAVICON_URL %}
+  <link rel="icon" type="image/x-icon" href="{{ SITE_FAVICON_URL }}">
+  {% else %}
+  <link rel="icon" type="image/png" href="{% static 'images/skulplus_logo.png' %}">
+  {% endif %}
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/landing_auth_modal.css' %}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script defer src="{% static 'js/newlogin.js' %}"></script>
+  {{ pricing_map|json_script:"pricing-data" }}
 
-    <style>
-        body { margin:0; font-family:'Poppins', sans-serif; background:#f8fafc; color:#333; }
-        header {
-            display:flex; justify-content:space-between; align-items:center;
-            padding:20px 60px; background:white; box-shadow:0 2px 10px rgba(0,0,0,0.05);
-        }
-        header h1 { color:#1a73e8; margin:0; }
-        .nav-buttons a {
-            margin-left:15px; padding:10px 18px; text-decoration:none;
-            border-radius:6px; font-weight:600;
-        }
-        .login-btn-landing { color:#1a73e8; border:2px solid #1a73e8; }
-        .signup-btn-landing { background:#1a73e8; color:white; }
-
-        .hero {
-            padding:90px 60px; display:flex; justify-content:space-between;
-            align-items:center; background:linear-gradient(120deg,#1a73e8,#4c51bf); color:white;
-        }
-        .hero-text { max-width:550px; }
-        .hero h2 { font-size:44px; margin-bottom:20px; }
-        .hero p { font-size:18px; margin-bottom:30px; line-height:1.6; }
-        .hero-buttons a {
-            padding:14px 24px; border-radius:6px; text-decoration:none; font-weight:600;
-            margin-right:15px;
-        }
-        .btn-primary { background:white; color:#1a73e8; }
-        .btn-outline { border:2px solid white; color:white; }
-
-        .section { padding:80px 60px; text-align:center; }
-        .section h2 { font-size:32px; margin-bottom:10px; }
-        .section p.subtitle { color:#666; margin-bottom:40px; }
-
-        .features {
-            display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
-            gap:30px; margin-top:40px;
-        }
-        .feature-card {
-            background:white; padding:30px; border-radius:10px;
-            box-shadow:0 6px 20px rgba(0,0,0,0.05);
-        }
-        .feature-card h3 { color:#1a73e8; margin-bottom:10px; }
-
-        .benefits { background:#edf2f7; padding:70px 60px; }
-        .benefits ul { max-width:800px; margin:auto; text-align:left; line-height:1.8; }
-
-        .cta {
-            background:#1a73e8; color:white; text-align:center;
-            padding:80px 20px;
-        }
-        .cta h2 { font-size:34px; margin-bottom:20px; }
-        .cta a {
-            background:white; color:#1a73e8; padding:14px 28px;
-            border-radius:6px; font-weight:600; text-decoration:none;
-        }
-
-        footer {
-            background:#2d3748; color:white; text-align:center;
-            padding:30px 20px;
-        }
-    </style>
+  <style>
+    :root{
+      --ink:#0f3057;--sea:#0ea5e9;--mint:#16a34a;--sun:#f59e0b;--rose:#dc2626;
+      --paper:#f4f7fb;--border:#e2e8f0;--shadow:0 18px 40px rgba(15,48,87,.12);
+    }
+    body{margin:0;font-family:'Inter',sans-serif;background:radial-gradient(1100px 300px at 20% -10%, #d9f2ff, transparent 70%), var(--paper);color:#0f172a;}
+    .nav{position:sticky;top:0;background:#fff;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:16px 40px;box-shadow:0 4px 20px rgba(15,48,87,.08);} 
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--ink);text-decoration:none;}
+    .nav a{color:#0f3057;text-decoration:none;font-weight:600;margin-left:18px;}
+    .nav .cta{background:linear-gradient(135deg,var(--mint),#22c55e);color:#fff;padding:8px 14px;border-radius:10px;}
+    .hero{padding:80px 40px;display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center;max-width:1200px;margin:0 auto;}
+    .hero h1{font-family:'Playfair Display',serif;font-size:44px;margin:0 0 12px;color:var(--ink);} 
+    .hero p{font-size:16px;line-height:1.7;color:#334155;}
+    .hero-card{background:linear-gradient(135deg,#0f3057,#2563eb);color:#fff;border-radius:18px;padding:24px;box-shadow:var(--shadow);} 
+    .btn-primary{background:linear-gradient(135deg,var(--mint),#22c55e);color:#fff;padding:12px 18px;border-radius:10px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;}
+    .btn-outline{border:2px solid var(--ink);color:var(--ink);padding:10px 16px;border-radius:10px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;}
+    .section{max-width:1200px;margin:0 auto;padding:0 40px 70px;}
+    .muted{color:#64748b;}
+    .section h2{font-family:'Playfair Display',serif;color:var(--ink);margin:0 0 10px;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;}
+    .card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 8px 22px rgba(15,48,87,.08);} 
+    .chip{display:inline-flex;align-items:center;gap:6px;background:#e0f2fe;color:#075985;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;}
+    .logos{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;align-items:center;}
+    .logo-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;text-align:center;box-shadow:0 6px 18px rgba(15,48,87,.08);} 
+    .logo-card img{max-height:60px;max-width:120px;object-fit:contain;display:block;margin:0 auto 8px;}
+    .calc{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
+    input, select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;}
+    footer{background:#0f3057;color:#fff;text-align:center;padding:24px;}
+    @media(max-width:900px){.hero{grid-template-columns:1fr;}}
+  </style>
 </head>
 <body>
+  <nav class="nav">
+    <a class="brand" href="{% url 'landing' %}">
+      {% if SITE_LOGO_URL %}
+      <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="SkulPlus" style="height:34px;border-radius:8px;background:#fff;padding:4px;">
+      {% else %}
+      <img src="{% static 'images/skulplus_logo.png' %}" alt="SkulPlus" style="height:34px;border-radius:8px;background:#fff;padding:4px;">
+      {% endif %}
+      <span>SkulPlus</span>
+    </a>
+    <div>
+      <a href="{% url 'feature_academics' %}">Academics</a>
+      <a href="{% url 'feature_finance' %}">Finance</a>
+      <a href="{% url 'feature_payroll' %}">Payroll</a>
+      <a href="{% url 'feature_parents' %}">Parent Portal</a>
+      <a href="{% url 'resources_select' %}">Resources</a>
+      <a href="#pricing">Pricing</a>
+      {% if user.is_authenticated %}
+        <a class="cta" href="{% url 'post_login' %}">Dashboard</a>
+      {% else %}
+        <a class="cta" href="{% url 'login' %}" data-open-auth="login">Login</a>
+      {% endif %}
+    </div>
+  </nav>
 
-<header>
-    <h1 style="display:flex;align-items:center;gap:10px;">
-        {% if SITE_LOGO_URL %}
-        <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="SkulPlus logo" style="height:40px;border-radius:8px;background:#fff;padding:4px;">
-        {% else %}
-        <img src="{% static 'images/skulplus_logo.png' %}" alt="SkulPlus logo" style="height:40px;border-radius:8px;background:#fff;padding:4px;">
-        {% endif %}
-        <span>SkulPlus</span>
-    </h1>
-    <div class="nav-buttons">
+  <section class="hero">
+    <div>
+      <span class="chip"><i class="fas fa-rocket"></i> School Operating System</span>
+      <h1>Run Your Entire School From One Smart Platform</h1>
+      <p>SkulPlus brings academics, finance, payroll, and parent communication together. Manage students, track performance, and scale with confidence.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
         {% if user.is_authenticated %}
-            <a href="{% url 'post_login' %}" class="signup-btn-landing">Open Dashboard</a>
+          <a href="{% url 'post_login' %}" class="btn-primary">Open Dashboard</a>
         {% else %}
-            <a href="{% url 'login' %}" class="login-btn-landing" data-open-auth="login">Login</a>
-            <a href="{% url 'signup' %}" class="signup-btn-landing" data-open-auth="signup">Get Started</a>
+          <a href="{% url 'signup' %}" class="btn-primary" data-open-auth="signup">Start Free Setup</a>
+          <a href="#pricing" class="btn-outline">Pricing Calculator</a>
         {% endif %}
+      </div>
     </div>
-</header>
-
-<section class="hero">
-    <div class="hero-text">
-        <h2>Run Your Entire School From One Smart Platform</h2>
-        <p>
-            SkulPlus helps schools manage students, fees, exams, payroll and parent communication - all in one secure cloud system.
-        </p>
-        <div class="hero-buttons">
-            {% if user.is_authenticated %}
-                <a href="{% url 'post_login' %}" class="btn-primary">Go to Dashboard</a>
-            {% else %}
-                <a href="{% url 'signup' %}" class="btn-primary" data-open-auth="signup">Start Free Setup</a>
-                <a href="{% url 'login' %}" class="btn-outline" data-open-auth="login">Login</a>
-            {% endif %}
-        </div>
+    <div class="hero-card">
+      <h3 style="margin-top:0;">What you get</h3>
+      <ul style="line-height:1.8;padding-left:18px;">
+        <li>Marks, report cards, and CBC competencies</li>
+        <li>Fees collection and bursar workflows</li>
+        <li>Payroll and staff management</li>
+        <li>Parent portal and announcements</li>
+      </ul>
     </div>
-    {% if SITE_LOGO_URL %}
-    <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" width="260" alt="SkulPlus logo">
-    {% else %}
-    <img src="{% static 'images/skulplus_logo.png' %}" width="260" alt="SkulPlus logo">
-    {% endif %}
-</section>
+  </section>
 
-<section class="section">
-    <h2>Everything Your School Needs</h2>
-    <p class="subtitle">No more paperwork. No more spreadsheets. Just one powerful system.</p>
-    <div class="features">
-        <div class="feature-card">
-            <h3>Academic Management</h3>
-            <p>Record marks, generate report cards, rank students and analyze subject performance.</p>
-        </div>
-        <div class="feature-card">
-            <h3>Fees and Billing</h3>
-            <p>Track payments, balances, receipts and send automatic SMS fee reminders.</p>
-        </div>
-        <div class="feature-card">
-            <h3>Staff and Payroll</h3>
-            <p>Manage teachers, salaries and generate professional payslips instantly.</p>
-        </div>
-        <div class="feature-card">
-            <h3>Parent Communication</h3>
-            <p>Announcements, performance reports and fee updates through the parent portal.</p>
-        </div>
+  <section class="section">
+    <h2>System Functionality</h2>
+    <p class="muted">Explore how each module helps your school.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>Academics</h3>
+        <p>Exam setup, grading, report cards, and CBC competencies.</p>
+        <a href="{% url 'feature_academics' %}">View details</a>
+      </div>
+      <div class="card">
+        <h3>Finance</h3>
+        <p>Fee structures, payment tracking, balances, and reports.</p>
+        <a href="{% url 'feature_finance' %}">View details</a>
+      </div>
+      <div class="card">
+        <h3>Payroll</h3>
+        <p>Staff records, payroll management, and payslips.</p>
+        <a href="{% url 'feature_payroll' %}">View details</a>
+      </div>
+      <div class="card">
+        <h3>Parent Portal</h3>
+        <p>Announcements, academic history, fees, and calendars.</p>
+        <a href="{% url 'feature_parents' %}">View details</a>
+      </div>
     </div>
-</section>
+  </section>
 
-<section class="benefits">
-    <h2 style="text-align:center;">Why Schools Love SkulPlus</h2>
-    <ul>
-        <li>Saves administrators hours of manual work</li>
-        <li>Improves transparency with parents</li>
-        <li>Boosts academic performance tracking</li>
-        <li>Secure cloud access from anywhere</li>
-        <li>Built for Cambridge and CBE schools</li>
-    </ul>
-</section>
-
-<section class="cta">
-    <h2>Ready to Transform Your School?</h2>
-    <p>Set up your school in minutes and start managing smarter today.</p>
-    <br>
-    {% if user.is_authenticated %}
-        <a href="{% url 'post_login' %}">Open Your Dashboard</a>
-    {% else %}
-        <a href="{% url 'signup' %}" data-open-auth="signup">Create Your School Account</a>
-    {% endif %}
-</section>
-
-{% if not user.is_authenticated %}
-<div class="auth-modal-overlay{% if open_auth_modal %} open{% endif %}" id="authModal" aria-hidden="{% if open_auth_modal %}false{% else %}true{% endif %}">
-    <div class="auth-modal-backdrop" data-close-auth></div>
-    <div class="auth-modal-dialog" role="dialog" aria-modal="true" aria-label="Login or register">
-        <button type="button" class="auth-modal-close" data-close-auth aria-label="Close">&times;</button>
-        <div class="container auth-modal-container {% if open_auth_modal == 'signup' %}active{% endif %}" id="container">
-            <div class="form-box login">
-                <form method="post" action="{% url 'login' %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="form_type" value="login">
-                    <h1>Welcome Back</h1>
-                    <p>Login to continue to SkulPlus</p>
-
-                    {% if form.non_field_errors %}
-                        <div class="form-errors">
-                            {% for err in form.non_field_errors %}
-                                <div class="error">{{ err }}</div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-
-                    <div class="input-box has-icon">
-                        <div class="input-shell">
-                            {{ form.username }}
-                            <i class="fa-solid fa-user field-icon" aria-hidden="true"></i>
-                        </div>
-                        {% for err in form.username.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-
-                    <div class="input-box has-icon password-field">
-                        <div class="input-shell">
-                            {{ form.password }}
-                            <i class="fa-solid fa-lock field-icon" aria-hidden="true"></i>
-                            <button type="button"
-                                    class="toggle-password"
-                                    data-target="{{ form.password.id_for_label }}"
-                                    aria-label="Show password"
-                                    aria-pressed="false">
-                                <i class="fa-solid fa-eye"></i>
-                            </button>
-                        </div>
-                        {% for err in form.password.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-
-                    <button type="submit" class="btn">Login</button>
-
-                    <div class="switch-action">
-                        <span>Need an account?</span>
-                        <button type="button" class="switch-link register-btn">Create account</button>
-                    </div>
-                </form>
-            </div>
-
-            <div class="form-box register">
-                <form method="post" action="{% url 'login' %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="form_type" value="signup">
-                    <h1>Registration</h1>
-
-                    {% if signup_form.non_field_errors %}
-                        <div class="form-errors">
-                            {% for err in signup_form.non_field_errors %}
-                                <div class="error">{{ err }}</div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-
-                    <div class="input-box">
-                        {{ signup_form.school_name.label_tag }}
-                        {{ signup_form.school_name }}
-                        {% for err in signup_form.school_name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-                    <div class="input-box">
-                        {{ signup_form.school_type.label_tag }}
-                        {{ signup_form.school_type }}
-                        {% for err in signup_form.school_type.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-                    <div class="input-box">
-                        {{ signup_form.school_category.label_tag }}
-                        {{ signup_form.school_category }}
-                        {% for err in signup_form.school_category.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-                    <div class="input-box">
-                        {{ signup_form.address.label_tag }}
-                        {{ signup_form.address }}
-                        {% for err in signup_form.address.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-                    <div class="input-box">
-                        {{ signup_form.school_email.label_tag }}
-                        {{ signup_form.school_email }}
-                        {% for err in signup_form.school_email.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-                    <div class="input-box">
-                        {{ signup_form.phone.label_tag }}
-                        {{ signup_form.phone }}
-                        {% for err in signup_form.phone.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-                    <div class="input-box">
-                        {{ signup_form.head_full_name.label_tag }}
-                        {{ signup_form.head_full_name }}
-                        {% for err in signup_form.head_full_name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-                    <div class="input-box">
-                        {{ signup_form.head_email.label_tag }}
-                        {{ signup_form.head_email }}
-                        {% for err in signup_form.head_email.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-                    <div class="input-box password-field">
-                        {{ signup_form.head_password.label_tag }}
-                        <div class="input-shell">
-                            {{ signup_form.head_password }}
-                            <button type="button"
-                                    class="toggle-password"
-                                    data-target="{{ signup_form.head_password.id_for_label }}"
-                                    aria-label="Show password"
-                                    aria-pressed="false">
-                                <i class="fa-solid fa-eye"></i>
-                            </button>
-                        </div>
-                        {% for err in signup_form.head_password.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-                    <div class="input-box">
-                        {{ signup_form.head_phone.label_tag }}
-                        {{ signup_form.head_phone }}
-                        {% for err in signup_form.head_phone.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
-                    </div>
-
-                    <button type="submit" class="btn">Register</button>
-
-                    <div class="switch-action full-width">
-                        <span>Already onboard?</span>
-                        <button type="button" class="switch-link login-btn">Back to login</button>
-                    </div>
-                </form>
-            </div>
+  <section class="section">
+    <h2>Our Trusted Clients</h2>
+    <p class="muted">Schools already growing with SkulPlus.</p>
+    <div class="logos">
+      {% for client in trusted_clients %}
+        <div class="logo-card">
+          {% if client.logo %}
+            <img src="{{ client.logo.url }}" alt="{{ client.name }} logo">
+          {% endif %}
+          <strong>{{ client.name }}</strong>
         </div>
+      {% empty %}
+        <div class="card">No client logos available yet.</div>
+      {% endfor %}
     </div>
-</div>
-{% endif %}
+  </section>
 
-<footer>
-    <p>&copy; 2026 SkulPlus School Management System</p>
-</footer>
+  <section class="section" id="pricing">
+    <h2>Billing Calculator</h2>
+    <p class="muted">Estimate monthly billing by student count.</p>
+    <div class="card">
+      <div class="calc">
+        <div>
+          <label>School Type</label>
+          <select id="calcType">
+            <option value="CAMBRIDGE">Cambridge</option>
+            <option value="CBE">CBE</option>
+          </select>
+        </div>
+        <div>
+          <label>Student Count</label>
+          <input type="number" id="calcCount" min="1" value="100">
+        </div>
+        <div>
+          <label>Price per Student</label>
+          <input type="text" id="calcPrice" readonly>
+        </div>
+        <div>
+          <label>Total</label>
+          <input type="text" id="calcTotal" readonly>
+        </div>
+      </div>
+      <div class="muted" style="margin-top:8px;">Limits are enforced by your selected student count. You can upgrade in admin later.</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="card" style="text-align:center;">
+      <h2 style="margin:0 0 8px;">Ready to Transform Your School?</h2>
+      <p>Set up your school in minutes and start managing smarter today.</p>
+      <div style="margin-top:10px;">
+        {% if user.is_authenticated %}
+          <a href="{% url 'post_login' %}" class="btn-primary">Open Dashboard</a>
+        {% else %}
+          <a href="{% url 'signup' %}" class="btn-primary" data-open-auth="signup">Create Your School Account</a>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  {% if not user.is_authenticated %}
+  <div class="auth-modal-overlay{% if open_auth_modal %} open{% endif %}" id="authModal" aria-hidden="{% if open_auth_modal %}false{% else %}true{% endif %}">
+      <div class="auth-modal-backdrop" data-close-auth></div>
+      <div class="auth-modal-dialog" role="dialog" aria-modal="true" aria-label="Login or register">
+          <button type="button" class="auth-modal-close" data-close-auth aria-label="Close">&times;</button>
+          <div class="container auth-modal-container {% if open_auth_modal == 'signup' %}active{% endif %}" id="container">
+              <div class="form-box login">
+                  <form method="post" action="{% url 'login' %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="form_type" value="login">
+                      <h1>Welcome Back</h1>
+                      <p>Login to continue to SkulPlus</p>
+
+                      {% if form.non_field_errors %}
+                          <div class="form-errors">
+                              {% for err in form.non_field_errors %}
+                                  <div class="error">{{ err }}</div>
+                              {% endfor %}
+                          </div>
+                      {% endif %}
+
+                      <div class="input-box has-icon">
+                          <div class="input-shell">
+                              {{ form.username }}
+                              <i class="fa-solid fa-user field-icon" aria-hidden="true"></i>
+                          </div>
+                          {% for err in form.username.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+
+                      <div class="input-box has-icon password-field">
+                          <div class="input-shell">
+                              {{ form.password }}
+                              <i class="fa-solid fa-lock field-icon" aria-hidden="true"></i>
+                              <button type="button"
+                                      class="toggle-password"
+                                      data-target="{{ form.password.id_for_label }}"
+                                      aria-label="Show password"
+                                      aria-pressed="false">
+                                  <i class="fa-solid fa-eye"></i>
+                              </button>
+                          </div>
+                          {% for err in form.password.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+
+                      <button type="submit" class="btn">Login</button>
+
+                      <div class="switch-action">
+                          <span>Need an account?</span>
+                          <button type="button" class="switch-link register-btn">Create account</button>
+                      </div>
+                  </form>
+              </div>
+
+              <div class="form-box register">
+                  <form method="post" action="{% url 'login' %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="form_type" value="signup">
+                      <h1>Registration</h1>
+
+                      {% if signup_form.non_field_errors %}
+                          <div class="form-errors">
+                              {% for err in signup_form.non_field_errors %}
+                                  <div class="error">{{ err }}</div>
+                              {% endfor %}
+                          </div>
+                      {% endif %}
+
+                      <div class="input-box">
+                          {{ signup_form.school_name.label_tag }}
+                          {{ signup_form.school_name }}
+                          {% for err in signup_form.school_name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+                      <div class="input-box">
+                          {{ signup_form.school_type.label_tag }}
+                          {{ signup_form.school_type }}
+                          {% for err in signup_form.school_type.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+                      <div class="input-box">
+                          {{ signup_form.school_category.label_tag }}
+                          {{ signup_form.school_category }}
+                          {% for err in signup_form.school_category.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+                      <div class="input-box">
+                          {{ signup_form.student_limit.label_tag }}
+                          {{ signup_form.student_limit }}
+                          {% for err in signup_form.student_limit.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+                      <div class="input-box">
+                          {{ signup_form.address.label_tag }}
+                          {{ signup_form.address }}
+                          {% for err in signup_form.address.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+                      <div class="input-box">
+                          {{ signup_form.school_email.label_tag }}
+                          {{ signup_form.school_email }}
+                          {% for err in signup_form.school_email.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+                      <div class="input-box">
+                          {{ signup_form.phone.label_tag }}
+                          {{ signup_form.phone }}
+                          {% for err in signup_form.phone.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+                      <div class="input-box">
+                          {{ signup_form.head_full_name.label_tag }}
+                          {{ signup_form.head_full_name }}
+                          {% for err in signup_form.head_full_name.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+                      <div class="input-box">
+                          {{ signup_form.head_email.label_tag }}
+                          {{ signup_form.head_email }}
+                          {% for err in signup_form.head_email.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+                      <div class="input-box password-field">
+                          {{ signup_form.head_password.label_tag }}
+                          <div class="input-shell">
+                              {{ signup_form.head_password }}
+                              <button type="button"
+                                      class="toggle-password"
+                                      data-target="{{ signup_form.head_password.id_for_label }}"
+                                      aria-label="Show password"
+                                      aria-pressed="false">
+                                  <i class="fa-solid fa-eye"></i>
+                              </button>
+                          </div>
+                          {% for err in signup_form.head_password.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+                      <div class="input-box">
+                          {{ signup_form.head_phone.label_tag }}
+                          {{ signup_form.head_phone }}
+                          {% for err in signup_form.head_phone.errors %}<div class="field-error">{{ err }}</div>{% endfor %}
+                      </div>
+
+                      <button type="submit" class="btn">Register</button>
+
+                      <div class="switch-action full-width">
+                          <span>Already onboard?</span>
+                          <button type="button" class="switch-link login-btn">Back to login</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      </div>
+  </div>
+  {% endif %}
+
+  <footer>
+      <p>&copy; 2026 SkulPlus School Management System</p>
+  </footer>
+
+<script>
+  const pricingData = JSON.parse(document.getElementById('pricing-data').textContent || '{}');
+  const calcType = document.getElementById('calcType');
+  const calcCount = document.getElementById('calcCount');
+  const calcPrice = document.getElementById('calcPrice');
+  const calcTotal = document.getElementById('calcTotal');
+
+  function updateCalculator(){
+    const type = calcType.value || 'CBE';
+    const price = pricingData[type] ? Number(pricingData[type]) : 0;
+    const count = Number(calcCount.value || 0);
+    calcPrice.value = price ? price.toFixed(2) : '0.00';
+    calcTotal.value = (price * count).toFixed(2);
+    const signupLimit = document.getElementById('id_student_limit');
+    if (signupLimit && count > 0){
+      signupLimit.value = count;
+    }
+  }
+
+  if (calcType && calcCount){
+    calcType.addEventListener('change', updateCalculator);
+    calcCount.addEventListener('input', updateCalculator);
+    updateCalculator();
+  }
+</script>
 
 </body>
 </html>

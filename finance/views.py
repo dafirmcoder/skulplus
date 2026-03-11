@@ -547,7 +547,7 @@ def balance_report(request):
         report_data.append({
             'student': student,
             'admission_number': student.admission_number or '-',
-            'school': student.school.name,
+            'school': school.name,
             'classroom': student.classroom.name if student.classroom else 'N/A',
             'due': meta['due_total'],
             'paid': meta['paid_total'],
@@ -1363,17 +1363,17 @@ def fee_receipt(request, payment_id):
 
         # Header
         logo_size = 54
-        if student.school.logo:
+        if school.logo:
             try:
-                p.drawImage(ImageReader(student.school.logo.path), margin, y - logo_size, width=logo_size, height=logo_size, preserveAspectRatio=True, mask='auto')
+                p.drawImage(ImageReader(school.logo.path), margin, y - logo_size, width=logo_size, height=logo_size, preserveAspectRatio=True, mask='auto')
             except Exception:
                 pass
         p.setFont('Helvetica-Bold', 16)
         p.setFillColor(colors.HexColor('#0f3057'))
-        p.drawString(margin + 64, y - 10, student.school.name or 'School')
+        p.drawString(margin + 64, y - 10, school.name or 'School')
         p.setFont('Helvetica', 10)
         p.setFillColor(colors.HexColor('#374151'))
-        school_line = ' | '.join([v for v in [student.school.address, student.school.phone, student.school.email] if v])
+        school_line = ' | '.join([v for v in [school.address, school.phone, school.email] if v])
         if school_line:
             p.drawString(margin + 64, y - 24, school_line[:120])
         p.setFont('Helvetica-Bold', 11)
@@ -1494,10 +1494,10 @@ def fee_receipt(request, payment_id):
         p.drawString(margin + box_w + gap + 10, y - 20, f'Prepared by {request.user.get_full_name() or request.user.username}')
         p.drawString(margin + box_w + gap + 10, y - 36, 'Accounts Office')
         p.drawString(margin + box_w + gap + 10, y - 52, 'Thank you.')
-        if student.school.stamp:
+        if school.stamp:
             try:
                 p.drawImage(
-                    ImageReader(student.school.stamp.path),
+                    ImageReader(school.stamp.path),
                     page_w - margin - 76,
                     y - 70,
                     width=64,
@@ -1518,6 +1518,7 @@ def fee_receipt(request, payment_id):
         'allocations': allocations,
         'balance_before': balance_before,
         'balance_after': balance_after,
+        'school': school,
     }
     return render(request, 'finance/fee_receipt.html', context)
 

@@ -34,6 +34,12 @@ urlpatterns = [
     path('login/', schools_views.login_view, name='login'),
     path('signup/', schools_views.signup_modal_redirect, name='signup'),
     path('post-login/', schools_views.post_login_redirect, name='post_login'),
+    path('features/academics/', schools_views.features_academics, name='feature_academics'),
+    path('features/finance/', schools_views.features_finance, name='feature_finance'),
+    path('features/payroll/', schools_views.features_payroll, name='feature_payroll'),
+    path('features/parents/', schools_views.features_parents, name='feature_parents'),
+    path('resources/', schools_views.resources_select, name='resources_select'),
+    path('resources/<str:curriculum>/', schools_views.resources, name='resources'),
     path('', schools_views.landing, name='landing'),
 
    

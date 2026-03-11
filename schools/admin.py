@@ -4,7 +4,7 @@ from .models import (
     Teacher, HeadTeacher, Announcement,
     GradeScale, ExamResult, MarkSheet,
     StudentMark, CompetencyComment, EducationLevel,
-    Pathway, PromotionLog, StreamClassTeacher, TermDate
+    Pathway, PromotionLog, StreamClassTeacher, TermDate, SchoolTypePricing, LearningResource
 )
 from .models import SiteConfig
 from .models import Exam
@@ -20,7 +20,7 @@ def get_user_school(user):
 # 🏫 SCHOOL ADMIN
 @admin.register(School)
 class SchoolAdmin(admin.ModelAdmin):
-    list_display = ('name', 'school_type', 'system_type', 'school_category', 'phone', 'email')
+    list_display = ('name', 'school_type', 'system_type', 'school_category', 'student_limit', 'phone', 'email')
 
 
 # 📘 SUBJECT ADMIN
@@ -280,5 +280,17 @@ class SiteConfigAdmin(admin.ModelAdmin):
 class SchoolUserAccessAdmin(admin.ModelAdmin):
     list_display = ('user', 'school', 'role', 'is_active', 'updated_at')
     list_filter = ('school', 'role', 'is_active')
+
+
+@admin.register(SchoolTypePricing)
+class SchoolTypePricingAdmin(admin.ModelAdmin):
+    list_display = ('school_type', 'price_per_student')
+
+
+@admin.register(LearningResource)
+class LearningResourceAdmin(admin.ModelAdmin):
+    list_display = ('title', 'curriculum', 'resource_type', 'education_level', 'class_name', 'subject_name', 'is_active', 'created_at')
+    list_filter = ('curriculum', 'resource_type', 'education_level', 'is_active')
+    search_fields = ('title', 'description', 'class_name', 'subject_name')
 
 

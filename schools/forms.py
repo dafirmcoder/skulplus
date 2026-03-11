@@ -24,6 +24,7 @@ class SchoolRegistrationForm(forms.Form):
     address = forms.CharField(widget=forms.Textarea, required=False)
     phone = forms.CharField(max_length=50, required=False)
     school_email = forms.EmailField(required=True)
+    student_limit = forms.IntegerField(min_value=1, label='Student Limit')
 
     # Headteacher fields
     head_full_name = forms.CharField(max_length=255, label='Headteacher Full Name')
@@ -80,6 +81,7 @@ class SchoolSignupForm(forms.Form):
     school_category = forms.ChoiceField(choices=School.SCHOOL_CATEGORY_CHOICES, label='School Category')
     school_email = forms.EmailField()
     phone = forms.CharField(max_length=50)
+    student_limit = forms.IntegerField(min_value=1)
 
     # Headteacher
     head_full_name = forms.CharField(max_length=200)
@@ -143,6 +145,7 @@ class StudentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         school = kwargs.pop('school', None)
         super().__init__(*args, **kwargs)
+        self.school = school
 
         if school and 'classroom' in self.fields:
             self.fields['classroom'].queryset = ClassRoom.objects.filter(school=school).order_by('name')
@@ -179,6 +182,19 @@ class StudentForm(forms.ModelForm):
             admission = (self.instance.admission_number or '').strip()
             first_name = (self.instance.first_name or '').strip()
         self.fields['parent_login_password'].initial = f'{admission}{first_name}'
+
+    def clean(self):
+        cleaned = super().clean()
+        school = getattr(self, 'school', None)
+        if school and not getattr(self.instance, 'pk', None):
+            limit = getattr(school, 'student_limit', 0) or 0
+            if limit > 0:
+                current_count = Student.objects.filter(school=school).count()
+                if current_count >= limit:
+                    raise forms.ValidationError(
+                        f"Student limit reached ({limit}). Please upgrade your plan."
+                    )
+        return cleaned
 
     def clean_stream(self):
         stream = self.cleaned_data.get('stream')

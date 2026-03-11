@@ -43,16 +43,16 @@
 <section class="receipt-wrap" id="receipt-print-root">
   <div class="receipt-top">
     <div class="header-left">
-      {% if student.school.logo %}
-        <img src="{{ student.school.logo.url }}" alt="{{ student.school.name }} logo" class="school-logo" />
+      {% if school.logo %}
+        <img src="{{ school.logo.url }}" alt="{{ school.name }} logo" class="school-logo" />
       {% endif %}
       <div>
-        <h3 style="margin:0;color:#0f3057;">{{ student.school.name }}</h3>
+        <h3 style="margin:0;color:#0f3057;">{{ school.name }}</h3>
         <div class="muted">Official Fee Receipt</div>
         <div class="muted">
-          {% if student.school.address %}{{ student.school.address }}{% endif %}
-          {% if student.school.phone %}{% if student.school.address %} | {% endif %}{{ student.school.phone }}{% endif %}
-          {% if student.school.email %} | {{ student.school.email }}{% endif %}
+          {% if school.address %}{{ school.address }}{% endif %}
+          {% if school.phone %}{% if school.address %} | {% endif %}{{ school.phone }}{% endif %}
+          {% if school.email %} | {{ school.email }}{% endif %}
         </div>
       </div>
     </div>
@@ -114,8 +114,8 @@
           <div class="muted">Prepared by {{ request.user.get_full_name|default:request.user.username }}</div>
           <div class="muted">Accounts Office</div>
         </div>
-        {% if student.school.stamp %}
-          <img src="{{ student.school.stamp.url }}" alt="{{ student.school.name }} stamp" class="school-stamp" />
+        {% if school.stamp %}
+          <img src="{{ school.stamp.url }}" alt="{{ school.name }} stamp" class="school-stamp" />
         {% endif %}
       </div>
       <div class="muted">Thank you.</div>

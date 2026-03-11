@@ -96,11 +96,21 @@ def export_merit_list_pdf(request):
     width, height = A4
     y = height - 40
     p.setFont("Helvetica-Bold", 16)
+    p.drawString(40, y, school.name or "School")
+    y -= 16
+    p.setFont("Helvetica", 9)
+    school_line = ' | '.join([v for v in [school.address, school.phone, school.email] if v])
+    if school_line:
+        p.drawString(40, y, school_line[:120])
+        y -= 14
+    else:
+        y -= 6
+    p.setFont("Helvetica-Bold", 12)
     p.drawString(40, y, f"Merit List: {classroom.name} - {exam.title}")
-    y -= 30
-    p.setFont("Helvetica", 10)
-    p.drawString(40, y, f"Generated: {term or ''}")
-    y -= 30
+    y -= 18
+    p.setFont("Helvetica", 9)
+    p.drawString(40, y, f"Generated: {term or ''}".strip() or "Generated")
+    y -= 20
     p.setFont("Helvetica-Bold", 11)
     p.drawString(40, y, "Pos")
     p.drawString(70, y, "Adm")
@@ -174,7 +184,7 @@ from finance.models import FeePayment as Payment, FeeStructure
 from payroll.models import Staff
 from schools.models import (
     School, ClassRoom, StreamClassTeacher, TeacherAssignment, Exam, TermDate, MarkSheet, Announcement, Stream, Subject, PromotionLog, EducationLevel, SubjectAllocation, HeadTeacher, SchoolUserAccess,
-    LearningStrand, SubStrand, StudentCompetency, StudentCompetencySummary, Assignment, SchoolCalendarEvent
+    LearningStrand, SubStrand, StudentCompetency, StudentCompetencySummary, Assignment, SchoolCalendarEvent, SchoolTypePricing, LearningResource
 )
 from schools.models import StudentMark
 from schools.forms import StudentForm, AnnouncementForm, ClassRoomForm
@@ -2382,6 +2392,13 @@ def landing(request):
     Note: role-based redirects happen after login via `post_login_redirect`.
     """
     context = {'user': request.user} if request.user.is_authenticated else {}
+    pricing_rows = SchoolTypePricing.objects.all()
+    pricing_map = {p.school_type: p.price_per_student for p in pricing_rows}
+    clients = School.objects.exclude(logo='').exclude(logo__isnull=True).order_by('name')[:18]
+    context.update({
+        'pricing_map': pricing_map,
+        'trusted_clients': clients,
+    })
     if not request.user.is_authenticated:
         open_auth_modal = (request.GET.get('auth') or '').strip().lower()
         if open_auth_modal not in ('login', 'signup'):
@@ -2392,6 +2409,98 @@ def landing(request):
             'open_auth_modal': open_auth_modal,
         })
     return render(request, 'landing.html', context)
+
+
+def resources_select(request):
+    return render(request, 'landing/resources_select.html', {'user': request.user})
+
+
+def resources(request, curriculum):
+    curriculum_key = (curriculum or '').strip().upper()
+    if curriculum_key in ('CBC', 'CBE'):
+        curriculum_key = LearningResource.CURRICULUM_CBE
+    elif curriculum_key in ('CAMBRIDGE', 'CAM'):
+        curriculum_key = LearningResource.CURRICULUM_CAMBRIDGE
+    else:
+        return redirect('landing')
+
+    base_qs = LearningResource.objects.filter(curriculum=curriculum_key, is_active=True).select_related('education_level')
+    qs = base_qs
+
+    query = (request.GET.get('q') or '').strip()
+    level = (request.GET.get('level') or '').strip()
+    class_name = (request.GET.get('class') or '').strip()
+    subject_name = (request.GET.get('subject') or '').strip()
+    resource_type = (request.GET.get('type') or '').strip()
+    sort = (request.GET.get('sort') or '').strip()
+
+    if query:
+        qs = qs.filter(
+            Q(title__icontains=query) |
+            Q(description__icontains=query) |
+            Q(class_name__icontains=query) |
+            Q(subject_name__icontains=query)
+        )
+    if level:
+        qs = qs.filter(education_level_id=level)
+    if class_name:
+        qs = qs.filter(class_name=class_name)
+    if subject_name:
+        qs = qs.filter(subject_name=subject_name)
+    if resource_type:
+        qs = qs.filter(resource_type=resource_type)
+
+    if sort == 'newest':
+        qs = qs.order_by('-created_at')
+    elif sort == 'oldest':
+        qs = qs.order_by('created_at')
+    elif sort == 'title_asc':
+        qs = qs.order_by('title')
+    elif sort == 'title_desc':
+        qs = qs.order_by('-title')
+
+    allowed_levels = LearningResource.allowed_level_names(curriculum_key)
+    level_ids = base_qs.values_list('education_level_id', flat=True)
+    if allowed_levels:
+        levels = EducationLevel.objects.filter(name__in=allowed_levels, id__in=level_ids).order_by('name')
+    else:
+        levels = EducationLevel.objects.filter(id__in=level_ids).order_by('name')
+    classes = base_qs.exclude(class_name='').values_list('class_name', flat=True).distinct().order_by('class_name')
+    subjects = base_qs.exclude(subject_name='').values_list('subject_name', flat=True).distinct().order_by('subject_name')
+
+    return render(request, 'landing/resources.html', {
+        'user': request.user,
+        'curriculum': curriculum_key,
+        'resources': qs,
+        'levels': levels,
+        'classes': classes,
+        'subjects': subjects,
+        'resource_types': LearningResource.RESOURCE_TYPE_CHOICES,
+        'filters': {
+            'q': query,
+            'level': level,
+            'class': class_name,
+            'subject': subject_name,
+            'type': resource_type,
+            'sort': sort,
+        },
+    })
+
+
+def features_academics(request):
+    return render(request, 'landing/feature_academics.html', {'user': request.user})
+
+
+def features_finance(request):
+    return render(request, 'landing/feature_finance.html', {'user': request.user})
+
+
+def features_payroll(request):
+    return render(request, 'landing/feature_payroll.html', {'user': request.user})
+
+
+def features_parents(request):
+    return render(request, 'landing/feature_parents.html', {'user': request.user})
 
 
 @ensure_csrf_cookie
@@ -2441,6 +2550,7 @@ def login_view(request):
                             address=signup_form.cleaned_data.get('address', ''),
                             phone=signup_form.cleaned_data.get('phone', ''),
                             email=school_email,
+                            student_limit=signup_form.cleaned_data.get('student_limit') or 0,
                         )
 
                         # Headteacher account logs in with school email.

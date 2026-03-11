@@ -1,0 +1,80 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SkulPlus | Resources</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {% if SITE_FAVICON_URL %}
+  <link rel="icon" type="image/x-icon" href="{{ SITE_FAVICON_URL }}">
+  {% else %}
+  <link rel="icon" type="image/png" href="{% static 'images/skulplus_logo.png' %}">
+  {% endif %}
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root{--ink:#0f3057;--sea:#0ea5e9;--mint:#16a34a;--paper:#f4f7fb;--border:#e2e8f0;--shadow:0 18px 40px rgba(15,48,87,.12);} 
+    body{margin:0;font-family:'Inter',sans-serif;background:radial-gradient(1100px 300px at 20% -10%, #d9f2ff, transparent 70%), var(--paper);color:#0f172a;}
+    .nav{position:sticky;top:0;background:#fff;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:16px 40px;box-shadow:0 4px 20px rgba(15,48,87,.08);} 
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--ink);text-decoration:none;}
+    .nav a{color:#0f3057;text-decoration:none;font-weight:600;margin-left:18px;}
+    .nav .cta{background:linear-gradient(135deg,var(--mint),#22c55e);color:#fff;padding:8px 14px;border-radius:10px;}
+    .hero{padding:80px 40px;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center;}
+    .hero h1{font-family:'Playfair Display',serif;font-size:40px;margin:0 0 10px;color:var(--ink);} 
+    .card{background:#fff;border:1px solid var(--border);border-radius:18px;padding:22px;box-shadow:0 8px 22px rgba(15,48,87,.08);} 
+    .choice{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+    .choice a{display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-decoration:none;color:#0f172a;border:1px solid var(--border);border-radius:16px;padding:18px;background:#fff;box-shadow:0 6px 18px rgba(15,48,87,.08);}
+    .choice span{font-weight:700;color:var(--ink)}
+    .choice small{color:#64748b}
+    footer{background:#0f3057;color:#fff;text-align:center;padding:24px;}
+    @media(max-width:900px){.hero{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="brand" href="{% url 'landing' %}">
+      {% if SITE_LOGO_URL %}
+      <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="SkulPlus" style="height:34px;border-radius:8px;background:#fff;padding:4px;">
+      {% else %}
+      <img src="{% static 'images/skulplus_logo.png' %}" alt="SkulPlus" style="height:34px;border-radius:8px;background:#fff;padding:4px;">
+      {% endif %}
+      <span>SkulPlus</span>
+    </a>
+    <div>
+      <a href="{% url 'feature_academics' %}">Academics</a>
+      <a href="{% url 'feature_finance' %}">Finance</a>
+      <a href="{% url 'feature_payroll' %}">Payroll</a>
+      <a href="{% url 'feature_parents' %}">Parent Portal</a>
+      <a href="{% url 'resources_select' %}">Resources</a>
+      {% if user.is_authenticated %}
+        <a class="cta" href="{% url 'post_login' %}">Dashboard</a>
+      {% else %}
+        <a class="cta" href="{% url 'login' %}">Login</a>
+      {% endif %}
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div>
+      <h1>Choose Your Curriculum Resources</h1>
+      <p>Access curated exams, notes, and learning materials tailored to your curriculum. Select a pathway to continue.</p>
+    </div>
+    <div class="card">
+      <div class="choice">
+        <a href="{% url 'resources' 'cbe' %}">
+          <span>CBE / CBC Resources</span>
+          <small>Competency Based Education learning materials.</small>
+        </a>
+        <a href="{% url 'resources' 'cambridge' %}">
+          <span>Cambridge Resources</span>
+          <small>Cambridge aligned notes, exams, and past papers.</small>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>&copy; 2026 SkulPlus School Management System</p>
+  </footer>
+</body>
+</html>
