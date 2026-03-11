@@ -4,7 +4,7 @@ from .models import (
     Teacher, HeadTeacher, Announcement,
     GradeScale, ExamResult, MarkSheet,
     StudentMark, CompetencyComment, EducationLevel,
-    Pathway, PromotionLog, StreamClassTeacher, TermDate, SchoolTypePricing, LearningResource
+    Pathway, PromotionLog, StreamClassTeacher, TermDate, SchoolTypePricing, LearningResource, Assignment
 )
 from .models import SiteConfig
 from .models import Exam
@@ -292,5 +292,21 @@ class LearningResourceAdmin(admin.ModelAdmin):
     list_display = ('title', 'curriculum', 'resource_type', 'education_level', 'class_name', 'subject_name', 'is_active', 'created_at')
     list_filter = ('curriculum', 'resource_type', 'education_level', 'is_active')
     search_fields = ('title', 'description', 'class_name', 'subject_name')
+
+
+@admin.register(Assignment)
+class AssignmentAdmin(admin.ModelAdmin):
+    list_display = ('title', 'school', 'classroom', 'subject', 'term', 'year', 'teacher', 'created_at')
+    list_filter = ('school', 'term', 'year', 'classroom', 'subject')
+    search_fields = ('title', 'classroom__name', 'subject__name', 'teacher__user__first_name', 'teacher__user__last_name')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        school = get_user_school(request.user)
+        if school:
+            return qs.filter(school=school)
+        return qs
 
 
