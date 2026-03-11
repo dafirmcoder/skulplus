@@ -290,6 +290,7 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.db import transaction, IntegrityError
 from django.db.models import Sum, Avg, Count, Value, IntegerField, Max, Q
+from django.db.models.functions import TruncMonth
 from django.http import HttpResponseForbidden, JsonResponse
 import json
 from collections import defaultdict
@@ -1680,6 +1681,15 @@ def headteacher_dashboard(request):
     total_paid = Payment.objects.filter(student__school=school).aggregate(
         total=Sum('amount_paid')
     )['total'] or 0
+    total_balance = sum((d.get('balance', 0) or 0) for d in debtors)
+    current_year = timezone.localdate().year
+    terms = ['Term 1', 'Term 2', 'Term 3']
+    total_expected = 0
+    for student in Student.objects.filter(school=school):
+        try:
+            total_expected += sum(student.total_fees_due(term, current_year) for term in terms)
+        except Exception:
+            pass
 
     recent_announcements = Announcement.objects.filter(
         school=school
@@ -1694,6 +1704,59 @@ def headteacher_dashboard(request):
         .order_by('marksheet__subject__name')
     )
     calendar_events = _get_calendar_events_with_past(school, 'teachers', limit_upcoming=10, limit_past=6)
+    upcoming_event = next((ev for ev in calendar_events if not getattr(ev, 'is_past', False)), None)
+
+    # Population growth (last 12 months by admission_date)
+    today = timezone.localdate()
+    start_month = (today.replace(day=1) - datetime.timedelta(days=365)).replace(day=1)
+    growth_qs = (
+        Student.objects
+        .filter(school=school, admission_date__gte=start_month)
+        .annotate(month=TruncMonth('admission_date'))
+        .values('month')
+        .annotate(total=Count('id'))
+        .order_by('month')
+    )
+    growth_map = {row['month'].date(): row['total'] for row in growth_qs if row.get('month')}
+    prev_start = start_month.replace(year=start_month.year - 1)
+    prev_end = start_month.replace(day=1)
+    growth_prev_qs = (
+        Student.objects
+        .filter(school=school, admission_date__gte=prev_start, admission_date__lt=prev_end)
+        .annotate(month=TruncMonth('admission_date'))
+        .values('month')
+        .annotate(total=Count('id'))
+        .order_by('month')
+    )
+    growth_prev_map = {row['month'].date(): row['total'] for row in growth_prev_qs if row.get('month')}
+    growth_labels = []
+    growth_counts = []
+    growth_counts_prev = []
+    cursor = start_month
+    for _ in range(12):
+        label = cursor.strftime('%b %Y')
+        growth_labels.append(label)
+        growth_counts.append(growth_map.get(cursor, 0))
+        prev_cursor = cursor.replace(year=cursor.year - 1)
+        growth_counts_prev.append(growth_prev_map.get(prev_cursor, 0))
+        # advance one month
+        if cursor.month == 12:
+            cursor = cursor.replace(year=cursor.year + 1, month=1)
+        else:
+            cursor = cursor.replace(month=cursor.month + 1)
+
+    alerts = []
+    if total_balance > 0:
+        alerts.append(f'Outstanding balances total {total_balance}.')
+    if total_expected and total_paid:
+        try:
+            rate = float(total_paid) / float(total_expected) if float(total_expected) > 0 else 0
+        except Exception:
+            rate = 0
+        if rate < 0.6:
+            alerts.append('Collections are below 60% of expected fees.')
+    if not upcoming_event:
+        alerts.append('No upcoming events scheduled.')
 
     context = {
         'school': school,
@@ -1701,10 +1764,17 @@ def headteacher_dashboard(request):
         'teachers_count': teachers_count,
         'classes_count': classes_count,
         'total_paid': total_paid,
+        'total_balance': total_balance,
+        'total_expected': total_expected,
         'recent_announcements': recent_announcements,
         'debtors': debtors,
         'subject_performance': subject_performance,
         'calendar_events': calendar_events,
+        'upcoming_event': upcoming_event,
+        'growth_labels': growth_labels,
+        'growth_counts': growth_counts,
+        'growth_counts_prev': growth_counts_prev,
+        'alerts': alerts,
     }
 
     return render(request, 'schools/headteacher_dashboard.html', context)
