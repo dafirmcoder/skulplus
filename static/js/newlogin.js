@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('container');
-    const registerButtons = document.querySelectorAll('.switch-link.register-btn');
-    const loginButtons = document.querySelectorAll('.switch-link.login-btn');
+    const registerButtons = document.querySelectorAll('.register-btn');
+    const loginButtons = document.querySelectorAll('.login-btn');
     const authModal = document.getElementById('authModal');
     const openAuthButtons = document.querySelectorAll('[data-open-auth]');
     const closeAuthButtons = document.querySelectorAll('[data-close-auth]');
