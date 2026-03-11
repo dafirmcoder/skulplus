@@ -43,6 +43,7 @@ urlpatterns = [
 
     # School settings
     path('settings/school-details/', views.school_details, name='school_details'),
+    path('settings/login-details/', views.headteacher_login_details, name='headteacher_login_details'),
     path('settings/teachers/', views.manage_teachers, name='manage_teachers'),
     path('settings/teachers/<int:pk>/edit/', views.edit_teacher, name='edit_teacher'),
     path('settings/teachers/<int:pk>/delete/', views.delete_teacher, name='delete_teacher'),

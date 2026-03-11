@@ -3,6 +3,7 @@ from .models import Teacher, Student, Announcement, ClassRoom, Subject, Stream, 
 from .models import School
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 
 
 class SignUpForm(UserCreationForm):
@@ -295,3 +296,55 @@ class SchoolDetailsForm(forms.ModelForm):
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
         }
+
+
+class HeadteacherLoginDetailsForm(forms.Form):
+    login_email = forms.EmailField(label='Login Email')
+    phone = forms.CharField(max_length=50, required=False, label='Phone')
+    current_password = forms.CharField(widget=forms.PasswordInput, label='Current Password')
+    new_password1 = forms.CharField(widget=forms.PasswordInput, label='New Password', required=False)
+    new_password2 = forms.CharField(widget=forms.PasswordInput, label='Confirm New Password', required=False)
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        self.school = kwargs.pop('school', None)
+        super().__init__(*args, **kwargs)
+        if self.school:
+            self.fields['login_email'].initial = getattr(self.school, 'email', '') or ''
+        if self.user and getattr(self.user, 'headteacher', None):
+            self.fields['phone'].initial = getattr(self.user.headteacher, 'phone', '') or ''
+
+    def clean_login_email(self):
+        email = (self.cleaned_data.get('login_email') or '').strip().lower()
+        if not email:
+            raise forms.ValidationError('Login email is required.')
+        User = get_user_model()
+        if self.user:
+            exists = User.objects.filter(username__iexact=email).exclude(id=self.user.id).exists()
+        else:
+            exists = User.objects.filter(username__iexact=email).exists()
+        if exists:
+            raise forms.ValidationError('That email is already used by another account.')
+        if self.school and School.objects.filter(email__iexact=email).exclude(id=self.school.id).exists():
+            raise forms.ValidationError('That email is already used by another school.')
+        return email
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self.user:
+            raise forms.ValidationError('User context missing.')
+        current_password = cleaned.get('current_password') or ''
+        if not self.user.check_password(current_password):
+            self.add_error('current_password', 'Current password is incorrect.')
+
+        new1 = cleaned.get('new_password1') or ''
+        new2 = cleaned.get('new_password2') or ''
+        if new1 or new2:
+            if new1 != new2:
+                self.add_error('new_password2', 'New passwords do not match.')
+            else:
+                try:
+                    validate_password(new1, self.user)
+                except forms.ValidationError as exc:
+                    self.add_error('new_password1', exc)
+        return cleaned

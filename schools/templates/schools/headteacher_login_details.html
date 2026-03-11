@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Login Details{% endblock %}
+
+{% block header %}
+<h2 style="margin:0">Headteacher Login Details</h2>
+{% endblock %}
+
+{% block content %}
+<style>
+  .login-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 10px 24px rgba(15,48,87,.08);padding:18px;max-width:720px}
+  .login-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .login-grid label{font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.02em}
+  .login-grid input{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px}
+  .full{grid-column:1 / -1}
+  .muted{color:#64748b;font-size:12px;margin-top:4px}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .btn-primary{background:#0f3057;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+  .btn-outline{background:#fff;color:#0f3057;border:1px solid #0f3057;border-radius:10px;padding:10px 14px;text-decoration:none;font-weight:700}
+  .errorlist{margin:6px 0 0;padding-left:18px;color:#b91c1c;font-size:12px}
+  @media(max-width:800px){.login-grid{grid-template-columns:1fr}}
+</style>
+
+<div class="login-card">
+  <form method="post">
+    {% csrf_token %}
+    <div class="login-grid">
+      <div class="full">
+        <label>{{ form.login_email.label }}</label>
+        {{ form.login_email }}
+        {% if form.login_email.errors %}{{ form.login_email.errors }}{% endif %}
+        <div class="muted">This email is used to log in to the headteacher account.</div>
+      </div>
+
+      <div>
+        <label>{{ form.phone.label }}</label>
+        {{ form.phone }}
+        {% if form.phone.errors %}{{ form.phone.errors }}{% endif %}
+      </div>
+
+      <div>
+        <label>{{ form.current_password.label }}</label>
+        {{ form.current_password }}
+        {% if form.current_password.errors %}{{ form.current_password.errors }}{% endif %}
+      </div>
+
+      <div>
+        <label>{{ form.new_password1.label }}</label>
+        {{ form.new_password1 }}
+        {% if form.new_password1.errors %}{{ form.new_password1.errors }}{% endif %}
+      </div>
+
+      <div>
+        <label>{{ form.new_password2.label }}</label>
+        {{ form.new_password2 }}
+        {% if form.new_password2.errors %}{{ form.new_password2.errors }}{% endif %}
+      </div>
+
+      {% if form.non_field_errors %}
+      <div class="full">{{ form.non_field_errors }}</div>
+      {% endif %}
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn-primary">Save Changes</button>
+      <a class="btn-outline" href="{% url 'headteacher_dashboard' %}">Back to Dashboard</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

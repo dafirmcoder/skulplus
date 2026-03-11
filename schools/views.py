@@ -187,7 +187,7 @@ from schools.models import (
     LearningStrand, SubStrand, StudentCompetency, StudentCompetencySummary, Assignment, SchoolCalendarEvent, SchoolTypePricing, LearningResource, SiteConfig
 )
 from schools.models import StudentMark
-from schools.forms import StudentForm, AnnouncementForm, ClassRoomForm
+from schools.forms import StudentForm, AnnouncementForm, ClassRoomForm, HeadteacherLoginDetailsForm
 from django.http import HttpResponse, FileResponse, Http404
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
@@ -198,7 +198,7 @@ from schools.forms import TeacherForm
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth import login
+from django.contrib.auth import login, update_session_auth_hash
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.db.models import Q
@@ -2394,6 +2394,53 @@ def post_announcement(request):
         form = AnnouncementForm()
 
     return render(request, 'schools/post_announcement.html', {'form': form})
+
+
+@login_required
+def headteacher_login_details(request):
+    if not hasattr(request.user, 'headteacher'):
+        return HttpResponseForbidden()
+    school = get_user_school(request.user)
+    if not school:
+        return HttpResponseForbidden()
+
+    if request.method == 'POST':
+        form = HeadteacherLoginDetailsForm(request.POST, user=request.user, school=school)
+        if form.is_valid():
+            login_email = form.cleaned_data['login_email']
+            phone = form.cleaned_data.get('phone', '') or ''
+            new_password = form.cleaned_data.get('new_password1') or ''
+
+            # Update school login email (used for headteacher login)
+            school.email = login_email
+            school.save(update_fields=['email'])
+
+            # Update auth user credentials
+            user = request.user
+            user.username = login_email
+            user.email = login_email
+            user.save(update_fields=['username', 'email'])
+
+            # Update headteacher contact
+            headteacher = getattr(user, 'headteacher', None)
+            if headteacher:
+                headteacher.phone = phone
+                headteacher.save(update_fields=['phone'])
+
+            if new_password:
+                user.set_password(new_password)
+                user.save(update_fields=['password'])
+                update_session_auth_hash(request, user)
+
+            messages.success(request, 'Login details updated successfully.')
+            return redirect('headteacher_login_details')
+    else:
+        form = HeadteacherLoginDetailsForm(user=request.user, school=school)
+
+    return render(request, 'schools/headteacher_login_details.html', {
+        'form': form,
+        'school': school,
+    })
 
 
 def landing(request):

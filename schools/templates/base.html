@@ -251,6 +251,7 @@
         {% url 'promote_students' as promote_students_url %}
         {% url 'school_details' as school_details_url %}
         {% url 'manage_teachers' as manage_teachers_url %}
+        {% url 'headteacher_login_details' as headteacher_login_details_url %}
         {% url 'subject_allocation' as subject_allocation_url %}
         {% url 'classes' as classes_url %}
         {% url 'exams' as exams_url %}
@@ -299,10 +300,11 @@
     {% endif %}
 
     {% if ACCESS_CAN_TEACHERS or ACCESS_CAN_FULL_DASHBOARD %}
-    <li class="has-submenu{% if request.path == school_details_url or request.path == manage_teachers_url or request.path == subject_allocation_url or request.path == classes_url or request.path == exams_url or request.path == grading_url or request.path == cbc_comments_report_url or request.path == term_dates_url or request.path == school_calendar_url or request.path == subjects_url or request.path == manage_strands_url or request.path == post_announcement_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
+    <li class="has-submenu{% if request.path == school_details_url or request.path == headteacher_login_details_url or request.path == manage_teachers_url or request.path == subject_allocation_url or request.path == classes_url or request.path == exams_url or request.path == grading_url or request.path == cbc_comments_report_url or request.path == term_dates_url or request.path == school_calendar_url or request.path == subjects_url or request.path == manage_strands_url or request.path == post_announcement_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
       <i class="fas fa-school"></i><span>School Settings</span>
       <ul class="submenu">
         <li><a href="{{ school_details_url }}" onclick="event.stopPropagation();" class="{% if request.path == school_details_url %}active-link{% endif %}"><i class="fas fa-info-circle"></i> School Details</a></li>
+        <li><a href="{{ headteacher_login_details_url }}" onclick="event.stopPropagation();" class="{% if request.path == headteacher_login_details_url %}active-link{% endif %}"><i class="fas fa-key"></i> Login Details</a></li>
         <li><a href="{{ manage_teachers_url }}" onclick="event.stopPropagation();" class="{% if request.path == manage_teachers_url %}active-link{% endif %}"><i class="fas fa-chalkboard-teacher"></i> Teachers</a></li>
         <li><a href="{{ subject_allocation_url }}" onclick="event.stopPropagation();" class="{% if request.path == subject_allocation_url %}active-link{% endif %}"><i class="fas fa-tasks"></i> Subject Allocation</a></li>
         <li><a href="{{ classes_url }}" onclick="event.stopPropagation();" class="{% if request.path == classes_url %}active-link{% endif %}"><i class="fas fa-door-open"></i> Classes</a></li>
