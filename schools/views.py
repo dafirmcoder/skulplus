@@ -184,7 +184,7 @@ from finance.models import FeePayment as Payment, FeeStructure
 from payroll.models import Staff
 from schools.models import (
     School, ClassRoom, StreamClassTeacher, TeacherAssignment, Exam, TermDate, MarkSheet, Announcement, Stream, Subject, PromotionLog, EducationLevel, SubjectAllocation, HeadTeacher, SchoolUserAccess,
-    LearningStrand, SubStrand, StudentCompetency, StudentCompetencySummary, Assignment, SchoolCalendarEvent, SchoolTypePricing, LearningResource
+    LearningStrand, SubStrand, StudentCompetency, StudentCompetencySummary, Assignment, SchoolCalendarEvent, SchoolTypePricing, LearningResource, SiteConfig
 )
 from schools.models import StudentMark
 from schools.forms import StudentForm, AnnouncementForm, ClassRoomForm
@@ -275,6 +275,16 @@ def _require_school_permission(request, *permissions):
     if permissions and not user_has_any_permission(request.user, school, permissions):
         return None, HttpResponseForbidden('Access denied for your role.')
     return school, None
+
+
+def _get_site_logo_url() -> str:
+    try:
+        cfg = SiteConfig.objects.order_by('-updated_at').first()
+        if cfg and cfg.logo:
+            return cfg.logo.url
+    except Exception:
+        pass
+    return ''
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone

@@ -6,7 +6,7 @@
   <title>SkulPlus | Parent Portal</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   {% if SITE_FAVICON_URL %}
-  <link rel="icon" type="image/x-icon" href="{{ SITE_FAVICON_URL }}">
+  <link rel="icon" type="image/x-icon" href="{{ SITE_FAVICON_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}">
   {% else %}
   <link rel="icon" type="image/png" href="{% static 'images/skulplus_logo.png' %}">
   {% endif %}
