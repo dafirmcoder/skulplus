@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Strands{% endblock %}
+
+{% block header %}
+  <h2 style="margin:0">Manage Strands</h2>
+{% endblock %}
+
+{% block content %}
+  {% csrf_token %}
+  <div class="card" style="padding:16px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+      <div>
+        <label>Level</label>
+        <select id="levelSelect" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
+          <option value="">Select level</option>
+          {% for lvl in levels %}
+            <option value="{{ lvl.id }}">{{ lvl.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>New Strand</label>
+        <input id="strandName" type="text" placeholder="e.g. Numeracy" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
+      </div>
+      <div style="display:flex;align-items:end">
+        <button class="btn btn-primary" onclick="createStrand()">Add Strand</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="padding:16px">
+    <h3 style="margin:0 0 8px">Strands & Sub‑Strands</h3>
+    <div id="strandList">
+      {% for strand in strands %}
+        <div class="strand-card" style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <strong>{{ strand.name }}</strong>
+              <span style="margin-left:8px;color:#64748b;font-size:12px">{{ strand.education_level.name }}</span>
+            </div>
+            <button class="btn btn-sm btn-danger" onclick="deleteStrand({{ strand.id }})">Delete</button>
+          </div>
+          <div style="margin-top:8px">
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" placeholder="New sub‑strand" id="subInput{{ strand.id }}" style="flex:1;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px">
+              <button class="btn btn-sm btn-success" onclick="createSubStrand({{ strand.id }})">Add</button>
+            </div>
+            <ul style="margin:8px 0 0;padding-left:18px">
+              {% for sub in strand.sub_strands.all %}
+                <li style="margin:4px 0;display:flex;justify-content:space-between;align-items:center">
+                  <span>{{ sub.name }}</span>
+                  <button class="btn btn-xs btn-danger" onclick="deleteSubStrand({{ sub.id }})">Delete</button>
+                </li>
+              {% empty %}
+                <li style="color:#94a3b8">No sub‑strands yet.</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      {% empty %}
+        <div style="color:#64748b">No strands added yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+<script>
+function csrfToken(){
+  const el = document.querySelector('input[name=csrfmiddlewaretoken]');
+  return el ? el.value : '';
+}
+
+function createStrand(){
+  const levelId = document.getElementById('levelSelect').value;
+  const name = document.getElementById('strandName').value.trim();
+  if (!levelId || !name){
+    alert('Select level and enter strand name.');
+    return;
+  }
+  fetch('{% url "create_strand" %}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken()},
+    body: JSON.stringify({ level_id: levelId, name })
+  }).then(r => r.json()).then(d => {
+    if (!d.success){
+      alert(d.error || 'Failed');
+      return;
+    }
+    location.reload();
+  }).catch(err => alert(err.message));
+}
+
+function createSubStrand(strandId){
+  const input = document.getElementById('subInput' + strandId);
+  const name = (input.value || '').trim();
+  if (!name){
+    alert('Enter sub‑strand name.');
+    return;
+  }
+  fetch('{% url "create_sub_strand" %}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken()},
+    body: JSON.stringify({ strand_id: strandId, name })
+  }).then(r => r.json()).then(d => {
+    if (!d.success){
+      alert(d.error || 'Failed');
+      return;
+    }
+    location.reload();
+  }).catch(err => alert(err.message));
+}
+
+function deleteStrand(id){
+  if (!confirm('Delete this strand and its sub‑strands?')) return;
+  fetch('{% url "delete_strand" 0 %}'.replace('/0/', '/' + id + '/'), {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrfToken()}
+  }).then(r => r.json()).then(d => {
+    if (!d.success){
+      alert(d.error || 'Failed');
+      return;
+    }
+    location.reload();
+  });
+}
+
+function deleteSubStrand(id){
+  if (!confirm('Delete this sub‑strand?')) return;
+  fetch('{% url "delete_sub_strand" 0 %}'.replace('/0/', '/' + id + '/'), {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrfToken()}
+  }).then(r => r.json()).then(d => {
+    if (!d.success){
+      alert(d.error || 'Failed');
+      return;
+    }
+    location.reload();
+  });
+}
+</script>
+{% endblock %}

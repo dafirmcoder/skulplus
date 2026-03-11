@@ -82,6 +82,11 @@ urlpatterns = [
     path('assignments/upload/', views.assignments_upload, name='assignments_upload'),
     path('assignments/admin/', views.assignments_admin, name='assignments_admin'),
     path('assignments/download/<int:assignment_id>/', views.download_assignment, name='download_assignment'),
+    path('settings/strands/', views.manage_strands, name='manage_strands'),
+    path('settings/strands/create/', views.create_strand, name='create_strand'),
+    path('settings/strands/create-sub/', views.create_sub_strand, name='create_sub_strand'),
+    path('settings/strands/delete/<int:strand_id>/', views.delete_strand, name='delete_strand'),
+    path('settings/strands/delete-sub/<int:sub_strand_id>/', views.delete_sub_strand, name='delete_sub_strand'),
 
     # User management
     path('users/new/', views.new_user, name='new_user'),

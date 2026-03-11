@@ -8389,6 +8389,117 @@ def assignments_admin(request):
 
 
 @login_required
+def manage_strands(request):
+    school = get_user_school(request.user)
+    if not school:
+        return HttpResponseForbidden()
+    if not (has_full_headteacher_access(request.user, school) or user_has_permission(request.user, school, 'academics')):
+        return HttpResponseForbidden()
+
+    levels = EducationLevel.objects.filter(name__in=['Pre School', 'Kindergarten']).order_by('name')
+    strands = LearningStrand.objects.filter(school=school).select_related('education_level').prefetch_related('sub_strands').order_by('education_level__name', 'name')
+
+    return render(request, 'schools/manage_strands.html', {
+        'school': school,
+        'levels': levels,
+        'strands': strands,
+    })
+
+
+@login_required
+@require_POST
+def create_strand(request):
+    school = get_user_school(request.user)
+    if not school:
+        return JsonResponse({'success': False, 'error': 'No school associated with this account.'}, status=403)
+    if not (has_full_headteacher_access(request.user, school) or user_has_permission(request.user, school, 'academics')):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+
+    try:
+        data = json.loads(request.body or '{}')
+    except Exception:
+        data = request.POST
+    name = (data.get('name') or '').strip()
+    level_id = data.get('level_id')
+    if not name or not level_id:
+        return JsonResponse({'success': False, 'error': 'Level and strand name are required.'}, status=400)
+
+    try:
+        level_obj = EducationLevel.objects.get(id=int(level_id))
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Invalid level.'}, status=400)
+    if level_obj.name not in ('Pre School', 'Kindergarten'):
+        return JsonResponse({'success': False, 'error': 'Strands are only for Pre School/Kindergarten.'}, status=400)
+
+    strand, created = LearningStrand.objects.get_or_create(
+        school=school,
+        education_level=level_obj,
+        name=name,
+    )
+    if not created:
+        return JsonResponse({'success': False, 'error': 'Strand already exists.'}, status=400)
+    return JsonResponse({'success': True, 'id': strand.id, 'name': strand.name})
+
+
+@login_required
+@require_POST
+def create_sub_strand(request):
+    school = get_user_school(request.user)
+    if not school:
+        return JsonResponse({'success': False, 'error': 'No school associated with this account.'}, status=403)
+    if not (has_full_headteacher_access(request.user, school) or user_has_permission(request.user, school, 'academics')):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+
+    try:
+        data = json.loads(request.body or '{}')
+    except Exception:
+        data = request.POST
+    name = (data.get('name') or '').strip()
+    strand_id = data.get('strand_id')
+    if not name or not strand_id:
+        return JsonResponse({'success': False, 'error': 'Strand and sub-strand name are required.'}, status=400)
+
+    strand = LearningStrand.objects.filter(id=strand_id, school=school).first()
+    if not strand:
+        return JsonResponse({'success': False, 'error': 'Strand not found.'}, status=404)
+
+    sub, created = SubStrand.objects.get_or_create(learning_strand=strand, name=name)
+    if not created:
+        return JsonResponse({'success': False, 'error': 'Sub-strand already exists.'}, status=400)
+    return JsonResponse({'success': True, 'id': sub.id, 'name': sub.name})
+
+
+@login_required
+@require_POST
+def delete_strand(request, strand_id):
+    school = get_user_school(request.user)
+    if not school:
+        return JsonResponse({'success': False, 'error': 'No school associated with this account.'}, status=403)
+    if not (has_full_headteacher_access(request.user, school) or user_has_permission(request.user, school, 'academics')):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+    strand = LearningStrand.objects.filter(id=strand_id, school=school).first()
+    if not strand:
+        return JsonResponse({'success': False, 'error': 'Strand not found.'}, status=404)
+    strand.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def delete_sub_strand(request, sub_strand_id):
+    school = get_user_school(request.user)
+    if not school:
+        return JsonResponse({'success': False, 'error': 'No school associated with this account.'}, status=403)
+    if not (has_full_headteacher_access(request.user, school) or user_has_permission(request.user, school, 'academics')):
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+    sub = SubStrand.objects.filter(id=sub_strand_id, learning_strand__school=school).first()
+    if not sub:
+        return JsonResponse({'success': False, 'error': 'Sub-strand not found.'}, status=404)
+    sub.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
 def download_assignment(request, assignment_id):
     assignment = Assignment.objects.select_related('school', 'classroom', 'subject', 'teacher').filter(id=assignment_id).first()
     if not assignment:
