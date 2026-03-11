@@ -1,0 +1,73 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SkulPlus | Parent Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {% if SITE_FAVICON_URL %}
+  <link rel="icon" type="image/x-icon" href="{{ SITE_FAVICON_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}">
+  {% else %}
+  <link rel="icon" type="image/png" href="{% static 'images/skulplus_logo.png' %}">
+  {% endif %}
+  <link rel="stylesheet" href="{% static 'css/parent_login.css' %}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <section class="parent-login">
+    <div class="form-side">
+      <div class="brand">
+        {% if SITE_LOGO_URL %}
+        <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="SkulPlus" style="height:34px;border-radius:8px;background:#fff;padding:4px;">
+        {% else %}
+        <img src="{% static 'images/skulplus_logo.png' %}" alt="SkulPlus" style="height:34px;border-radius:8px;background:#fff;padding:4px;">
+        {% endif %}
+        <span>SkulPlus Parent Portal</span>
+      </div>
+
+      <div>
+        <h1 class="title">Welcome back, Parent</h1>
+        <p class="subtitle">Track your child’s progress, fees, and school updates in one trusted place.</p>
+      </div>
+
+      {% if form.non_field_errors %}
+        <div class="error">
+          {% for err in form.non_field_errors %}
+            <div>{{ err }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'parent_login' %}">
+        {% csrf_token %}
+        <div class="field">
+          {{ form.username.label_tag }}
+          {{ form.username }}
+          {% for err in form.username.errors %}<div class="error">{{ err }}</div>{% endfor %}
+        </div>
+        <div class="field">
+          {{ form.password.label_tag }}
+          {{ form.password }}
+          {% for err in form.password.errors %}<div class="error">{{ err }}</div>{% endfor %}
+        </div>
+
+        <div class="form-actions">
+          <label><input type="checkbox"> Remember me</label>
+          <a href="{% url 'login' %}?auth=login">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn-primary">Sign in</button>
+      </form>
+
+      <div class="helper">Need help? Contact your school administration for parent login details.</div>
+    </div>
+
+    <aside class="side-panel">
+      <div class="side-icon"><i class="fa-solid fa-shield-heart"></i></div>
+      <h2>Your child, always in focus</h2>
+      <p>Access attendance, fees, assignments, and announcements instantly—stay connected to every milestone.</p>
+      <div class="side-ill"></div>
+    </aside>
+  </section>
+</body>
+</html>

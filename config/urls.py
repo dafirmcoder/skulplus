@@ -40,6 +40,7 @@ urlpatterns = [
     path('features/finance/', schools_views.features_finance, name='feature_finance'),
     path('features/payroll/', schools_views.features_payroll, name='feature_payroll'),
     path('features/parents/', schools_views.features_parents, name='feature_parents'),
+    path('parents/login/', schools_views.parent_login, name='parent_login'),
     path('resources/', schools_views.resources_select, name='resources_select'),
     path('resources/<str:curriculum>/', schools_views.resources, name='resources'),
     path('', schools_views.landing, name='landing'),

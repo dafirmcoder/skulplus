@@ -16,11 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    const openModal = (mode) => {
-        if (container && mode === 'signup') {
-            container.classList.add('active');
-        } else if (container) {
-            container.classList.remove('active');
+    const setMode = (mode) => {
+        if (container) {
+            const useSignup = mode === 'signup';
+            container.classList.toggle('active', useSignup);
         }
         if (authModal) {
             authModal.classList.add('open');
@@ -41,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!authModal) return;
             event.preventDefault();
             const target = (btn.dataset.openAuth || 'login').toLowerCase();
-            openModal(target === 'signup' ? 'signup' : 'login');
+            setMode(target === 'signup' ? 'signup' : 'login');
         });
     });
 
@@ -58,24 +57,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container) return;
 
     registerButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            container.classList.add('active');
-            if (authModal) {
-                authModal.classList.add('open');
-                authModal.setAttribute('aria-hidden', 'false');
-                document.body.classList.add('auth-modal-open');
-            }
+        btn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setMode('signup');
         });
     });
 
     loginButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            container.classList.remove('active');
-            if (authModal) {
-                authModal.classList.add('open');
-                authModal.setAttribute('aria-hidden', 'false');
-                document.body.classList.add('auth-modal-open');
-            }
+        btn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setMode('login');
         });
     });
 

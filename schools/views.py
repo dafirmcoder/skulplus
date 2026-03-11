@@ -269,6 +269,23 @@ def _build_login_form(request, data=None):
     return form
 
 
+def _build_parent_login_form(request, data=None):
+    form = AuthenticationForm(request, data=data)
+    form.fields['username'].label = 'Parent Phone / Username'
+    form.fields['username'].widget.attrs.update({
+        'placeholder': 'Parent phone number',
+        'autocomplete': 'username',
+        'inputmode': 'tel',
+        'class': 'input',
+    })
+    form.fields['password'].widget.attrs.update({
+        'placeholder': 'Password',
+        'autocomplete': 'current-password',
+        'class': 'input',
+    })
+    return form
+
+
 def signup_modal_redirect(request):
     return redirect(f"{reverse('landing')}?auth=signup")
 
@@ -2636,6 +2653,28 @@ def features_payroll(request):
 
 def features_parents(request):
     return render(request, 'landing/feature_parents.html', {'user': request.user})
+
+
+@ensure_csrf_cookie
+@csrf_protect
+def parent_login(request):
+    if request.user.is_authenticated:
+        if Student.objects.filter(parent_user=request.user).exists():
+            return redirect('parent_dashboard')
+        return redirect('post_login')
+
+    form = _build_parent_login_form(request)
+    if request.method == 'POST':
+        form = _build_parent_login_form(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            if Student.objects.filter(parent_user=user).exists():
+                return redirect('parent_dashboard')
+            auth_logout(request)
+            form.add_error(None, 'This login is for parents only.')
+
+    return render(request, 'landing/parent_login.html', {'form': form})
 
 
 @ensure_csrf_cookie
