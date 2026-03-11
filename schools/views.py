@@ -1717,7 +1717,7 @@ def headteacher_dashboard(request):
         .annotate(total=Count('id'))
         .order_by('month')
     )
-    growth_map = {row['month'].date(): row['total'] for row in growth_qs if row.get('month')}
+    growth_map = {row['month']: row['total'] for row in growth_qs if row.get('month')}
     prev_start = start_month.replace(year=start_month.year - 1)
     prev_end = start_month.replace(day=1)
     growth_prev_qs = (
@@ -1728,7 +1728,7 @@ def headteacher_dashboard(request):
         .annotate(total=Count('id'))
         .order_by('month')
     )
-    growth_prev_map = {row['month'].date(): row['total'] for row in growth_prev_qs if row.get('month')}
+    growth_prev_map = {row['month']: row['total'] for row in growth_prev_qs if row.get('month')}
     growth_labels = []
     growth_counts = []
     growth_counts_prev = []
