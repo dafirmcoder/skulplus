@@ -179,8 +179,8 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # After login redirect users to a post-login handler that routes by role
 LOGIN_REDIRECT_URL = '/post-login/'
-# After logout redirect to login page
-LOGOUT_REDIRECT_URL = '/login/'
+# After logout redirect to landing page
+LOGOUT_REDIRECT_URL = '/'
 
 # Media files (user-uploaded)
 MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
@@ -189,6 +189,8 @@ MEDIA_ROOT = Path(media_root_env) if media_root_env else BASE_DIR / 'media'
 
 # Cloudinary (Railway production uploads)
 cloudinary_url = os.environ.get('CLOUDINARY_URL', '').strip()
+if cloudinary_url and not cloudinary_url.startswith('cloudinary://'):
+    cloudinary_url = ''
 if cloudinary_url:
     INSTALLED_APPS += [
         'cloudinary_storage',
