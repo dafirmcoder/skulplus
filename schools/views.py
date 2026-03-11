@@ -198,7 +198,7 @@ from schools.forms import TeacherForm
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth import login, update_session_auth_hash
+from django.contrib.auth import login, update_session_auth_hash, logout as auth_logout
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.db.models import Q
@@ -244,6 +244,13 @@ def post_login_redirect(request):
         return redirect('headteacher_dashboard')
     if request.user.is_staff:
         return redirect('admin:index')
+    return redirect('landing')
+
+
+@require_http_methods(["GET", "POST"])
+def logout_view(request):
+    if request.user.is_authenticated:
+        auth_logout(request)
     return redirect('landing')
 
 

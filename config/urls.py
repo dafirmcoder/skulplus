@@ -22,6 +22,7 @@ from schools import views as schools_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('logout/', schools_views.logout_view, name='logout'),
     path('accounts/', include('django.contrib.auth.urls')),
     path('finance/', include('finance.urls')),
     path('add-payment/', add_payment, name='add_payment'),
