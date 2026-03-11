@@ -119,6 +119,7 @@
   align-items: center;
   justify-content: center;
   transition: transform 0.55s ease;
+  z-index: 1;
 }
 
 .auth-modal-container .toggle-panel {
@@ -132,6 +133,7 @@
   opacity: 0;
   transform: translateX(10%);
   transition: all 0.45s ease;
+  pointer-events: none;
 }
 
 .auth-modal-container .toggle-panel h1 {
@@ -158,15 +160,17 @@
 .auth-modal-container:not(.active) .toggle-panel.toggle-left {
   opacity: 1;
   transform: translateX(0);
+  pointer-events: auto;
 }
 
 .auth-modal-container.active .toggle-panel.toggle-right {
   opacity: 1;
   transform: translateX(0);
+  pointer-events: auto;
 }
 
 .auth-modal-container.active .toggle-box {
-  transform: translateX(-115%);
+  transform: translateX(-150%);
   border-radius: 16px 0 0 16px;
 }
 

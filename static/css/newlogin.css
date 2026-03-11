@@ -93,6 +93,7 @@
   align-items: center;
   justify-content: center;
   transition: transform 0.55s ease;
+  z-index: 1;
 }
 
 .toggle-panel {
@@ -107,6 +108,7 @@
   transform: translateX(10%);
   transition: all 0.45s ease;
   text-align: left;
+  pointer-events: none;
 }
 
 .toggle-panel h1 {
@@ -134,15 +136,17 @@
 .container:not(.active) .toggle-panel.toggle-left {
   opacity: 1;
   transform: translateX(0);
+  pointer-events: auto;
 }
 
 .container.active .toggle-panel.toggle-right {
   opacity: 1;
   transform: translateX(0);
+  pointer-events: auto;
 }
 
 .container.active .toggle-box {
-  transform: translateX(-110%);
+  transform: translateX(-150%);
   border-radius: 20px 0 0 20px;
 }
 
