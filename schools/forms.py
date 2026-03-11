@@ -211,6 +211,13 @@ class ClassRoomForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if 'section' in self.fields:
             self.fields['section'].label = 'Stream'
+        if school and 'level' in self.fields:
+            qs = EducationLevel.objects.all().order_by('name')
+            if getattr(school, 'school_type', '') == 'CAMBRIDGE':
+                qs = qs.filter(name__in=['Kindergarten', 'Lower Primary', 'Upper Primary', 'Lower Secondary', 'Upper Secondary (IGCSE)', 'A Level'])
+            elif getattr(school, 'school_type', '') == 'CBE':
+                qs = qs.filter(name__in=['Pre School', 'Lower Primary', 'Upper Primary', 'Junior', 'Senior'])
+            self.fields['level'].queryset = qs
         if 'class_teacher' in self.fields:
             if school:
                 self.fields['class_teacher'].queryset = Teacher.objects.filter(
