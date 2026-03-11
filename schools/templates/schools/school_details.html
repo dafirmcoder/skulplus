@@ -80,6 +80,7 @@
             <label>School Category</label>
             {{ form.school_category }}
           </div>
+          {% if school.school_type == 'CAMBRIDGE' %}
           <div>
             <label>Cambridge Grading</label>
             {{ form.cambridge_grading_system }}
@@ -88,6 +89,7 @@
             <label>Cambridge Show Ranking</label>
             {{ form.cambridge_show_ranking }}
           </div>
+          {% endif %}
           <div>
             <label>Phone</label>
             {{ form.phone }}
@@ -156,8 +158,10 @@
         <div class="meta-item"><strong>Motto</strong><span>{{ school.motto }}</span></div>
         <div class="meta-item"><strong>Type</strong><span>{{ school.school_type }}</span></div>
         <div class="meta-item"><strong>Category</strong><span>{{ school.get_school_category_display }}</span></div>
+        {% if school.school_type == 'CAMBRIDGE' %}
         <div class="meta-item"><strong>Cambridge Grading</strong><span>{{ school.get_cambridge_grading_system_display }}</span></div>
         <div class="meta-item"><strong>Cambridge Ranking</strong><span>{% if school.cambridge_show_ranking %}Enabled{% else %}Disabled{% endif %}</span></div>
+        {% endif %}
         <div class="meta-item"><strong>Address</strong><span>{{ school.address }}</span></div>
         <div class="meta-item"><strong>Phone</strong><span>{{ school.phone }}</span></div>
         <div class="meta-item"><strong>Email</strong><span>{{ school.email }}</span></div>
