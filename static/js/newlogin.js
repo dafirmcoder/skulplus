@@ -6,6 +6,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const openAuthButtons = document.querySelectorAll('[data-open-auth]');
     const closeAuthButtons = document.querySelectorAll('[data-close-auth]');
 
+    if (container) {
+        const params = new URLSearchParams(window.location.search || '');
+        const mode = (params.get('auth') || params.get('mode') || params.get('form') || '').toLowerCase();
+        if (mode === 'signup' || mode === 'register') {
+            container.classList.add('active');
+        } else if (mode === 'login') {
+            container.classList.remove('active');
+        }
+    }
+
     const openModal = (mode) => {
         if (container && mode === 'signup') {
             container.classList.add('active');

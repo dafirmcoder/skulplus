@@ -110,6 +110,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.55s ease;
 }
 
 .auth-modal-container .toggle-panel {
@@ -154,6 +155,11 @@
 .auth-modal-container.active .toggle-panel.toggle-right {
   opacity: 1;
   transform: translateX(0);
+}
+
+.auth-modal-container.active .toggle-box {
+  transform: translateX(-115%);
+  border-radius: 16px 0 0 16px;
 }
 
 .auth-modal-container .form-box h1 {

@@ -84,6 +84,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.55s ease;
 }
 
 .toggle-panel {
@@ -130,6 +131,11 @@
 .container.active .toggle-panel.toggle-right {
   opacity: 1;
   transform: translateX(0);
+}
+
+.container.active .toggle-box {
+  transform: translateX(-110%);
+  border-radius: 20px 0 0 20px;
 }
 
 /* TITLES */
