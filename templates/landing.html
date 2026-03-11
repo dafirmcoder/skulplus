@@ -64,10 +64,10 @@
       <a href="{% url 'feature_parents' %}">Parent Portal</a>
       <a href="{% url 'resources_select' %}">Resources</a>
       <a href="#pricing">Pricing</a>
+      <a href="{% url 'login' %}" data-open-auth="login">Login</a>
+      <a href="{% url 'signup' %}" data-open-auth="signup">Signup</a>
       {% if user.is_authenticated %}
         <a class="cta" href="{% url 'post_login' %}">Dashboard</a>
-      {% else %}
-        <a class="cta" href="{% url 'login' %}" data-open-auth="login">Login</a>
       {% endif %}
     </div>
   </nav>
@@ -78,11 +78,10 @@
       <h1>Run Your Entire School From One Smart Platform</h1>
       <p>SkulPlus brings academics, finance, payroll, and parent communication together. Manage students, track performance, and scale with confidence.</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+        <a href="{% url 'signup' %}" class="btn-primary" data-open-auth="signup">Start Free Setup</a>
+        <a href="{% url 'login' %}" class="btn-outline" data-open-auth="login">Login</a>
         {% if user.is_authenticated %}
-          <a href="{% url 'post_login' %}" class="btn-primary">Open Dashboard</a>
-        {% else %}
-          <a href="{% url 'signup' %}" class="btn-primary" data-open-auth="signup">Start Free Setup</a>
-          <a href="#pricing" class="btn-outline">Pricing Calculator</a>
+          <a href="{% url 'post_login' %}" class="btn-outline">Open Dashboard</a>
         {% endif %}
       </div>
     </div>
@@ -175,10 +174,10 @@
       <h2 style="margin:0 0 8px;">Ready to Transform Your School?</h2>
       <p>Set up your school in minutes and start managing smarter today.</p>
       <div style="margin-top:10px;">
+        <a href="{% url 'signup' %}" class="btn-primary" data-open-auth="signup">Create Your School Account</a>
+        <a href="{% url 'login' %}" class="btn-outline" data-open-auth="login">Login</a>
         {% if user.is_authenticated %}
-          <a href="{% url 'post_login' %}" class="btn-primary">Open Dashboard</a>
-        {% else %}
-          <a href="{% url 'signup' %}" class="btn-primary" data-open-auth="signup">Create Your School Account</a>
+          <a href="{% url 'post_login' %}" class="btn-outline">Open Dashboard</a>
         {% endif %}
       </div>
     </div>
