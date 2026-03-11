@@ -48,7 +48,7 @@ if render_hostname and render_hostname not in ALLOWED_HOSTS:
 
 csrf_trusted_origins_raw = os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
-    'https://skulplus.up.railway.app,http://127.0.0.1,http://localhost,https://*.railway.app',
+    'https://skulplus.up.railway.app,http://127.0.0.1,http://localhost,https://*.railway.app,https://*.up.railway.app',
 ).strip()
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in csrf_trusted_origins_raw.split(',') if origin.strip()
@@ -57,6 +57,11 @@ if railway_public_domain:
     railway_origin = f"https://{railway_public_domain}"
     if railway_origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(railway_origin)
+for host in ALLOWED_HOSTS:
+    if host and host != '*' and '*' not in host and '.' in host:
+        origin = f"https://{host}"
+        if origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
 
 CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', str(not DEBUG)).strip().lower() == 'true'
 SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', str(not DEBUG)).strip().lower() == 'true'
