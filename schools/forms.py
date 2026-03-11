@@ -235,6 +235,8 @@ class SubjectForm(forms.ModelForm):
             qs = EducationLevel.objects.all().order_by('name')
             if school and getattr(school, 'school_type', '') == 'CAMBRIDGE':
                 qs = qs.filter(name__in=['Kindergarten', 'Lower Primary', 'Upper Primary', 'Lower Secondary', 'Upper Secondary (IGCSE)', 'A Level'])
+            elif school and getattr(school, 'school_type', '') == 'CBE':
+                qs = qs.filter(name__in=['Pre School', 'Lower Primary', 'Upper Primary', 'Junior', 'Senior'])
             self.fields['education_level'].queryset = qs
             self.fields['education_level'].required = True
 
