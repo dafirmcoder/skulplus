@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}Competencies Entry{% endblock %}
 
@@ -8,39 +8,90 @@
 
 {% block content %}
   <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
-  <div class="card" style="padding:16px;margin-bottom:12px">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
-      <div>
-        <label>Class</label>
-        <select id="classSelect" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
-          <option value="">Select class</option>
-          {% for c in classes %}
-            <option value="{{ c.id }}">{{ c.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label>Exam</label>
-        <select id="examSelect" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:8px">
-          <option value="">Select exam</option>
-          {% for e in exams %}
-            <option value="{{ e.id }}">{{ e.title }} - {{ e.term }} {{ e.year }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-primary" id="loadBtn">Load</button>
-      <button class="btn btn-success" id="saveBtn" disabled>Save</button>
-    </div>
-  </div>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --ink:#0f3057;
+      --sea:#0ea5e9;
+      --mint:#16a34a;
+      --sun:#f59e0b;
+      --paper:#f4f7fb;
+      --card:#ffffff;
+      --border:#e2e8f0;
+      --shadow:0 18px 40px rgba(15,48,87,.12);
+    }
+    body{background:radial-gradient(1100px 300px at 20% -10%, #d9f2ff, transparent 70%), var(--paper); font-family:'Inter',sans-serif;}
+    .page-shell{display:grid;gap:16px;}
+    .hero{
+      background:linear-gradient(135deg,#0f3057 0%, #134e8a 35%, #2563eb 100%);
+      color:#fff;border-radius:18px;padding:18px 20px;box-shadow:var(--shadow);
+      display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+    }
+    .hero h1{font-family:'Playfair Display',serif;margin:0;font-size:26px;}
+    .hero p{margin:6px 0 0;color:#dbeafe;font-size:13px;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 8px 22px rgba(15,48,87,.08);} 
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;}
+    label{font-weight:600;color:#334155;font-size:13px;display:block;margin-bottom:4px;}
+    select, textarea, input{
+      width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;
+      transition:box-shadow .15s ease,border-color .15s ease;
+    }
+    select:focus, textarea:focus, input:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 4px rgba(59,130,246,.12);}
+    .btn-primary{background:linear-gradient(135deg,var(--mint),#22c55e);color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;}
+    .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-weight:600;}
+    .muted{color:#64748b;font-size:12px;}
+    .table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px;}
+    table{width:100%;border-collapse:collapse;background:#fff;}
+    th, td{border-bottom:1px solid #eef2f7;padding:8px;vertical-align:top;}
+    th{background:#f8fafc;color:#334155;font-size:12px;text-transform:uppercase;letter-spacing:.4px;}
+    .chip{display:inline-flex;align-items:center;gap:6px;background:#e0f2fe;color:#075985;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;}
+  </style>
 
-  <div class="card" style="padding:16px">
-    <div id="competencyTableWrap" style="overflow:auto"></div>
-  </div>
-  <div class="card" style="padding:16px;margin-top:12px">
-    <h3 style="margin:0 0 8px">Overall Competency Comments</h3>
-    <div id="overallCommentsWrap"></div>
+  <div class="page-shell">
+    <div class="hero">
+      <div>
+        <h1>Competencies Entry</h1>
+        <p>Capture strand performance and tailored feedback per learner.</p>
+      </div>
+      <span class="chip"><i class="fas fa-clipboard-check"></i> Early Years</span>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div>
+          <label>Class</label>
+          <select id="classSelect">
+            <option value="">Select class</option>
+            {% for c in classes %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Exam</label>
+          <select id="examSelect">
+            <option value="">Select exam</option>
+            {% for e in exams %}
+              <option value="{{ e.id }}">{{ e.title }} - {{ e.term }} {{ e.year }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="display:flex;align-items:end;gap:8px;flex-wrap:wrap">
+          <button class="btn-primary" id="loadBtn">Load</button>
+          <button class="btn-ghost" id="saveBtn" disabled>Save</button>
+        </div>
+      </div>
+      <div class="muted" style="margin-top:8px">Select a class and exam to load competency strands.</div>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap" id="competencyTableWrap"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 8px;color:var(--ink);font-family:'Playfair Display',serif;">Overall Competency Comments</h3>
+      <div id="overallCommentsWrap"></div>
+    </div>
   </div>
 
 <script>
@@ -56,12 +107,23 @@ function csrfToken(){
   return el ? el.value : '';
 }
 
+function setTextareaValue(textarea, value, markManual){
+  if (!textarea) return;
+  textarea.value = value || '';
+  if (markManual){
+    textarea.dataset.manual = 'true';
+  } else {
+    textarea.dataset.manual = 'false';
+  }
+}
+
 function renderTable(payload){
   const students = payload.students || [];
   const strands = payload.strands || [];
   const levels = payload.levels || [];
   const entries = payload.entries || {};
   const overallComments = payload.overall_comments || {};
+  const commentVariants = payload.comment_variants || {};
 
   if (!students.length || !strands.length){
     tableWrap.innerHTML = '<div style="color:#64748b">No students or strands configured.</div>';
@@ -69,13 +131,13 @@ function renderTable(payload){
     return;
   }
 
-  let headerTop = '<tr><th rowspan="2" style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Student</th>';
+  let headerTop = '<tr><th rowspan="2" style="text-align:left">Student</th>';
   let headerBottom = '<tr>';
   strands.forEach(strand => {
     const count = (strand.sub_strands || []).length || 1;
-    headerTop += `<th colspan="${count}" style="text-align:center;padding:6px;border-bottom:1px solid #e2e8f0">${strand.name}</th>`;
+    headerTop += `<th colspan="${count}" style="text-align:center">${strand.name}</th>`;
     (strand.sub_strands || []).forEach(ss => {
-      headerBottom += `<th style="text-align:center;padding:6px;border-bottom:1px solid #e2e8f0">${ss.name}</th>`;
+      headerBottom += `<th style="text-align:center">${ss.name}</th>`;
     });
   });
   headerTop += '</tr>';
@@ -83,24 +145,24 @@ function renderTable(payload){
 
   let body = '';
   students.forEach(stu => {
-    body += `<tr><td style="padding:6px;border-bottom:1px solid #f1f5f9">${stu.name}</td>`;
+    body += `<tr><td style="font-weight:600">${stu.name}</td>`;
     strands.forEach(strand => {
       (strand.sub_strands || []).forEach(ss => {
         const key = `${stu.id}:${ss.id}`;
         const entry = entries[key] || {};
         const current = entry.level || '';
-        const commentText = entry.comment_text || entry.suggested_comment || '';
         const suggested = entry.suggested_comment || '';
+        const commentText = entry.comment_text || suggested || '';
         let options = '<option value=""></option>';
         levels.forEach(l => {
           const sel = (l.value === current) ? 'selected' : '';
           options += `<option value="${l.value}" ${sel}>${l.label}</option>`;
         });
-        body += `<td style="padding:6px;border-bottom:1px solid #f1f5f9">
-          <select data-student-id="${stu.id}" data-sub-strand-id="${ss.id}" style="width:100%;padding:6px;border:1px solid #e2e8f0;border-radius:6px">
+        body += `<td>
+          <select data-student-id="${stu.id}" data-sub-strand-id="${ss.id}" data-strand-id="${strand.id}">
             ${options}
           </select>
-          <textarea data-student-id="${stu.id}" data-sub-strand-id="${ss.id}" data-suggested="${suggested.replace(/"/g,'&quot;')}" rows="2" style="width:100%;margin-top:6px;padding:6px;border:1px solid #e2e8f0;border-radius:6px" placeholder="Comment">${commentText}</textarea>
+          <textarea data-student-id="${stu.id}" data-sub-strand-id="${ss.id}" data-suggested="${suggested.replace(/"/g,'&quot;')}" rows="2" placeholder="Comment">${commentText}</textarea>
         </td>`;
       });
     });
@@ -108,12 +170,14 @@ function renderTable(payload){
   });
 
   tableWrap.innerHTML = `
-    <table class="table" style="width:100%;border-collapse:collapse">
+    <table>
       <thead>${headerTop}${headerBottom}</thead>
       <tbody>${body}</tbody>
     </table>`;
+
   renderOverall(overallComments, students);
   wireManualFlags();
+  wireAutoComments(commentVariants);
   saveBtn.disabled = false;
 }
 
@@ -125,12 +189,12 @@ function renderOverall(overallComments, students){
   let html = '';
   students.forEach(stu => {
     const entry = overallComments[String(stu.id)] || {};
-    const commentText = entry.comment_text || entry.suggested_comment || '';
     const suggested = entry.suggested_comment || '';
+    const commentText = entry.comment_text || suggested || '';
     html += `
       <div style="margin-bottom:10px;">
         <div style="font-weight:600;margin-bottom:4px;">${stu.name}</div>
-        <textarea data-overall-student-id="${stu.id}" data-suggested="${suggested.replace(/"/g,'&quot;')}" rows="3" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px" placeholder="Overall comment">${commentText}</textarea>
+        <textarea data-overall-student-id="${stu.id}" data-suggested="${suggested.replace(/"/g,'&quot;')}" rows="3" placeholder="Overall comment">${commentText}</textarea>
       </div>
     `;
   });
@@ -144,6 +208,39 @@ function wireManualFlags(){
   overallWrap.querySelectorAll('textarea[data-overall-student-id]').forEach(t => {
     t.addEventListener('input', () => { t.dataset.manual = 'true'; });
   });
+}
+
+function wireAutoComments(commentVariants){
+  tableWrap.querySelectorAll('select[data-student-id]').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const textarea = tableWrap.querySelector(`textarea[data-student-id="${sel.dataset.studentId}"][data-sub-strand-id="${sel.dataset.subStrandId}"]`);
+      if (!textarea) return;
+      const manual = textarea.dataset.manual === 'true';
+      const levelVal = sel.value || '';
+      const strandId = sel.dataset.strandId || '';
+      const key = `${strandId}:${levelVal}`;
+      const variants = commentVariants[key] || [];
+      let suggested = '';
+      if (variants.length){
+        const seed = `${sel.dataset.studentId}:${sel.dataset.subStrandId}:${levelVal}`;
+        const idx = Math.abs(hashCode(seed)) % variants.length;
+        suggested = variants[idx] || '';
+      }
+      textarea.dataset.suggested = suggested;
+      if (!manual){
+        setTextareaValue(textarea, suggested, false);
+      }
+    });
+  });
+}
+
+function hashCode(str){
+  let hash = 0;
+  for (let i = 0; i < str.length; i++){
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
 }
 
 loadBtn.addEventListener('click', () => {
@@ -198,6 +295,7 @@ saveBtn.addEventListener('click', () => {
       comment_manual: manualFlag
     });
   });
+
   fetch(`{% url 'save_competencies' %}`, {
     method: 'POST',
     headers: {
