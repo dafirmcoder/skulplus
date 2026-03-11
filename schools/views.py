@@ -2513,6 +2513,7 @@ def headteacher_login_details(request):
     })
 
 
+@ensure_csrf_cookie
 def landing(request):
     """Public landing page — always render homepage first.
 
