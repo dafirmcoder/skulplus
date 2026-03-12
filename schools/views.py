@@ -3092,8 +3092,8 @@ def parent_dashboard(request):
     student_cards = []
     total_balance = 0
     total_assignments = 0
-      for student in students:
-          school = student.school
+    for student in students:
+        school = student.school
         term, year = resolve_active_term_year(school)
         balance = student.balance(term, year)
         total_balance += balance
