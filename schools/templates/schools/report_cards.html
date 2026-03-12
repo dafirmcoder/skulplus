@@ -236,6 +236,10 @@ function fmtDate(isoDate){
   }
 }
 
+function upper(value){
+  return String(value || '').toUpperCase();
+}
+
 function buildOverallTrendSvg(points){
   if (!points || points.length === 0) {
     return '<div style="font-size:12px;color:#64748b">No trend history available.</div>';
@@ -309,10 +313,10 @@ function renderEarlyYearsCard(school, card, meta = {}){
     <div class="school-header">
       ${school.logo_url ? `<img class="school-logo" src="${school.logo_url}" alt="${school.name}">` : ''}
       <div class="school-text">
-        <h2>${school.name || ''}</h2>
-        ${school.motto ? `<p>${school.motto}</p>` : ''}
-        ${school.address ? `<p>${school.address}</p>` : ''}
-        ${(school.phone || school.email) ? `<p>${school.phone ? `Tel: ${school.phone}` : ''}${(school.phone && school.email) ? ' | ' : ''}${school.email ? `Email: ${school.email}` : ''}</p>` : ''}
+        <h2>${upper(school.name || '')}</h2>
+        ${school.motto ? `<p style="font-style:italic">${upper(school.motto)}</p>` : ''}
+        ${(school.phone || school.email) ? `<p style="text-decoration:underline">${school.phone ? `${upper(school.phone)}` : ''}${(school.phone && school.email) ? ' | ' : ''}${school.email ? `${upper(school.email)}` : ''}</p>` : ''}
+        ${school.address ? `<p>${upper(school.address)}</p>` : ''}
       </div>
       ${card.student.photo_url
         ? `<img class="student-photo" src="${card.student.photo_url}" alt="${card.student.name || 'Student'}">`
@@ -440,10 +444,10 @@ function renderCard(school, card, meta = {}){
     <div class="school-header">
       ${school.logo_url ? `<img class="school-logo" src="${school.logo_url}" alt="${school.name}">` : ''}
       <div class="school-text">
-        <h2>${school.name || ''}</h2>
-        ${school.motto ? `<p>${school.motto}</p>` : ''}
-        ${school.address ? `<p>${school.address}</p>` : ''}
-        ${(school.phone || school.email) ? `<p>${school.phone ? `Tel: ${school.phone}` : ''}${(school.phone && school.email) ? ' | ' : ''}${school.email ? `Email: ${school.email}` : ''}</p>` : ''}
+        <h2>${upper(school.name || '')}</h2>
+        ${school.motto ? `<p style="font-style:italic">${upper(school.motto)}</p>` : ''}
+        ${(school.phone || school.email) ? `<p style="text-decoration:underline">${school.phone ? `${upper(school.phone)}` : ''}${(school.phone && school.email) ? ' | ' : ''}${school.email ? `${upper(school.email)}` : ''}</p>` : ''}
+        ${school.address ? `<p>${upper(school.address)}</p>` : ''}
       </div>
       ${card.student.photo_url
         ? `<img class="student-photo" src="${card.student.photo_url}" alt="${card.student.name || 'Student'}">`

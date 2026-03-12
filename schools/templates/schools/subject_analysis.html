@@ -80,10 +80,10 @@ th{background:#0f3057;color:white}
 <div id="results"></div>
 
 <div id="schoolMeta"
-    data-school-name="{{ school.name|default:'' }}"
-    data-school-address="{{ school.address|default:'' }}"
-    data-school-phone="{{ school.phone|default:'' }}"
-    data-school-email="{{ school.email|default:'' }}"
+    data-school-name="{{ school.name|default:''|upper }}"
+    data-school-address="{{ school.address|default:''|upper }}"
+    data-school-phone="{{ school.phone|default:''|upper }}"
+    data-school-email="{{ school.email|default:''|upper }}"
     data-school-logo="{% if school.logo %}{{ school.logo.url }}{% elif SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{% endif %}">
 </div>
 

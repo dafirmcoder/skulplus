@@ -96,12 +96,21 @@ def export_merit_list_pdf(request):
     width, height = A4
     y = height - 40
     p.setFont("Helvetica-Bold", 16)
-    p.drawString(40, y, school.name or "School")
+    p.drawString(40, y, (school.name or "School").upper())
     y -= 16
-    p.setFont("Helvetica", 9)
-    school_line = ' | '.join([v for v in [school.address, school.phone, school.email] if v])
-    if school_line:
-        p.drawString(40, y, school_line[:120])
+    if getattr(school, 'motto', ''):
+        p.setFont("Helvetica-Oblique", 9)
+        p.drawString(40, y, str(school.motto).upper()[:120])
+        y -= 12
+    contact_line = ' | '.join([str(v).upper() for v in [school.phone, school.email] if v])
+    if contact_line:
+        p.setFont("Helvetica", 9)
+        p.drawString(40, y, contact_line[:120])
+        p.line(40, y - 1, 40 + p.stringWidth(contact_line[:120], "Helvetica", 9), y - 1)
+        y -= 12
+    if getattr(school, 'address', ''):
+        p.setFont("Helvetica", 9)
+        p.drawString(40, y, str(school.address).upper()[:120])
         y -= 14
     else:
         y -= 6
@@ -3954,17 +3963,24 @@ def export_class_list_pdf(request):
             except Exception:
                 pass
         p.setFont('Helvetica-Bold', 12)
-        p.drawCentredString(width / 2, page_y - 10, school_any.name.upper())
-        p.setFont('Helvetica', 9)
-        p.drawCentredString(width / 2, page_y - 24, 'WE PLAY, LEARN, GROW')
-        if school_any.phone:
+        p.drawCentredString(width / 2, page_y - 10, (school_any.name or 'SCHOOL').upper())
+        if getattr(school_any, 'motto', ''):
+            p.setFont('Helvetica-Oblique', 9)
+            p.drawCentredString(width / 2, page_y - 24, str(school_any.motto).upper())
+        contact_line = ' | '.join([str(v).upper() for v in [school_any.phone, school_any.email] if v])
+        if contact_line:
             p.setFont('Helvetica-Bold', 9)
             p.setFillColorRGB(0.1, 0.55, 0.1)
-            p.drawCentredString(width / 2, page_y - 38, school_any.phone)
+            p.drawCentredString(width / 2, page_y - 38, contact_line)
+            text_w = p.stringWidth(contact_line, 'Helvetica-Bold', 9)
+            p.line((width - text_w) / 2, page_y - 39, (width + text_w) / 2, page_y - 39)
             p.setFillColorRGB(0, 0, 0)
+        if getattr(school_any, 'address', ''):
+            p.setFont('Helvetica', 9)
+            p.drawCentredString(width / 2, page_y - 52, str(school_any.address).upper())
         p.setFont('Helvetica-Bold', 10)
-        p.drawString(left_margin, page_y - 62, 'Class List:')
-        p.drawString(left_margin + 110, page_y - 62, class_display)
+        p.drawString(left_margin, page_y - 66, 'CLASS LIST:')
+        p.drawString(left_margin + 110, page_y - 66, class_display.upper())
         return page_y - 80
 
     def draw_footer(page_num):
@@ -4496,10 +4512,28 @@ def export_classes_pdf(request):
 
     p = canvas.Canvas(cast(IO[bytes], response))
     y = 800
-    title = f"{school.name if school else ''} - Classes List"
-    p.setFont('Helvetica-Bold', 14)
+    school_name = (school.name or '') if school else ''
+    p.setFont('Helvetica-Bold', 16)
+    p.drawString(50, y, school_name.upper())
+    y -= 16
+    if getattr(school, 'motto', ''):
+        p.setFont('Helvetica-Oblique', 10)
+        p.drawString(50, y, str(school.motto).upper())
+        y -= 12
+    contact_line = ' | '.join([str(v).upper() for v in [school.phone, school.email] if v])
+    if contact_line:
+        p.setFont('Helvetica', 10)
+        p.drawString(50, y, contact_line[:120])
+        p.line(50, y - 1, 50 + p.stringWidth(contact_line[:120], 'Helvetica', 10), y - 1)
+        y -= 12
+    if getattr(school, 'address', ''):
+        p.setFont('Helvetica', 10)
+        p.drawString(50, y, str(school.address).upper())
+        y -= 16
+    title = f"{school_name.upper()} - CLASSES LIST"
+    p.setFont('Helvetica-Bold', 12)
     p.drawString(50, y, title)
-    y -= 30
+    y -= 24
     p.setFont('Helvetica', 11)
     for c in classes:
         c_any = cast(Any, c)

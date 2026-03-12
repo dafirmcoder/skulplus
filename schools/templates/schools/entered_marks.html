@@ -163,10 +163,12 @@ th{background:#f8fafc;color:#334155}
                 <img class="print-school-logo" src="{{ school.logo.url }}" alt="{{ school.name }}">
               {% endif %}
               <div class="print-school-text">
-                <h1>{{ school.name }}</h1>
-                {% if school.motto %}<p>{{ school.motto }}</p>{% endif %}
-                {% if school.address %}<p>{{ school.address }}</p>{% endif %}
-                {% if school.phone %}<p>{{ school.phone }}</p>{% endif %}
+                <h1>{{ school.name|upper }}</h1>
+                {% if school.motto %}<p style="font-style:italic">{{ school.motto|upper }}</p>{% endif %}
+                <p style="text-decoration:underline">
+                  {% if school.phone %}{{ school.phone|upper }}{% endif %}{% if school.phone and school.email %} | {% endif %}{% if school.email %}{{ school.email|upper }}{% endif %}
+                </p>
+                {% if school.address %}<p>{{ school.address|upper }}</p>{% endif %}
               </div>
               {% if school.logo %}
                 <div style="width:72px"></div>

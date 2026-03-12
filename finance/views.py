@@ -613,12 +613,12 @@ def balance_report(request):
 
         # Header block (aligned with print layout)
         ws.merge_cells('A1:G1')
-        ws['A1'] = school.name
+        ws['A1'] = (school.name or '').upper()
         ws['A1'].font = Font(size=15, bold=True, color='0F3057')
         ws['A1'].alignment = Alignment(horizontal='center')
 
         ws.merge_cells('A2:G2')
-        details = ' | '.join([v for v in [school.address, school.phone, school.email] if v])
+        details = ' | '.join([str(v).upper() for v in [school.phone, school.email, school.address] if v])
         ws['A2'] = details or ' '
         ws['A2'].font = Font(size=10, color='4B5563')
         ws['A2'].alignment = Alignment(horizontal='center')
@@ -714,10 +714,10 @@ def balance_report(request):
                     pass
             p.setFillColor(colors.HexColor('#0f3057'))
             p.setFont('Helvetica-Bold', 14)
-            p.drawString(margin + 52, y_top - 10, school.name)
+            p.drawString(margin + 52, y_top - 10, (school.name or '').upper())
             p.setFillColor(colors.HexColor('#4B5563'))
             p.setFont('Helvetica', 9)
-            details = ' | '.join([v for v in [school.address, school.phone, school.email] if v])
+            details = ' | '.join([str(v).upper() for v in [school.phone, school.email, school.address] if v])
             if details:
                 p.drawString(margin + 52, y_top - 24, details[:130])
             p.setFillColor(colors.black)
@@ -929,7 +929,7 @@ def model_reports(request):
                     pass
             p.setFillColor(colors.HexColor('#0f3057'))
             p.setFont('Helvetica-Bold', 13)
-            p.drawString(margin + 44, y_top - 10, f'{school.name} - Income vs Expenditure')
+            p.drawString(margin + 44, y_top - 10, f'{(school.name or "").upper()} - INCOME VS EXPENDITURE')
             p.setFillColor(colors.HexColor('#4b5563'))
             p.setFont('Helvetica', 8.5)
             p.drawString(margin + 44, y_top - 24, f'Period: {period_label}')
@@ -1132,11 +1132,11 @@ def expenditure_report(request):
 
             p.setFillColor(colors.HexColor('#0f3057'))
             p.setFont('Helvetica-Bold', 14)
-            p.drawString(margin + 52, y_top - 12, school.name)
+            p.drawString(margin + 52, y_top - 12, (school.name or '').upper())
 
             p.setFillColor(colors.HexColor('#4B5563'))
             p.setFont('Helvetica', 9)
-            details = ' | '.join([v for v in [school.address, school.phone, school.email] if v])
+            details = ' | '.join([str(v).upper() for v in [school.phone, school.email, school.address] if v])
             if details:
                 p.drawString(margin + 52, y_top - 26, details[:130])
 
@@ -1370,10 +1370,10 @@ def fee_receipt(request, payment_id):
                 pass
         p.setFont('Helvetica-Bold', 16)
         p.setFillColor(colors.HexColor('#0f3057'))
-        p.drawString(margin + 64, y - 10, school.name or 'School')
+        p.drawString(margin + 64, y - 10, (school.name or 'SCHOOL').upper())
         p.setFont('Helvetica', 10)
         p.setFillColor(colors.HexColor('#374151'))
-        school_line = ' | '.join([v for v in [school.address, school.phone, school.email] if v])
+        school_line = ' | '.join([str(v).upper() for v in [school.phone, school.email, school.address] if v])
         if school_line:
             p.drawString(margin + 64, y - 24, school_line[:120])
         p.setFont('Helvetica-Bold', 11)

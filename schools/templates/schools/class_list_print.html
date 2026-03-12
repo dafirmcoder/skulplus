@@ -11,9 +11,10 @@
     .print-card { max-width: 800px; margin: 0 auto; padding: 0; background: #fff; }
     .header { display: grid; grid-template-columns: 80px 1fr 80px; align-items: center; text-align: center; margin-bottom: 6px; margin-top: 0; }
     .header img { width: 70px; height: 70px; object-fit: contain; }
-    .school-name { font-weight: 800; letter-spacing: 0.5px; font-size: 16px; }
-    .tagline { font-size: 12px; margin-top: 2px; }
-    .phone { color: #1f7a1f; font-weight: 700; margin-top: 2px; font-size: 11px; }
+    .school-name { font-weight: 800; letter-spacing: 0.5px; font-size: 18px; }
+    .tagline { font-size: 12px; margin-top: 2px; font-style: italic; }
+    .phone { color: #1f7a1f; font-weight: 700; margin-top: 2px; font-size: 11px; text-decoration: underline; }
+    .address { font-size: 11px; margin-top: 2px; }
     .class-line { margin: 6px 0 4px; font-weight: 700; }
     table { width: 100%; border-collapse: collapse; border: 2px solid #000; }
     th, td { border: 1px solid #000; padding: 6px 8px; font-size: 13px; text-align: left; }
@@ -39,9 +40,12 @@
       <div>
         <div class="school-name">{{ school.name|upper }}</div>
         {% if school.motto %}
-        <div class="tagline">{{ school.motto }}</div>
+        <div class="tagline">{{ school.motto|upper }}</div>
         {% endif %}
-        {% if school.phone %}<div class="phone">{{ school.phone }}</div>{% endif %}
+        <div class="phone">
+          {% if school.phone %}{{ school.phone|upper }}{% endif %}{% if school.phone and school.email %} | {% endif %}{% if school.email %}{{ school.email|upper }}{% endif %}
+        </div>
+        {% if school.address %}<div class="address">{{ school.address|upper }}</div>{% endif %}
       </div>
       <div></div>
     </div>

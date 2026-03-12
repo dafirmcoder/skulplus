@@ -73,8 +73,10 @@
     .print-header { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #0f3057; padding-bottom: 10px; margin-bottom: 12px; }
     .print-logo { width: 68px; height: 68px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 6px; }
     .print-header-text { flex:1; text-align:center; }
-    .print-title { font-size: 20px; margin: 0; color: #0f3057; }
+    .print-title { font-size: 22px; margin: 0; color: #0f3057; font-weight: 800; }
     .print-meta { font-size: 12px; color: #374151; margin-top: 3px; }
+    .print-motto { font-style: italic; font-size: 12px; color:#475569; }
+    .print-contact { text-decoration: underline; }
     .print-table { width: 100%; border-collapse: collapse; font-size: 12px; }
     .print-table th, .print-table td { border: 1px solid #d1d5db; padding: 7px; }
     .print-table th { background: #f3f4f6; text-align: left; }
@@ -245,14 +247,18 @@
   </table>
 </div>
 
-<div class="print-only print-wrap">
+<div class="print-only print-wrap" id="fee-print-area">
   <div class="print-header">
     {% if school.logo %}
       <img class="print-logo" src="{{ school.logo.url }}" alt="{{ school.name }} logo" />
     {% endif %}
     <div class="print-header-text">
-      <h1 class="print-title">{{ school.name }}</h1>
-      <div class="print-meta">{% if school.address %}{{ school.address }}{% endif %}{% if school.phone %} | {{ school.phone }}{% endif %}{% if school.email %} | {{ school.email }}{% endif %}</div>
+      <h1 class="print-title">{{ school.name|upper }}</h1>
+      {% if school.motto %}<div class="print-meta print-motto">{{ school.motto|upper }}</div>{% endif %}
+      <div class="print-meta print-contact">
+        {% if school.phone %}{{ school.phone|upper }}{% endif %}{% if school.phone and school.email %} | {% endif %}{% if school.email %}{{ school.email|upper }}{% endif %}
+      </div>
+      {% if school.address %}<div class="print-meta">{{ school.address|upper }}</div>{% endif %}
       <div class="print-meta"><strong>Fee Structure</strong>{% if selected_year %} - Year {{ selected_year }}{% endif %}{% if print_single_term %} - {{ print_term_label }}{% else %} - All Terms{% endif %}</div>
     </div>
   </div>
@@ -334,6 +340,38 @@
 <script>
 
 function printFeeStructure() {
+  const printArea = document.getElementById('fee-print-area');
+  if (printArea && window.SkulPlusPrint && window.SkulPlusPrint.printHtml) {
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Fee Structure - ${document.title || ''}</title>
+  <style>
+    *{box-sizing:border-box;}
+    body{font-family:Arial, sans-serif;margin:0;padding:0;color:#111;background:#fff;}
+    @page{size:A4 portrait;margin:10mm;}
+    .print-wrap{padding:8mm;color:#111;}
+    .print-header{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0f3057;padding-bottom:10px;margin-bottom:12px;}
+    .print-logo{width:68px;height:68px;object-fit:contain;border:1px solid #e5e7eb;border-radius:6px;}
+    .print-header-text{flex:1;text-align:center;}
+    .print-title{font-size:20px;margin:0;color:#0f3057;}
+    .print-meta{font-size:12px;color:#374151;margin-top:3px;}
+    .print-table{width:100%;border-collapse:collapse;font-size:12px;}
+    .print-table th,.print-table td{border:1px solid #d1d5db;padding:7px;}
+    .print-table th{background:#f3f4f6;text-align:left;}
+    .right{text-align:right;}
+    .strong-row td{font-weight:700;background:#f9fafb;}
+    .print-footer{margin-top:12px;font-size:12px;color:#374151;border-top:1px solid #d1d5db;padding-top:8px;}
+  </style>
+</head>
+<body>
+  ${printArea.innerHTML}
+</body>
+</html>`;
+    window.SkulPlusPrint.printHtml(html);
+    return;
+  }
   window.print();
 }
 function toggleBillingMode() {

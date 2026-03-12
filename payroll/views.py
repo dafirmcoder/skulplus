@@ -162,7 +162,7 @@ def _build_payroll_period_pdf_bytes(school, month, year, records):
 
     header_x = left + (58 if logo_drawn else 0)
     p.setFont('Helvetica-Bold', 14)
-    p.drawString(header_x, y, f'{school.name} Payroll Evidence')
+    p.drawString(header_x, y, f'{(school.name or "").upper()} PAYROLL EVIDENCE')
     p.setFont('Helvetica', 10)
     p.drawString(header_x, y - 14, f'Period: {month} {year}')
     p.drawString(header_x, y - 28, f'Records: {len(records)}')
@@ -575,11 +575,11 @@ def generate_payslip(request, record_id):
 
     header_x = left + (62 if logo_drawn else 0)
     p.setFont('Helvetica-Bold', 16)
-    p.drawString(header_x, y, school.name)
+    p.drawString(header_x, y, (school.name or '').upper())
     p.setFont('Helvetica', 10)
-    detail_line = " | ".join([v for v in [school.address, school.phone, school.email] if v])
+    detail_line = " | ".join([str(v).upper() for v in [school.phone, school.email, school.address] if v])
     if school.motto:
-        p.drawString(header_x, y - 14, school.motto)
+        p.drawString(header_x, y - 14, str(school.motto).upper())
         if detail_line:
             p.drawString(header_x, y - 27, detail_line)
     elif detail_line:
@@ -756,7 +756,7 @@ def generate_p9(request, record_id):
             logo_drawn = False
     header_x = left + (62 if logo_drawn else 0)
     p.setFont('Helvetica-Bold', 16)
-    p.drawString(header_x, y, school.name)
+    p.drawString(header_x, y, (school.name or '').upper())
     p.setFont('Helvetica-Bold', 13)
     p.drawRightString(right, y, f'P9 FORM - {year}')
     p.setFont('Helvetica', 10)
@@ -882,7 +882,7 @@ def export_payroll_excel(request):
     ws.title = 'Payroll'
 
     period_label = f'{export_month} {export_year}' if export_month and export_year is not None else 'All Periods'
-    ws.append([f'{school.name} Payroll Report'])
+    ws.append([f'{(school.name or "").upper()} PAYROLL REPORT'])
     ws.append([f'Payroll Month: {period_label}'])
     ws.append([])
 
@@ -1064,7 +1064,7 @@ def export_payroll_pdf(request):
 
     header_x = left + (52 if logo_drawn else 0)
     p.setFont('Helvetica-Bold', 14)
-    p.drawString(header_x, y, f'{school.name} Payroll Report')
+    p.drawString(header_x, y, f'{(school.name or "").upper()} PAYROLL REPORT')
     p.setFont('Helvetica', 10)
     p.drawString(header_x, y - 14, f'Payroll Month: {period_label}')
     p.drawString(header_x, y - 27, f'Total Records: {records.count()}')

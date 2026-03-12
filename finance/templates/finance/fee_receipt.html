@@ -13,6 +13,9 @@
   .header-text { text-align:center; }
   .school-logo { width:72px; height:72px; object-fit:contain; border:1px solid #e5e7eb; border-radius:6px; padding:4px; background:#fff; }
   .muted { color:#6b7280; font-size:12px; }
+  .receipt-title { font-size:20px; font-weight:800; margin:0; color:#0f3057; }
+  .receipt-motto { font-style: italic; }
+  .receipt-contact { text-decoration: underline; }
   .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
   .info-box { border:1px solid #e5e7eb; border-radius:8px; padding:10px; }
   .kv { display:flex; justify-content:space-between; margin:4px 0; }
@@ -48,13 +51,13 @@
       <div></div>
     {% endif %}
     <div class="header-text">
-      <h3 style="margin:0;color:#0f3057;">{{ school.name }}</h3>
-      <div class="muted">Official Fee Receipt</div>
-      <div class="muted">
-        {% if school.address %}{{ school.address }}{% endif %}
-        {% if school.phone %}{% if school.address %} | {% endif %}{{ school.phone }}{% endif %}
-        {% if school.email %} | {{ school.email }}{% endif %}
+      <div class="receipt-title">{{ school.name|upper }}</div>
+      {% if school.motto %}<div class="muted receipt-motto">{{ school.motto|upper }}</div>{% endif %}
+      <div class="muted receipt-contact">
+        {% if school.phone %}{{ school.phone|upper }}{% endif %}{% if school.phone and school.email %} | {% endif %}{% if school.email %}{{ school.email|upper }}{% endif %}
       </div>
+      {% if school.address %}<div class="muted">{{ school.address|upper }}</div>{% endif %}
+      <div class="muted">OFFICIAL FEE RECEIPT</div>
     </div>
     <div class="right">
       <div><strong>Receipt No:</strong> {{ payment.id }}</div>
