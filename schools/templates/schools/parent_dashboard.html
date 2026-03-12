@@ -3,7 +3,14 @@
 {% block title %}Parent Dashboard{% endblock %}
 
 {% block header %}
-  <h2 style="margin:0">Parent Dashboard</h2>
+  <div class="identity-pill">
+    {% if student_cards and student_cards.0.student.photo %}
+      <img src="{{ student_cards.0.student.photo.url }}" alt="Student" class="identity-avatar">
+    {% elif SITE_LOGO_URL %}
+      <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="SkulPlus" class="identity-logo">
+    {% endif %}
+    <span>{{ student_cards.0.student.school.name|default:"Parent Dashboard" }}</span>
+  </div>
 {% endblock %}
 
 {% block content %}
@@ -77,7 +84,12 @@
     <div class="section-card">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px">
         <div>
-          <h3 style="margin:0 0 6px">{{ student.first_name }} {{ student.last_name }}</h3>
+          <div style="display:flex;gap:10px;align-items:center">
+            {% if student.photo %}
+              <img src="{{ student.photo.url }}" alt="{{ student.first_name }}" class="identity-avatar">
+            {% endif %}
+            <h3 style="margin:0 0 6px">{{ student.first_name }} {{ student.last_name }}</h3>
+          </div>
           <div style="color:#475569;font-size:13px">
             {{ student.school.name }} • {{ student.classroom.name|default:"-" }} • {{ student.stream.name|default:"-" }}
           </div>

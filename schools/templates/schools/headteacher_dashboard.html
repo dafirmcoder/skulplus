@@ -45,8 +45,13 @@
 {% endblock %}
 
 {% block header %}
-  <div>
-    <strong>{{ school.name }} Dashboard</strong>
+  <div class="identity-pill">
+    {% if school.logo %}
+      <img src="{{ school.logo.url }}" alt="{{ school.name }}" class="identity-logo">
+    {% elif SITE_LOGO_URL %}
+      <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="{{ school.name }}" class="identity-logo">
+    {% endif %}
+    <span>{{ school.name }}</span>
   </div>
 {% endblock %}
 

@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block header %}
+  <div class="identity-pill">
+    {% if teacher.school.logo %}
+      <img src="{{ teacher.school.logo.url }}" alt="{{ teacher.school.name }}" class="identity-logo">
+    {% elif SITE_LOGO_URL %}
+      <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="{{ teacher.school.name }}" class="identity-logo">
+    {% endif %}
+    <span>{{ teacher.school.name }}</span>
+  </div>
+{% endblock %}
+
 {% block content %}
 
 <style>
