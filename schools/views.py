@@ -1427,6 +1427,7 @@ def school_calendar_print(request):
     range_from = parse_date(request.GET.get('from') or '')
     range_to = parse_date(request.GET.get('to') or '')
     audience = (request.GET.get('audience') or 'all').strip().lower()
+    preview = (request.GET.get('preview') or '') == '1'
 
     events = SchoolCalendarEvent.objects.filter(school=school)
     if audience == 'parents':
@@ -1517,6 +1518,7 @@ def school_calendar_print(request):
         'audience': audience,
         'calendar_months': months,
         'now': generated_at,
+        'preview': preview,
     })
 
 

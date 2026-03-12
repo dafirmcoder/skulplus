@@ -110,6 +110,22 @@ th { color:#777; font-size:13px; }
 
 <div id="notif" style="position:fixed;right:20px;top:20px;display:none;background:#16a34a;color:#fff;padding:10px 14px;border-radius:8px;z-index:1200"></div>
 
+<!-- PRINT PREVIEW MODAL -->
+<div class="modal-bg" id="printModal" style="z-index:1200;">
+  <div class="modal" style="max-width:980px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <h3 style="margin:0;color:#0f3057;">Calendar Print Preview</h3>
+      <button type="button" class="btn-cancel" onclick="closePrintModal()">Close</button>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="btn-print" onclick="printFromPreview()"><i class="fas fa-print"></i> Print</button>
+    </div>
+    <div style="margin-top:12px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#fff;">
+      <iframe id="printPreviewFrame" title="Calendar Preview" style="width:100%;height:70vh;border:0;"></iframe>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL -->
 <div class="modal-bg" id="calendarModal">
   <div class="modal">
@@ -298,20 +314,32 @@ if(openPrintBtn){
     if(from) params.set('from', from);
     if(to) params.set('to', to);
     if(audience) params.set('audience', audience);
-    const url = '{% url "school_calendar_print" %}' + (params.toString() ? `?${params.toString()}` : '');
-    try {
-      if (window.SkulPlusPrint && typeof window.SkulPlusPrint.printUrl === 'function') {
-        window.SkulPlusPrint.printUrl(url);
-        return;
-      }
-    } catch (e) {}
-    const win = window.open(url, '_blank');
-    if (!win) {
-      alert('Popup blocked. Please allow popups and try again.');
-    } else {
-      win.focus();
-    }
+    params.set('preview', '1');
+    const url = '{% url "school_calendar_print" %}' + `?${params.toString()}`;
+    openPrintModal(url);
   });
+}
+
+function openPrintModal(url){
+  const frame = document.getElementById('printPreviewFrame');
+  if (frame) {
+    frame.src = url;
+  }
+  document.getElementById('printModal').style.display = 'flex';
+}
+
+function closePrintModal(){
+  const frame = document.getElementById('printPreviewFrame');
+  if (frame) frame.src = 'about:blank';
+  document.getElementById('printModal').style.display = 'none';
+}
+
+function printFromPreview(){
+  const frame = document.getElementById('printPreviewFrame');
+  if (frame && frame.contentWindow) {
+    frame.contentWindow.focus();
+    frame.contentWindow.print();
+  }
 }
 
 // Helper to attach handlers to a newly inserted row
