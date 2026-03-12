@@ -38,7 +38,9 @@
       {% endif %}
       <div>
         <div class="school-name">{{ school.name|upper }}</div>
-        <div class="tagline">WE PLAY, LEARN, GROW</div>
+        {% if school.motto %}
+        <div class="tagline">{{ school.motto }}</div>
+        {% endif %}
         {% if school.phone %}<div class="phone">{{ school.phone }}</div>{% endif %}
       </div>
       <div></div>
