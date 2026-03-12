@@ -333,6 +333,7 @@ from django.views.decorators.http import require_POST, require_GET, require_http
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 
 from django.views.decorators.http import require_POST
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET
 
 from .cbe import (
@@ -1419,6 +1420,7 @@ def delete_school_calendar_event(request, pk):
 
 
 @login_required
+@xframe_options_sameorigin
 def school_calendar_print(request):
     school, denied = _require_calendar_access(request)
     if denied:
