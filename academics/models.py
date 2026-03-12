@@ -78,3 +78,28 @@ class Attendance(models.Model):
 
     def __str__(self):
         return f"{self.student} - {self.date}"
+
+
+class SyllabusDocument(models.Model):
+    CURRICULUM_CBE = 'CBE'
+    CURRICULUM_CAMBRIDGE = 'CAMBRIDGE'
+    CURRICULUM_CHOICES = (
+        (CURRICULUM_CBE, 'CBE'),
+        (CURRICULUM_CAMBRIDGE, 'Cambridge'),
+    )
+
+    title = models.CharField(max_length=200)
+    curriculum_type = models.CharField(max_length=20, choices=CURRICULUM_CHOICES)
+    subject = models.ForeignKey(Subject, on_delete=models.SET_NULL, null=True, blank=True)
+    classroom = models.ForeignKey(ClassRoom, on_delete=models.SET_NULL, null=True, blank=True)
+    education_level = models.ForeignKey(EducationLevel, on_delete=models.SET_NULL, null=True, blank=True)
+    document = models.FileField(upload_to='syllabus_docs/')
+    sample_scheme = models.FileField(upload_to='syllabus_docs/', null=True, blank=True)
+    sample_lesson_plan = models.FileField(upload_to='syllabus_docs/', null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"{self.title} ({self.get_curriculum_type_display()})"

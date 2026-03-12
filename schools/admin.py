@@ -4,7 +4,8 @@ from .models import (
     Teacher, HeadTeacher, Announcement,
     GradeScale, ExamResult, MarkSheet,
     StudentMark, CompetencyComment, EducationLevel,
-    Pathway, PromotionLog, StreamClassTeacher, TermDate, SchoolTypePricing, LearningResource, Assignment
+    Pathway, PromotionLog, StreamClassTeacher, TermDate, SchoolTypePricing, LearningResource, Assignment,
+    AttendanceRegister, AttendanceEntry,
 )
 from .models import SiteConfig
 from .models import Exam
@@ -308,5 +309,19 @@ class AssignmentAdmin(admin.ModelAdmin):
         if school:
             return qs.filter(school=school)
         return qs
+
+
+@admin.register(AttendanceRegister)
+class AttendanceRegisterAdmin(admin.ModelAdmin):
+    list_display = ('school', 'classroom', 'stream', 'date', 'status', 'created_by')
+    list_filter = ('school', 'status', 'date')
+    search_fields = ('school__name', 'classroom__name')
+
+
+@admin.register(AttendanceEntry)
+class AttendanceEntryAdmin(admin.ModelAdmin):
+    list_display = ('register', 'student', 'status')
+    list_filter = ('status', 'register__date')
+    search_fields = ('student__first_name', 'student__last_name', 'register__classroom__name')
 
 

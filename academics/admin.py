@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Subject, StudentPathway, Exam, Mark, Attendance
+from .models import Subject, StudentPathway, Exam, Mark, Attendance, SyllabusDocument
 
 
 @admin.register(Subject)
@@ -34,3 +34,10 @@ class AttendanceAdmin(admin.ModelAdmin):
 	list_display = ('student', 'date', 'present')
 	list_filter = ('date', 'present')
 	search_fields = ('student__first_name', 'student__last_name', 'student__admission_number')
+
+
+@admin.register(SyllabusDocument)
+class SyllabusDocumentAdmin(admin.ModelAdmin):
+	list_display = ('title', 'curriculum_type', 'subject', 'classroom', 'education_level', 'uploaded_at')
+	list_filter = ('curriculum_type', 'education_level')
+	search_fields = ('title', 'subject__name')

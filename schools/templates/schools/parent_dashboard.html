@@ -190,6 +190,67 @@
         </div>
       </div>
 
+      {% if item.attendance_summary %}
+      <div style="margin-top:14px">
+        <div class="section-title"><i class="fas fa-calendar-check" style="color:#0ea5e9"></i> Attendance Summary (Last 30 Days)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          <div class="parent-card" style="flex:1 1 160px">
+            <div class="parent-kpi">
+              <div class="kpi-icon kpi-students"><i class="fas fa-check"></i></div>
+              <div>
+                <div style="font-size:12px;color:#64748b">Present</div>
+                <div style="font-size:18px;font-weight:700">{{ item.attendance_summary.present }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="parent-card" style="flex:1 1 160px">
+            <div class="parent-kpi">
+              <div class="kpi-icon kpi-announce"><i class="fas fa-xmark"></i></div>
+              <div>
+                <div style="font-size:12px;color:#64748b">Absent</div>
+                <div style="font-size:18px;font-weight:700">{{ item.attendance_summary.absent }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="parent-card" style="flex:1 1 160px">
+            <div class="parent-kpi">
+              <div class="kpi-icon kpi-fees"><i class="fas fa-clock"></i></div>
+              <div>
+                <div style="font-size:12px;color:#64748b">Late</div>
+                <div style="font-size:18px;font-weight:700">{{ item.attendance_summary.late }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="parent-card" style="flex:1 1 160px">
+            <div class="parent-kpi">
+              <div class="kpi-icon kpi-assign"><i class="fas fa-user-check"></i></div>
+              <div>
+                <div style="font-size:12px;color:#64748b">Excused</div>
+                <div style="font-size:18px;font-weight:700">{{ item.attendance_summary.excused }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="parent-card" style="flex:1 1 160px">
+            <div class="parent-kpi">
+              <div class="kpi-icon kpi-students"><i class="fas fa-percent"></i></div>
+              <div>
+                <div style="font-size:12px;color:#64748b">Attendance %</div>
+                <div style="font-size:18px;font-weight:700">{{ item.attendance_summary.percent }}%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="soft-muted" style="margin-top:6px;font-size:12px;">
+          {{ item.attendance_summary.range_start }} to {{ item.attendance_summary.range_end }}
+        </div>
+        <div style="margin-top:8px">
+          <a class="assign-btn" href="{% url 'parent_attendance_report' %}">
+            <i class="fas fa-chart-line"></i> View Full Attendance Report
+          </a>
+        </div>
+      </div>
+      {% endif %}
+
       {% if item.competency_history %}
       <div style="margin-top:14px">
         <div class="section-title"><i class="fas fa-clipboard-check" style="color:#f59e0b"></i> Competency History</div>

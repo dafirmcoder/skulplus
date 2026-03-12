@@ -1512,15 +1512,211 @@ def school_calendar_print(request):
             m += 1
 
     generated_at = timezone.localtime(timezone.now()).strftime('%d %b %Y, %I:%M %p %Z')
-    return render(request, 'schools/school_calendar_print.html', {
+      return render(request, 'schools/school_calendar_print.html', {
+          'school': school,
+          'events': event_list,
+          'range_from': range_from,
+          'range_to': range_to,
+          'audience': audience,
+          'calendar_months': months,
+          'now': generated_at,
+          'preview': preview,
+      })
+
+
+@login_required
+def attendance_register(request):
+    if not hasattr(request.user, 'teacher'):
+        return HttpResponseForbidden('Only class teachers can mark attendance.')
+    teacher = request.user.teacher
+    school = teacher.school
+    class_ids = _teacher_class_teacher_class_ids(teacher, school)
+    if not class_ids:
+        return HttpResponseForbidden('Only class teachers can mark attendance.')
+
+    from .models import AttendanceRegister, AttendanceEntry, Student, ClassRoom, Stream
+
+    classes = ClassRoom.objects.filter(id__in=class_ids, school=school).order_by('order', 'name')
+    selected_class_id = request.GET.get('class_id') or request.POST.get('class_id') or (classes[0].id if classes else None)
+    selected_date = parse_date(request.GET.get('date') or request.POST.get('date') or '') or timezone.localdate()
+
+    register = None
+    entries_map = {}
+    students = Student.objects.none()
+    stream_options = []
+    selected_stream_id = None
+
+    if selected_class_id:
+        allowed, all_streams, allowed_stream_ids = _teacher_class_teacher_scope_for_class(
+            teacher, school, int(selected_class_id)
+        )
+        if not allowed:
+            return HttpResponseForbidden('Not allowed for selected class.')
+
+        if not all_streams and allowed_stream_ids:
+            stream_options = list(Stream.objects.filter(id__in=allowed_stream_ids).order_by('name'))
+            selected_stream_id = request.GET.get('stream_id') or request.POST.get('stream_id') or (stream_options[0].id if stream_options else None)
+            if selected_stream_id and int(selected_stream_id) not in allowed_stream_ids:
+                return HttpResponseForbidden('Not allowed for selected stream.')
+        stream_obj = Stream.objects.filter(id=selected_stream_id).first() if selected_stream_id else None
+
+        students = Student.objects.filter(school=school, classroom_id=selected_class_id, is_alumni=False)
+        if stream_obj:
+            students = students.filter(stream=stream_obj)
+        students = students.order_by('first_name', 'last_name')
+
+        register, _ = AttendanceRegister.objects.get_or_create(
+            school=school,
+            classroom_id=selected_class_id,
+            stream=stream_obj,
+            date=selected_date,
+            defaults={'created_by': request.user},
+        )
+        entries = AttendanceEntry.objects.filter(register=register).select_related('student')
+        entries_map = {e.student_id: e for e in entries}
+
+        if request.method == 'POST':
+            if register.status == AttendanceRegister.STATUS_SUBMITTED:
+                messages.warning(request, 'This register is already submitted.')
+                stream_qs = f"&stream_id={selected_stream_id}" if selected_stream_id else ""
+                return redirect(f"{request.path}?class_id={selected_class_id}&date={selected_date}{stream_qs}")
+            action = (request.POST.get('action') or 'save').lower()
+            for student in students:
+                status = request.POST.get(f'status_{student.id}') or AttendanceEntry.STATUS_PRESENT
+                remarks = request.POST.get(f'remarks_{student.id}', '')
+                AttendanceEntry.objects.update_or_create(
+                    register=register,
+                    student=student,
+                    defaults={'status': status, 'remarks': remarks},
+                )
+            if action == 'submit':
+                register.status = AttendanceRegister.STATUS_SUBMITTED
+                register.submitted_at = timezone.now()
+            else:
+                register.status = AttendanceRegister.STATUS_DRAFT
+                register.submitted_at = None
+            register.created_by = request.user
+            register.save(update_fields=['status', 'submitted_at', 'created_by'])
+            messages.success(request, 'Attendance saved.' if action != 'submit' else 'Attendance submitted.')
+            stream_qs = f"&stream_id={selected_stream_id}" if selected_stream_id else ""
+            return redirect(f"{request.path}?class_id={selected_class_id}&date={selected_date}{stream_qs}")
+
+    return render(request, 'schools/attendance_register.html', {
         'school': school,
-        'events': event_list,
+        'classes': classes,
+        'selected_class_id': int(selected_class_id) if selected_class_id else None,
+        'selected_date': selected_date,
+        'students': students,
+        'entries_map': entries_map,
+        'register': register,
+        'stream_options': stream_options,
+        'selected_stream_id': int(selected_stream_id) if selected_stream_id else None,
+        'status_choices': AttendanceEntry.STATUS_CHOICES,
+    })
+
+
+@login_required
+def attendance_overview(request):
+    school, denied = _require_school_permission(request, 'academics', 'students')
+    if denied:
+        return denied
+    if not has_full_headteacher_access(request.user, school) and not request.user.is_superuser:
+        return HttpResponseForbidden('Only headteachers can access attendance reports.')
+
+    from .models import AttendanceRegister, AttendanceEntry, ClassRoom
+
+    class_id = request.GET.get('class_id')
+    status = (request.GET.get('status') or '').strip().upper()
+    range_from = parse_date(request.GET.get('from') or '')
+    range_to = parse_date(request.GET.get('to') or '')
+
+    registers = AttendanceRegister.objects.filter(school=school).select_related('classroom', 'stream', 'created_by')
+    if class_id:
+        registers = registers.filter(classroom_id=class_id)
+    if status in (AttendanceRegister.STATUS_DRAFT, AttendanceRegister.STATUS_SUBMITTED):
+        registers = registers.filter(status=status)
+    if range_from:
+        registers = registers.filter(date__gte=range_from)
+    if range_to:
+        registers = registers.filter(date__lte=range_to)
+    registers = registers.order_by('-date', '-id')[:200]
+
+    class_list = ClassRoom.objects.filter(school=school).order_by('order', 'name')
+    register_ids = [r.id for r in registers]
+    entry_counts = {}
+    if register_ids:
+        counts = (
+            AttendanceEntry.objects.filter(register_id__in=register_ids)
+            .values('register_id', 'status')
+            .annotate(total=Count('id'))
+        )
+        for row in counts:
+            entry_counts.setdefault(row['register_id'], {})[row['status']] = row['total']
+
+    return render(request, 'schools/attendance_overview.html', {
+        'school': school,
+        'classes': class_list,
+        'registers': registers,
+        'entry_counts': entry_counts,
         'range_from': range_from,
         'range_to': range_to,
-        'audience': audience,
-        'calendar_months': months,
-        'now': generated_at,
-        'preview': preview,
+        'selected_class_id': int(class_id) if class_id else None,
+        'selected_status': status,
+    })
+
+
+@login_required
+def attendance_print_week(request):
+    school, denied = _require_school_permission(request, 'academics', 'students')
+    if denied:
+        return denied
+
+    from .models import AttendanceRegister, AttendanceEntry, Student, ClassRoom, Stream
+
+    class_id = request.GET.get('class_id')
+    week_start = parse_date(request.GET.get('week_start') or '') or timezone.localdate()
+    if not class_id:
+        return HttpResponseForbidden('Class required.')
+
+    classroom = ClassRoom.objects.filter(id=class_id, school=school).first()
+    if not classroom:
+        return HttpResponseForbidden('Invalid class.')
+
+    stream_id = request.GET.get('stream_id')
+    stream_obj = Stream.objects.filter(id=stream_id).first() if stream_id else None
+
+    # normalize week_start to Monday
+    week_start = week_start - datetime.timedelta(days=week_start.weekday())
+    week_days = [week_start + datetime.timedelta(days=i) for i in range(7)]
+
+    registers = AttendanceRegister.objects.filter(
+        school=school,
+        classroom=classroom,
+        date__in=week_days,
+        status=AttendanceRegister.STATUS_SUBMITTED,
+    )
+    if stream_obj:
+        registers = registers.filter(stream=stream_obj)
+
+    register_map = {r.date: r for r in registers}
+    students = Student.objects.filter(school=school, classroom=classroom, is_alumni=False)
+    if stream_obj:
+        students = students.filter(stream=stream_obj)
+    students = students.order_by('first_name', 'last_name')
+
+    entry_map = {}
+    if register_map:
+        entries = AttendanceEntry.objects.filter(register_id__in=[r.id for r in register_map.values()]).select_related('student', 'register')
+        for e in entries:
+            entry_map.setdefault(e.student_id, {})[e.register.date] = e
+
+    return render(request, 'schools/attendance_print_week.html', {
+        'school': school,
+        'classroom': classroom,
+        'stream': stream_obj,
+        'week_days': week_days,
+        'students': students,
+        'entry_map': entry_map,
     })
 
 
@@ -2896,8 +3092,8 @@ def parent_dashboard(request):
     student_cards = []
     total_balance = 0
     total_assignments = 0
-    for student in students:
-        school = student.school
+      for student in students:
+          school = student.school
         term, year = resolve_active_term_year(school)
         balance = student.balance(term, year)
         total_balance += balance
@@ -2978,23 +3174,54 @@ def parent_dashboard(request):
                 })
             competency_history.sort(key=lambda r: (r['year'], term_order.get(r['term'], 0), r['title']), reverse=True)
 
-        student_cards.append({
-            'student': student,
-            'term': term,
-            'year': year,
-            'balance': balance,
-            'payments': payments,
-            'academic_history': academic_history,
-            'competency_history': competency_history,
-            'assignments': list(
-                Assignment.objects.filter(
-                    classroom=student.classroom,
-                    term=term,
-                    year=year,
-                ).select_related('subject', 'teacher__user').order_by('subject__name')
-            ) if student.classroom else [],
-        })
-        total_assignments += len(student_cards[-1]['assignments'])
+          student_cards.append({
+              'student': student,
+              'term': term,
+              'year': year,
+              'balance': balance,
+              'payments': payments,
+              'academic_history': academic_history,
+              'competency_history': competency_history,
+              'assignments': list(
+                  Assignment.objects.filter(
+                      classroom=student.classroom,
+                      term=term,
+                      year=year,
+                  ).select_related('subject', 'teacher__user').order_by('subject__name')
+              ) if student.classroom else [],
+          })
+          total_assignments += len(student_cards[-1]['assignments'])
+
+          try:
+              from .models import AttendanceRegister, AttendanceEntry
+              end_date = timezone.localdate()
+              start_date = end_date - datetime.timedelta(days=30)
+              att_qs = AttendanceEntry.objects.filter(
+                  student=student,
+                  register__status=AttendanceRegister.STATUS_SUBMITTED,
+                  register__date__range=(start_date, end_date),
+              ).select_related('register')
+              total_days = att_qs.count()
+              status_counts = defaultdict(int)
+              for row in att_qs.values('status').annotate(total=Count('id')):
+                  status_counts[row['status']] = row['total']
+              present = status_counts.get(AttendanceEntry.STATUS_PRESENT, 0)
+              absent = status_counts.get(AttendanceEntry.STATUS_ABSENT, 0)
+              late = status_counts.get(AttendanceEntry.STATUS_LATE, 0)
+              excused = status_counts.get(AttendanceEntry.STATUS_EXCUSED, 0)
+              pct = round((present / total_days) * 100, 1) if total_days else 0
+              student_cards[-1]['attendance_summary'] = {
+                  'total_days': total_days,
+                  'present': present,
+                  'absent': absent,
+                  'late': late,
+                  'excused': excused,
+                  'percent': pct,
+                  'range_start': start_date,
+                  'range_end': end_date,
+              }
+          except Exception:
+              student_cards[-1]['attendance_summary'] = None
 
     announcements = Announcement.objects.filter(
         school_id__in={s.school_id for s in students}
@@ -3029,6 +3256,60 @@ def parent_dashboard(request):
         'total_assignments': total_assignments,
         'announcement_count': announcements.count(),
         'calendar_events': parent_calendar_events,
+    })
+
+
+@login_required
+def parent_attendance_report(request):
+    students = Student.objects.filter(parent_user=request.user).select_related(
+        'classroom__level', 'stream', 'school'
+    ).order_by('first_name', 'last_name')
+    if not students.exists():
+        return HttpResponseForbidden()
+
+    from .models import AttendanceRegister, AttendanceEntry
+
+    range_to = parse_date(request.GET.get('to') or '') or timezone.localdate()
+    range_from = parse_date(request.GET.get('from') or '') or (range_to - datetime.timedelta(days=30))
+
+    entries = (
+        AttendanceEntry.objects.filter(
+            student__in=students,
+            register__status=AttendanceRegister.STATUS_SUBMITTED,
+            register__date__range=(range_from, range_to),
+        )
+        .select_related('student', 'register', 'register__classroom', 'register__stream')
+        .order_by('-register__date')
+    )
+
+    student_maps = {}
+    for student in students:
+        student_maps[student.id] = {
+            'student': student,
+            'entries': [],
+            'counts': defaultdict(int),
+            'total_days': 0,
+            'percent': 0,
+        }
+
+    for entry in entries:
+        data = student_maps.get(entry.student_id)
+        if not data:
+            continue
+        data['entries'].append(entry)
+        data['counts'][entry.status] += 1
+
+    for data in student_maps.values():
+        total_days = sum(data['counts'].values())
+        present = data['counts'].get(AttendanceEntry.STATUS_PRESENT, 0)
+        percent = round((present / total_days) * 100, 1) if total_days else 0
+        data['total_days'] = total_days
+        data['percent'] = percent
+
+    return render(request, 'schools/parent_attendance_report.html', {
+        'student_maps': list(student_maps.values()),
+        'range_from': range_from,
+        'range_to': range_to,
     })
 
 

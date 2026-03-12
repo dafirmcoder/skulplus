@@ -502,6 +502,55 @@ class SchoolCalendarEvent(models.Model):
         return f"{self.school.name} - {self.title} ({self.start_date})"
 
 
+class AttendanceRegister(models.Model):
+    STATUS_DRAFT = 'DRAFT'
+    STATUS_SUBMITTED = 'SUBMITTED'
+    STATUS_CHOICES = (
+        (STATUS_DRAFT, 'Draft'),
+        (STATUS_SUBMITTED, 'Submitted'),
+    )
+
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='attendance_registers')
+    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, related_name='attendance_registers')
+    stream = models.ForeignKey(Stream, on_delete=models.SET_NULL, null=True, blank=True, related_name='attendance_registers')
+    date = models.DateField()
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='attendance_created')
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-id']
+        unique_together = ('school', 'classroom', 'stream', 'date')
+
+    def __str__(self):
+        return f"{self.school.name} {self.classroom} {self.date}"
+
+
+class AttendanceEntry(models.Model):
+    STATUS_PRESENT = 'PRESENT'
+    STATUS_ABSENT = 'ABSENT'
+    STATUS_LATE = 'LATE'
+    STATUS_EXCUSED = 'EXCUSED'
+    STATUS_CHOICES = (
+        (STATUS_PRESENT, 'Present'),
+        (STATUS_ABSENT, 'Absent'),
+        (STATUS_LATE, 'Late'),
+        (STATUS_EXCUSED, 'Excused'),
+    )
+
+    register = models.ForeignKey(AttendanceRegister, on_delete=models.CASCADE, related_name='entries')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendance_entries')
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_PRESENT)
+    remarks = models.TextField(blank=True, default='')
+
+    class Meta:
+        unique_together = ('register', 'student')
+
+    def __str__(self):
+        return f"{self.student} - {self.get_status_display()}"
+
+
 # Site-level configuration (singleton pattern not enforced here; admin can keep one active entry)
 class SiteConfig(models.Model):
     """Holds site-wide assets such as the logo uploaded by a superuser/admin.

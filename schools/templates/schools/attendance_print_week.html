@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Attendance Register</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #fff; color: #111; }
+    @page { size: A4 landscape; margin: 8mm 10mm 10mm 10mm; }
+    .print-card { max-width: 1100px; margin: 0 auto; padding: 0; }
+    .header { display: grid; grid-template-columns: 80px 1fr 80px; align-items: center; text-align: center; margin-bottom: 6px; }
+    .header img { width: 70px; height: 70px; object-fit: contain; }
+    .school-name { font-weight: 800; letter-spacing: 0.5px; font-size: 18px; }
+    .tagline { font-size: 12px; margin-top: 2px; font-style: italic; }
+    .phone { color: #1f7a1f; font-weight: 700; margin-top: 2px; font-size: 11px; text-decoration: underline; }
+    .address { font-size: 11px; margin-top: 2px; }
+    .meta { display: flex; justify-content: space-between; font-size: 12px; margin: 8px 0 6px; }
+    .meta strong { font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; border: 2px solid #000; }
+    th, td { border: 1px solid #000; padding: 6px 6px; font-size: 11px; text-align: center; }
+    th { background: #e6f4f1; font-weight: 700; }
+    td.name { text-align: left; }
+    .status { font-weight: 700; padding: 2px 4px; border-radius: 6px; display: inline-block; min-width: 18px; }
+    .st-PRESENT { background: #dcfce7; color: #166534; }
+    .st-ABSENT { background: #fee2e2; color: #b91c1c; }
+    .st-LATE { background: #fef9c3; color: #92400e; }
+    .st-EXCUSED { background: #e0f2fe; color: #0369a1; }
+    .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; margin-top: 8px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i { width: 10px; height: 10px; border-radius: 4px; display: inline-block; }
+    @media print {
+      body { margin: 0; padding: 0; }
+      .print-card { margin: 0; }
+      @page { size: A4 landscape; margin: 8mm 10mm 10mm 10mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-card">
+    <div class="header">
+      {% if school.logo %}
+        <img src="{{ school.logo.url }}" alt="{{ school.name }}">
+      {% else %}
+        <div></div>
+      {% endif %}
+      <div>
+        <div class="school-name">{{ school.name|upper }}</div>
+        {% if school.motto %}<div class="tagline">{{ school.motto|upper }}</div>{% endif %}
+        <div class="phone">
+          {% if school.phone %}{{ school.phone|upper }}{% endif %}{% if school.phone and school.email %} | {% endif %}{% if school.email %}{{ school.email|upper }}{% endif %}
+        </div>
+        {% if school.address %}<div class="address">{{ school.address|upper }}</div>{% endif %}
+      </div>
+      <div></div>
+    </div>
+
+    <div class="meta">
+      <div>
+        <strong>Class:</strong> {{ classroom.name }}{% if stream %} - {{ stream.name }}{% endif %}
+      </div>
+      <div>
+        <strong>Week:</strong> {{ week_days.0|date:'M d, Y' }} - {{ week_days|last|date:'M d, Y' }}
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:38px;">#</th>
+          <th style="width:180px;">Student</th>
+          {% for day in week_days %}
+            <th>{{ day|date:'D' }}<br>{{ day|date:'m/d' }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in students %}
+        {% with student_map=entry_map|get_item:student.id %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td class="name">{{ student.first_name }} {{ student.last_name }}</td>
+          {% for day in week_days %}
+            {% with entry=student_map|get_item:day %}
+            <td>
+              {% if entry %}
+                <span class="status st-{{ entry.status }}">{{ entry.status|slice:":1" }}</span>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            {% endwith %}
+          {% endfor %}
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td colspan="{{ week_days|length|add:'2' }}" style="text-align:center;">No students found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="legend">
+      <span><i style="background:#dcfce7"></i> P - Present</span>
+      <span><i style="background:#fee2e2"></i> A - Absent</span>
+      <span><i style="background:#fef9c3"></i> L - Late</span>
+      <span><i style="background:#e0f2fe"></i> E - Excused</span>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+{% block content %}
+<style>
+  .att-card{background:#fff;border-radius:14px;padding:18px;border:1px solid #e2e8f0;box-shadow:0 10px 24px rgba(15,23,42,.08);}  
+  .att-header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .att-title{font-size:20px;font-weight:700;color:#0f3057;margin:0;}
+  .filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px;}
+  .filter-grid label{font-size:12px;color:#64748b;font-weight:600;}
+  .status-pill{padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;}
+  .status-draft{background:#fee2e2;color:#b91c1c;}
+  .status-submitted{background:#dcfce7;color:#166534;}
+  .metric{display:flex;gap:10px;align-items:center;font-size:12px;color:#475569;}
+  .metric strong{color:#0f172a;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{padding:10px;border-bottom:1px solid #e2e8f0;}
+  th{font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;}
+  .table-wrap{overflow:auto;}
+  @media(max-width:768px){.att-card{padding:12px}}
+</style>
+
+<div class="att-card">
+  <div class="att-header">
+    <h2 class="att-title"><i class="fas fa-clipboard-check"></i> Attendance Overview</h2>
+  </div>
+
+  <form method="get">
+    <div class="filter-grid">
+      <div>
+        <label>Class</label>
+        <select class="form-control" name="class_id">
+          <option value="">All Classes</option>
+          {% for c in classes %}
+            <option value="{{ c.id }}" {% if selected_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Status</label>
+        <select class="form-control" name="status">
+          <option value="">All</option>
+          <option value="DRAFT" {% if selected_status == 'DRAFT' %}selected{% endif %}>Draft</option>
+          <option value="SUBMITTED" {% if selected_status == 'SUBMITTED' %}selected{% endif %}>Submitted</option>
+        </select>
+      </div>
+      <div>
+        <label>From</label>
+        <input type="date" class="form-control" name="from" value="{{ range_from|date:'Y-m-d' }}">
+      </div>
+      <div>
+        <label>To</label>
+        <input type="date" class="form-control" name="to" value="{{ range_to|date:'Y-m-d' }}">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary" type="submit">Filter</button>
+      <a class="btn btn-outline" href="{{ request.path }}">Reset</a>
+    </div>
+  </form>
+
+  <div class="table-wrap" style="margin-top:14px;">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Class</th>
+          <th>Stream</th>
+          <th>Status</th>
+          <th>Present</th>
+          <th>Absent</th>
+          <th>Late</th>
+          <th>Excused</th>
+          <th>Marked By</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in registers %}
+        {% with counts=entry_counts|get_item:r.id %}
+        <tr>
+          <td>{{ r.date|date:'M d, Y' }}</td>
+          <td>{{ r.classroom.name }}</td>
+          <td>{% if r.stream %}{{ r.stream.name }}{% else %}-{% endif %}</td>
+          <td>
+            <span class="status-pill {% if r.status == 'SUBMITTED' %}status-submitted{% else %}status-draft{% endif %}">
+              {{ r.get_status_display }}
+            </span>
+          </td>
+          <td>{{ counts.PRESENT|default:0 }}</td>
+          <td>{{ counts.ABSENT|default:0 }}</td>
+          <td>{{ counts.LATE|default:0 }}</td>
+          <td>{{ counts.EXCUSED|default:0 }}</td>
+          <td>{% if r.created_by %}{{ r.created_by.get_full_name|default:r.created_by.username }}{% else %}-{% endif %}</td>
+          <td>
+            <button type="button" class="btn btn-sm btn-outline" onclick="printWeek('{{ r.classroom.id }}','{{ r.date|date:'Y-m-d' }}','{% if r.stream %}{{ r.stream.id }}{% endif %}')">
+              <i class="fas fa-print"></i> Print Week
+            </button>
+          </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td colspan="10" style="text-align:center;color:#64748b;">No registers found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function printWeek(classId, weekStart, streamId){
+  const params = new URLSearchParams();
+  params.set('class_id', classId);
+  if (weekStart) params.set('week_start', weekStart);
+  if (streamId) params.set('stream_id', streamId);
+  const url = "{% url 'attendance_print_week' %}?" + params.toString();
+  if (window.SkulPlusPrint && typeof window.SkulPlusPrint.printUrl === 'function') {
+    window.SkulPlusPrint.printUrl(url);
+  } else {
+    window.open(url, '_blank');
+  }
+}
+</script>
+{% endblock %}
