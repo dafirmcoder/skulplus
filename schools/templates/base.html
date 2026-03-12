@@ -570,6 +570,8 @@
       }
 
       function triggerPrint(win) {
+        if (!win || win.__skulplusPrinted) return;
+        win.__skulplusPrinted = true;
         const run = function () {
           try {
             win.focus();
@@ -579,7 +581,7 @@
           }
         };
         setTimeout(run, 300);
-        setTimeout(run, 1100);
+        setTimeout(function(){ win.__skulplusPrinted = false; }, 3000);
       }
 
       window.SkulPlusPrint = {
@@ -587,6 +589,8 @@
           const frame = ensureFrame();
           frame.onload = function () {
             if (frame.contentWindow) triggerPrint(frame.contentWindow);
+            frame.onload = null;
+            setTimeout(function(){ frame.src = 'about:blank'; }, 1500);
           };
           frame.src = url;
         },
@@ -594,6 +598,8 @@
           const frame = ensureFrame();
           frame.onload = function () {
             if (frame.contentWindow) triggerPrint(frame.contentWindow);
+            frame.onload = null;
+            setTimeout(function(){ frame.src = 'about:blank'; }, 1500);
           };
           frame.srcdoc = html;
         }

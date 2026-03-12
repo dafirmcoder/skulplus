@@ -101,6 +101,9 @@
           </div>
           <div class="muted">Prepared by: {{ request.user.get_full_name|default:request.user.username }}</div>
         </div>
+        {% if school.logo %}
+          <div style="width:62px;height:62px;"></div>
+        {% endif %}
       </div>
     </div>
     <div class="table-wrap">

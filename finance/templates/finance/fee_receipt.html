@@ -128,14 +128,43 @@
 
 <script>
   function printReceipt() {
-    const url = new URL(window.location.href);
-    url.searchParams.set('format', 'pdf');
-    url.searchParams.set('print_pdf', '1');
-    if (window.SkulPlusPrint && window.SkulPlusPrint.printUrl) {
-      window.SkulPlusPrint.printUrl(url.toString());
-    } else {
-      window.open(url.toString(), '_blank');
+    const printRoot = document.getElementById('receipt-print-root');
+    if (printRoot && window.SkulPlusPrint && window.SkulPlusPrint.printHtml) {
+      const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Fee Receipt</title>
+  <style>
+    *{box-sizing:border-box;}
+    body{font-family:Arial, sans-serif;margin:0;padding:0;background:#fff;color:#111;}
+    @page{size:A4 portrait;margin:10mm;}
+    .receipt-wrap{max-width:none;margin:0;border:none;border-radius:0;padding:6mm;}
+    .receipt-top{display:grid;grid-template-columns:72px 1fr auto;gap:12px;border-bottom:2px solid #0f3057;padding-bottom:10px;margin-bottom:12px;align-items:center;}
+    .school-logo{width:72px;height:72px;object-fit:contain;border:1px solid #e5e7eb;border-radius:6px;padding:4px;background:#fff;}
+    .muted{color:#6b7280;font-size:12px;}
+    .receipt-title{font-size:20px;font-weight:800;margin:0;color:#0f3057;}
+    .receipt-motto{font-style:italic;}
+    .receipt-contact{text-decoration:underline;}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+    .info-box{border:1px solid #e5e7eb;border-radius:8px;padding:10px;}
+    .kv{display:flex;justify-content:space-between;margin:4px 0;}
+    .split-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
+    .split-table th,.split-table td{border:1px solid #e5e7eb;padding:8px;}
+    .split-table th{background:#f9fafb;text-align:left;}
+    .right{text-align:right;}
+    .stamp-wrap{display:flex;align-items:center;justify-content:flex-end;gap:12px;}
+    .school-stamp{width:110px;height:110px;object-fit:contain;background:transparent;border:none;padding:0;}
+  </style>
+</head>
+<body>
+  ${printRoot.innerHTML}
+</body>
+</html>`;
+      window.SkulPlusPrint.printHtml(html);
+      return;
     }
+    window.print();
   }
 </script>
 {% endblock %}

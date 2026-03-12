@@ -152,21 +152,33 @@ def _build_payroll_period_pdf_bytes(school, month, year, records):
     right = width - 45
     y = height - 42
 
-    logo_drawn = False
-    if school.logo:
+    logo = _image_reader_from_field(school.logo)
+    if logo:
         try:
-            p.drawImage(ImageReader(school.logo.path), left, y - 44, width=48, height=48, preserveAspectRatio=True, mask='auto')
-            logo_drawn = True
+            p.drawImage(logo, left, y - 44, width=48, height=48, preserveAspectRatio=True, mask='auto')
         except Exception:
-            logo_drawn = False
+            pass
 
-    header_x = left + (58 if logo_drawn else 0)
+    center_x = width / 2
     p.setFont('Helvetica-Bold', 14)
-    p.drawString(header_x, y, f'{(school.name or "").upper()} PAYROLL EVIDENCE')
+    p.drawCentredString(center_x, y, (school.name or '').upper())
+    if getattr(school, 'motto', ''):
+        p.setFont('Helvetica-Oblique', 10)
+        p.drawCentredString(center_x, y - 14, str(school.motto).upper()[:120])
+    contact_line = ' | '.join([str(v).upper() for v in [school.phone, school.email] if v])
+    if contact_line:
+        p.setFont('Helvetica', 10)
+        p.drawCentredString(center_x, y - 28, contact_line[:120])
+        text_w = p.stringWidth(contact_line[:120], 'Helvetica', 10)
+        p.line(center_x - text_w / 2, y - 30, center_x + text_w / 2, y - 30)
+    if getattr(school, 'address', ''):
+        p.setFont('Helvetica', 10)
+        p.drawCentredString(center_x, y - 42, str(school.address).upper()[:120])
+    p.setFont('Helvetica-Bold', 11)
+    p.drawCentredString(center_x, y - 56, f'PAYROLL EVIDENCE - PERIOD: {month} {year}')
     p.setFont('Helvetica', 10)
-    p.drawString(header_x, y - 14, f'Period: {month} {year}')
-    p.drawString(header_x, y - 28, f'Records: {len(records)}')
-    y -= 56
+    p.drawCentredString(center_x, y - 70, f'RECORDS: {len(records)}')
+    y -= 84
     p.line(left, y, right, y)
     y -= 14
 
@@ -565,32 +577,35 @@ def generate_payslip(request, record_id):
         return f"{amount:,.2f}"
 
     # Header with school details and logo
-    logo_drawn = False
-    if school.logo:
+    logo = _image_reader_from_field(school.logo)
+    if logo:
         try:
-            p.drawImage(ImageReader(school.logo.path), left, y - 46, width=52, height=52, preserveAspectRatio=True, mask='auto')
-            logo_drawn = True
+            p.drawImage(logo, left, y - 46, width=52, height=52, preserveAspectRatio=True, mask='auto')
         except Exception:
-            logo_drawn = False
+            pass
 
-    header_x = left + (62 if logo_drawn else 0)
+    center_x = width / 2
     p.setFont('Helvetica-Bold', 16)
-    p.drawString(header_x, y, (school.name or '').upper())
-    p.setFont('Helvetica', 10)
-    detail_line = " | ".join([str(v).upper() for v in [school.phone, school.email, school.address] if v])
-    if school.motto:
-        p.drawString(header_x, y - 14, str(school.motto).upper())
-        if detail_line:
-            p.drawString(header_x, y - 27, detail_line)
-    elif detail_line:
-        p.drawString(header_x, y - 14, detail_line)
+    p.drawCentredString(center_x, y, (school.name or '').upper())
+    if getattr(school, 'motto', ''):
+        p.setFont('Helvetica-Oblique', 10)
+        p.drawCentredString(center_x, y - 14, str(school.motto).upper()[:120])
+    contact_line = " | ".join([str(v).upper() for v in [school.phone, school.email] if v])
+    if contact_line:
+        p.setFont('Helvetica', 10)
+        p.drawCentredString(center_x, y - 28, contact_line[:120])
+        text_w = p.stringWidth(contact_line[:120], 'Helvetica', 10)
+        p.line(center_x - text_w / 2, y - 30, center_x + text_w / 2, y - 30)
+    if getattr(school, 'address', ''):
+        p.setFont('Helvetica', 10)
+        p.drawCentredString(center_x, y - 42, str(school.address).upper()[:120])
 
     p.setFont('Helvetica-Bold', 15)
     p.drawRightString(right, y, 'PAYSLIP')
     p.setFont('Helvetica', 10)
     p.drawRightString(right, y - 14, f'{record.month} {record.year}')
 
-    y -= 62
+    y -= 74
     p.line(left, y, right, y)
     y -= 16
 
@@ -668,9 +683,10 @@ def generate_payslip(request, record_id):
 
     y -= 48
     stamp_drawn = False
-    if school.stamp:
+    stamp_img = _image_reader_from_field(school.stamp)
+    if stamp_img:
         try:
-            p.drawImage(ImageReader(school.stamp.path), stamp_x, y - 8, width=95, height=52, preserveAspectRatio=True, mask='auto')
+            p.drawImage(stamp_img, stamp_x, y - 8, width=95, height=52, preserveAspectRatio=True, mask='auto')
             stamp_drawn = True
         except Exception:
             stamp_drawn = False
@@ -678,9 +694,10 @@ def generate_payslip(request, record_id):
         p.line(stamp_x, y + 4, stamp_x + 120, y + 4)
 
     sign_drawn = False
-    if school.head_signature:
+    sign_img = _image_reader_from_field(school.head_signature)
+    if sign_img:
         try:
-            p.drawImage(ImageReader(school.head_signature.path), sign_x, y - 8, width=130, height=52, preserveAspectRatio=True, mask='auto')
+            p.drawImage(sign_img, sign_x, y - 8, width=130, height=52, preserveAspectRatio=True, mask='auto')
             sign_drawn = True
         except Exception:
             sign_drawn = False
@@ -747,22 +764,33 @@ def generate_p9(request, record_id):
     y = height - 42
 
     # Header
-    logo_drawn = False
-    if school.logo:
+    logo = _image_reader_from_field(school.logo)
+    if logo:
         try:
-            p.drawImage(ImageReader(school.logo.path), left, y - 46, width=52, height=52, preserveAspectRatio=True, mask='auto')
-            logo_drawn = True
+            p.drawImage(logo, left, y - 46, width=52, height=52, preserveAspectRatio=True, mask='auto')
         except Exception:
-            logo_drawn = False
-    header_x = left + (62 if logo_drawn else 0)
+            pass
+    center_x = width / 2
     p.setFont('Helvetica-Bold', 16)
-    p.drawString(header_x, y, (school.name or '').upper())
+    p.drawCentredString(center_x, y, (school.name or '').upper())
+    if getattr(school, 'motto', ''):
+        p.setFont('Helvetica-Oblique', 10)
+        p.drawCentredString(center_x, y - 14, str(school.motto).upper()[:120])
+    contact_line = " | ".join([str(v).upper() for v in [school.phone, school.email] if v])
+    if contact_line:
+        p.setFont('Helvetica', 10)
+        p.drawCentredString(center_x, y - 28, contact_line[:120])
+        text_w = p.stringWidth(contact_line[:120], 'Helvetica', 10)
+        p.line(center_x - text_w / 2, y - 30, center_x + text_w / 2, y - 30)
+    if getattr(school, 'address', ''):
+        p.setFont('Helvetica', 10)
+        p.drawCentredString(center_x, y - 42, str(school.address).upper()[:120])
     p.setFont('Helvetica-Bold', 13)
     p.drawRightString(right, y, f'P9 FORM - {year}')
     p.setFont('Helvetica', 10)
-    p.drawString(header_x, y - 16, f'Staff: {staff.full_name}')
-    p.drawString(header_x, y - 30, f'KRA PIN: {staff.kra_pin or "-"}')
-    y -= 58
+    p.drawString(left, y - 16, f'Staff: {staff.full_name}')
+    p.drawString(left, y - 30, f'KRA PIN: {staff.kra_pin or "-"}')
+    y -= 62
     p.line(left, y, right, y)
     y -= 14
 
@@ -1054,21 +1082,32 @@ def export_payroll_pdf(request):
     y = height - 42
     period_label = f'{export_month} {export_year}' if export_month and export_year is not None else 'All Periods'
 
-    logo_drawn = False
-    if school.logo:
+    logo = _image_reader_from_field(school.logo)
+    if logo:
         try:
-            p.drawImage(ImageReader(school.logo.path), left, y - 36, width=42, height=42, preserveAspectRatio=True, mask='auto')
-            logo_drawn = True
+            p.drawImage(logo, left, y - 36, width=42, height=42, preserveAspectRatio=True, mask='auto')
         except Exception:
-            logo_drawn = False
+            pass
 
-    header_x = left + (52 if logo_drawn else 0)
+    center_x = width / 2
     p.setFont('Helvetica-Bold', 14)
-    p.drawString(header_x, y, f'{(school.name or "").upper()} PAYROLL REPORT')
+    p.drawCentredString(center_x, y, (school.name or '').upper())
+    if getattr(school, 'motto', ''):
+        p.setFont('Helvetica-Oblique', 10)
+        p.drawCentredString(center_x, y - 14, str(school.motto).upper()[:120])
+    contact_line = " | ".join([str(v).upper() for v in [school.phone, school.email] if v])
+    if contact_line:
+        p.setFont('Helvetica', 10)
+        p.drawCentredString(center_x, y - 28, contact_line[:120])
+        text_w = p.stringWidth(contact_line[:120], 'Helvetica', 10)
+        p.line(center_x - text_w / 2, y - 30, center_x + text_w / 2, y - 30)
+    if getattr(school, 'address', ''):
+        p.setFont('Helvetica', 10)
+        p.drawCentredString(center_x, y - 42, str(school.address).upper()[:120])
     p.setFont('Helvetica', 10)
-    p.drawString(header_x, y - 14, f'Payroll Month: {period_label}')
-    p.drawString(header_x, y - 27, f'Total Records: {records.count()}')
-    y -= 52
+    p.drawCentredString(center_x, y - 56, f'PAYROLL REPORT - {period_label}')
+    p.drawCentredString(center_x, y - 70, f'TOTAL RECORDS: {records.count()}')
+    y -= 82
 
     headers = [
         'Staff', 'Role', 'Days', 'Basic', 'Payable',
@@ -1211,3 +1250,16 @@ def export_payroll_pdf(request):
     p.showPage()
     p.save()
     return response
+def _image_reader_from_field(field):
+    if not field:
+        return None
+    try:
+        if hasattr(field, 'path'):
+            return ImageReader(field.path)
+    except Exception:
+        pass
+    try:
+        if hasattr(field, 'url'):
+            return ImageReader(field.url)
+    except Exception:
+        return None

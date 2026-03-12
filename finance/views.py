@@ -698,11 +698,11 @@ def balance_report(request):
         page_no = 1
 
         def draw_header(y_top):
-            # Logo
-            if school.logo:
+            logo = _image_reader_from_field(school.logo)
+            if logo:
                 try:
                     p.drawImage(
-                        ImageReader(school.logo.path),
+                        logo,
                         margin,
                         y_top - 48,
                         width=44,
@@ -712,23 +712,34 @@ def balance_report(request):
                     )
                 except Exception:
                     pass
+            center_x = page_w / 2
             p.setFillColor(colors.HexColor('#0f3057'))
             p.setFont('Helvetica-Bold', 14)
-            p.drawString(margin + 52, y_top - 10, (school.name or '').upper())
-            p.setFillColor(colors.HexColor('#4B5563'))
-            p.setFont('Helvetica', 9)
-            details = ' | '.join([str(v).upper() for v in [school.phone, school.email, school.address] if v])
-            if details:
-                p.drawString(margin + 52, y_top - 24, details[:130])
+            p.drawCentredString(center_x, y_top - 10, (school.name or '').upper())
+            if getattr(school, 'motto', ''):
+                p.setFont('Helvetica-Oblique', 9)
+                p.setFillColor(colors.HexColor('#475569'))
+                p.drawCentredString(center_x, y_top - 24, str(school.motto).upper()[:120])
+            contact = ' | '.join([str(v).upper() for v in [school.phone, school.email] if v])
+            if contact:
+                p.setFont('Helvetica', 9)
+                p.setFillColor(colors.HexColor('#374151'))
+                p.drawCentredString(center_x, y_top - 38, contact[:120])
+                text_w = p.stringWidth(contact[:120], 'Helvetica', 9)
+                p.line(center_x - text_w / 2, y_top - 40, center_x + text_w / 2, y_top - 40)
+            if getattr(school, 'address', ''):
+                p.setFont('Helvetica', 9)
+                p.setFillColor(colors.HexColor('#374151'))
+                p.drawCentredString(center_x, y_top - 52, str(school.address).upper()[:120])
             p.setFillColor(colors.black)
             p.setFont('Helvetica-Bold', 10)
-            p.drawString(margin + 52, y_top - 38, f'Balance Report (Cumulative) - Class: {class_label} | Term: {term} | Year: {year}')
+            p.drawCentredString(center_x, y_top - 66, f'BALANCE REPORT (CUMULATIVE) - CLASS: {class_label} | TERM: {term} | YEAR: {year}')
             p.setFont('Helvetica', 9)
-            p.drawString(margin + 52, y_top - 50, f'Prepared by: {request.user.get_full_name() or request.user.username}')
+            p.drawCentredString(center_x, y_top - 78, f'PREPARED BY: {request.user.get_full_name() or request.user.username}')
             p.setStrokeColor(colors.HexColor('#0f3057'))
             p.setLineWidth(1.2)
-            p.line(margin, y_top - 58, page_w - margin, y_top - 58)
-            return y_top - 70
+            p.line(margin, y_top - 86, page_w - margin, y_top - 86)
+            return y_top - 98
 
         def draw_table_header(y_head):
             p.setFillColor(colors.HexColor('#f3f4f6'))
@@ -914,10 +925,11 @@ def model_reports(request):
 
         def draw_header():
             y_top = page_h - margin
-            if school.logo:
+            logo = _image_reader_from_field(school.logo)
+            if logo:
                 try:
                     p.drawImage(
-                        ImageReader(school.logo.path),
+                        logo,
                         margin,
                         y_top - 42,
                         width=36,
@@ -927,17 +939,36 @@ def model_reports(request):
                     )
                 except Exception:
                     pass
+            center_x = page_w / 2
             p.setFillColor(colors.HexColor('#0f3057'))
             p.setFont('Helvetica-Bold', 13)
-            p.drawString(margin + 44, y_top - 10, f'{(school.name or "").upper()} - INCOME VS EXPENDITURE')
+            p.drawCentredString(center_x, y_top - 10, (school.name or '').upper())
+            if getattr(school, 'motto', ''):
+                p.setFont('Helvetica-Oblique', 8.5)
+                p.setFillColor(colors.HexColor('#475569'))
+                p.drawCentredString(center_x, y_top - 24, str(school.motto).upper()[:120])
+            contact = ' | '.join([str(v).upper() for v in [school.phone, school.email] if v])
+            if contact:
+                p.setFont('Helvetica', 8.5)
+                p.setFillColor(colors.HexColor('#4b5563'))
+                p.drawCentredString(center_x, y_top - 36, contact[:120])
+                text_w = p.stringWidth(contact[:120], 'Helvetica', 8.5)
+                p.line(center_x - text_w / 2, y_top - 38, center_x + text_w / 2, y_top - 38)
+            if getattr(school, 'address', ''):
+                p.setFont('Helvetica', 8.5)
+                p.setFillColor(colors.HexColor('#4b5563'))
+                p.drawCentredString(center_x, y_top - 48, str(school.address).upper()[:120])
+            p.setFillColor(colors.HexColor('#0f3057'))
+            p.setFont('Helvetica-Bold', 10)
+            p.drawCentredString(center_x, y_top - 62, 'INCOME VS EXPENDITURE REPORT')
             p.setFillColor(colors.HexColor('#4b5563'))
             p.setFont('Helvetica', 8.5)
-            p.drawString(margin + 44, y_top - 24, f'Period: {period_label}')
-            p.drawString(margin + 44, y_top - 36, f'Range: {period_start.isoformat()} to {period_end.isoformat()}')
+            p.drawCentredString(center_x, y_top - 74, f'PERIOD: {period_label}')
+            p.drawCentredString(center_x, y_top - 86, f'RANGE: {period_start.isoformat()} TO {period_end.isoformat()}')
             p.setStrokeColor(colors.HexColor('#0f3057'))
             p.setLineWidth(1)
-            p.line(margin, y_top - 48, page_w - margin, y_top - 48)
-            return y_top - 60
+            p.line(margin, y_top - 94, page_w - margin, y_top - 94)
+            return y_top - 106
 
         def ensure_space(y, needed):
             nonlocal page_no
@@ -1116,10 +1147,11 @@ def expenditure_report(request):
         page_no = 1
 
         def draw_header(y_top):
-            if school.logo:
+            logo = _image_reader_from_field(school.logo)
+            if logo:
                 try:
                     p.drawImage(
-                        ImageReader(school.logo.path),
+                        logo,
                         margin,
                         y_top - 48,
                         width=44,
@@ -1130,27 +1162,40 @@ def expenditure_report(request):
                 except Exception:
                     pass
 
+            center_x = page_w / 2
             p.setFillColor(colors.HexColor('#0f3057'))
             p.setFont('Helvetica-Bold', 14)
-            p.drawString(margin + 52, y_top - 12, (school.name or '').upper())
+            p.drawCentredString(center_x, y_top - 12, (school.name or '').upper())
 
-            p.setFillColor(colors.HexColor('#4B5563'))
-            p.setFont('Helvetica', 9)
-            details = ' | '.join([str(v).upper() for v in [school.phone, school.email, school.address] if v])
-            if details:
-                p.drawString(margin + 52, y_top - 26, details[:130])
+            if getattr(school, 'motto', ''):
+                p.setFont('Helvetica-Oblique', 9)
+                p.setFillColor(colors.HexColor('#4B5563'))
+                p.drawCentredString(center_x, y_top - 26, str(school.motto).upper()[:120])
+
+            contact = ' | '.join([str(v).upper() for v in [school.phone, school.email] if v])
+            if contact:
+                p.setFont('Helvetica', 9)
+                p.setFillColor(colors.HexColor('#4B5563'))
+                p.drawCentredString(center_x, y_top - 40, contact[:120])
+                text_w = p.stringWidth(contact[:120], 'Helvetica', 9)
+                p.line(center_x - text_w / 2, y_top - 42, center_x + text_w / 2, y_top - 42)
+
+            if getattr(school, 'address', ''):
+                p.setFont('Helvetica', 9)
+                p.setFillColor(colors.HexColor('#4B5563'))
+                p.drawCentredString(center_x, y_top - 54, str(school.address).upper()[:120])
 
             p.setFillColor(colors.black)
             p.setFont('Helvetica-Bold', 10)
-            p.drawString(margin + 52, y_top - 40, 'Expenditure Report')
+            p.drawCentredString(center_x, y_top - 68, 'EXPENDITURE REPORT')
             p.setFont('Helvetica', 8.5)
             summary = f"Filters: Date={filters['date'] or 'All'}, Votehead={filters['vote_head'] or 'All'}, Source={filters['source'] or 'All'}, Payment={filters['payment_method'] or 'All'}"
-            p.drawString(margin + 52, y_top - 52, summary[:150])
+            p.drawCentredString(center_x, y_top - 80, summary[:150])
 
             p.setStrokeColor(colors.HexColor('#0f3057'))
             p.setLineWidth(1.1)
-            p.line(margin, y_top - 60, page_w - margin, y_top - 60)
-            return y_top - 72
+            p.line(margin, y_top - 88, page_w - margin, y_top - 88)
+            return y_top - 100
 
         def draw_table_header(y_head):
             col_widths = [58, 150, 95, 86, 64, 44, 68, 66, 98, 56]
@@ -1191,10 +1236,11 @@ def expenditure_report(request):
             p.drawString(stamp_x, 68, 'Stamp')
             p.drawString(sig_x, 68, 'Signature')
 
-            if school.stamp:
+            stamp_img = _image_reader_from_field(school.stamp)
+            if stamp_img:
                 try:
                     p.drawImage(
-                        ImageReader(school.stamp.path),
+                        stamp_img,
                         stamp_x,
                         asset_y,
                         width=box_w,
@@ -1207,10 +1253,11 @@ def expenditure_report(request):
             else:
                 p.rect(stamp_x, asset_y, box_w, box_h, stroke=1, fill=0)
 
-            if school.head_signature:
+            sign_img = _image_reader_from_field(school.head_signature)
+            if sign_img:
                 try:
                     p.drawImage(
-                        ImageReader(school.head_signature.path),
+                        sign_img,
                         sig_x,
                         asset_y,
                         width=box_w,
@@ -1355,6 +1402,20 @@ def fee_receipt(request, payment_id):
         if request.GET.get('print_pdf') == '1':
             response['X-Frame-Options'] = 'SAMEORIGIN'
 
+        def _image_reader_from_field(field):
+            if not field:
+                return None
+            try:
+                if hasattr(field, 'path'):
+                    return ImageReader(field.path)
+            except Exception:
+                pass
+            try:
+                if hasattr(field, 'url'):
+                    return ImageReader(field.url)
+            except Exception:
+                return None
+
         p = canvas.Canvas(response, pagesize=A4)
         page_w, page_h = A4
         margin = 36
@@ -1363,25 +1424,37 @@ def fee_receipt(request, payment_id):
 
         # Header
         logo_size = 54
-        if school.logo:
+        logo_img = _image_reader_from_field(school.logo)
+        if logo_img:
             try:
-                p.drawImage(ImageReader(school.logo.path), margin, y - logo_size, width=logo_size, height=logo_size, preserveAspectRatio=True, mask='auto')
+                p.drawImage(logo_img, margin, y - logo_size, width=logo_size, height=logo_size, preserveAspectRatio=True, mask='auto')
             except Exception:
                 pass
         p.setFont('Helvetica-Bold', 16)
         p.setFillColor(colors.HexColor('#0f3057'))
         p.drawString(margin + 64, y - 10, (school.name or 'SCHOOL').upper())
-        p.setFont('Helvetica', 10)
+        if getattr(school, 'motto', ''):
+            p.setFont('Helvetica-Oblique', 10)
+            p.setFillColor(colors.HexColor('#475569'))
+            p.drawString(margin + 64, y - 24, str(school.motto).upper()[:120])
+        contact_line = ' | '.join([str(v).upper() for v in [school.phone, school.email] if v])
+        if contact_line:
+            p.setFont('Helvetica', 10)
+            p.setFillColor(colors.HexColor('#374151'))
+            p.drawString(margin + 64, y - 38, contact_line[:120])
+            underline_w = p.stringWidth(contact_line[:120], 'Helvetica', 10)
+            p.line(margin + 64, y - 40, margin + 64 + underline_w, y - 40)
+        if getattr(school, 'address', ''):
+            p.setFont('Helvetica', 10)
+            p.setFillColor(colors.HexColor('#374151'))
+            p.drawString(margin + 64, y - 52, str(school.address).upper()[:120])
         p.setFillColor(colors.HexColor('#374151'))
-        school_line = ' | '.join([str(v).upper() for v in [school.phone, school.email, school.address] if v])
-        if school_line:
-            p.drawString(margin + 64, y - 24, school_line[:120])
         p.setFont('Helvetica-Bold', 11)
         p.drawRightString(page_w - margin, y - 8, f'Receipt No: {payment.id}')
         p.setFont('Helvetica', 10)
         p.drawRightString(page_w - margin, y - 22, f'Date: {payment.date_paid}')
 
-        y -= 66
+        y -= 78
         p.setStrokeColor(colors.HexColor('#0f3057'))
         p.setLineWidth(1.5)
         p.line(margin, y, page_w - margin, y)
@@ -1494,10 +1567,11 @@ def fee_receipt(request, payment_id):
         p.drawString(margin + box_w + gap + 10, y - 20, f'Prepared by {request.user.get_full_name() or request.user.username}')
         p.drawString(margin + box_w + gap + 10, y - 36, 'Accounts Office')
         p.drawString(margin + box_w + gap + 10, y - 52, 'Thank you.')
-        if school.stamp:
+        stamp_img = _image_reader_from_field(school.stamp)
+        if stamp_img:
             try:
                 p.drawImage(
-                    ImageReader(school.stamp.path),
+                    stamp_img,
                     page_w - margin - 76,
                     y - 70,
                     width=64,
@@ -1816,3 +1890,16 @@ def send_fee_reminders(request):
 
 
 
+def _image_reader_from_field(field):
+    if not field:
+        return None
+    try:
+        if hasattr(field, 'path'):
+            return ImageReader(field.path)
+    except Exception:
+        pass
+    try:
+        if hasattr(field, 'url'):
+            return ImageReader(field.url)
+    except Exception:
+        return None
