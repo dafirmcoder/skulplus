@@ -15,7 +15,15 @@ body{font-family:Poppins, sans-serif;background:#f4f7fb}
 button{padding:8px 14px;border:none;border-radius:6px;font-weight:600;cursor:pointer}
 .btn-load{background:#0f3057;color:#fff}
 .btn-save{background:#16a34a;color:#fff}
-.btn-publish{background:#f59e0b;color:#fff;display:none}
+.btn-publish{background:#f59e0b;color:#fff}
+.btn-muted{background:#e5e7eb;color:#6b7280;cursor:not-allowed}
+.btn-row{padding:6px 10px;border-radius:6px;font-weight:600}
+.btn-row-edit{background:#0f3057;color:#fff}
+.btn-row-save{background:#16a34a;color:#fff}
+.btn-row[disabled]{background:#e5e7eb;color:#6b7280;cursor:not-allowed}
+.table-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.table-actions .btn-save,.table-actions .btn-publish{min-width:110px}
+.row-actions{display:flex;gap:6px}
 table{width:100%;border-collapse:collapse;margin-top:10px}
 th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}
 th{background:#f9fafb}
@@ -62,6 +70,11 @@ input.score{width:80px;padding:5px;text-align:center}
     <button class="btn-load" id="loadStudents">Load Students</button>
   </div>
 
+  <div class="table-actions" id="tableActions" style="display:none">
+    <button class="btn-save" id="saveMarks">Save</button>
+    <button class="btn-publish" id="publishMarks">Publish</button>
+  </div>
+
   <table id="marksTable" style="display:none">
     <thead>
       <tr>
@@ -73,15 +86,11 @@ input.score{width:80px;padding:5px;text-align:center}
         <th id="pointsHeader" style="display:none">Points</th>
         <th>Suggested Comments</th>
         <th>Remark</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
-
-  <div style="margin-top:15px">
-    <button class="btn-save" id="saveMarks" style="display:none">Save</button>
-    <button class="btn-publish" id="publishMarks">Publish</button>
-  </div>
 </div>
 
 <script>
@@ -96,22 +105,46 @@ const subject = document.getElementById('subject');
 const outOf = document.getElementById('outOf');
 const saveButton = document.getElementById('saveMarks');
 const publishButton = document.getElementById('publishMarks');
+const tableActions = document.getElementById('tableActions');
 const loadStudentsButton = document.getElementById('loadStudents');
 const preselectedSubjectId = "{{ selected_subject_id|default:'' }}";
 const preselectedStreamId = "{{ selected_stream_id|default:'' }}";
 
-function setSaveMode(){
-  saveButton.textContent = 'Save';
-  saveButton.dataset.action = 'save';
-  saveButton.classList.add('btn-save');
-  saveButton.classList.remove('btn-publish');
+let hasUnsavedChanges = false;
+let marksheetLoaded = false;
+
+function setDirty(isDirty){
+  hasUnsavedChanges = isDirty;
+  updateActionButtons();
 }
 
-function setPublishMode(){
-  saveButton.textContent = 'Publish';
-  saveButton.dataset.action = 'publish';
-  saveButton.classList.add('btn-publish');
-  saveButton.classList.remove('btn-save');
+function updateActionButtons(){
+  if(!marksheetLoaded){
+    saveButton.disabled = true;
+    publishButton.disabled = true;
+    saveButton.classList.add('btn-muted');
+    publishButton.classList.add('btn-muted');
+    return;
+  }
+
+  if(currentStatus === 'published'){
+    saveButton.disabled = true;
+    publishButton.disabled = true;
+    saveButton.classList.add('btn-muted');
+    publishButton.classList.add('btn-muted');
+    return;
+  }
+
+  saveButton.disabled = false;
+  saveButton.classList.remove('btn-muted');
+
+  if(hasUnsavedChanges){
+    publishButton.disabled = true;
+    publishButton.classList.add('btn-muted');
+  } else {
+    publishButton.disabled = false;
+    publishButton.classList.remove('btn-muted');
+  }
 }
 
 function getCookie(name){
@@ -132,11 +165,17 @@ function updateStatusUI(){
     if(!canEditAfterPublish){
       document.querySelectorAll('.score').forEach(i=>i.disabled=true);
     }
+    document.querySelectorAll('.btn-row-edit, .btn-row-save').forEach(btn => {
+      btn.disabled = true;
+    });
   } else {
     badge.textContent = 'Draft';
     badge.className = 'status-badge draft';
-    document.querySelectorAll('.score').forEach(i=>i.disabled=false);
+    document.querySelectorAll('.btn-row-edit').forEach(btn => {
+      btn.disabled = false;
+    });
   }
+  updateActionButtons();
 }
 
 async function loadClassStreamsAndSubjects(classId, selectedSubjectId, selectedStreamId){
@@ -295,28 +334,30 @@ loadStudentsButton.addEventListener('click', function(){
           <td>
             <textarea class="remark" data-id="${s.student_id}" data-manual="${s.comment_manual ? 'true' : 'false'}" rows="2" style="width:100%">${s.comment_text || ''}</textarea>
           </td>
+          <td>
+            <div class="row-actions">
+              <button type="button" class="btn-row btn-row-edit" data-row="${s.student_id}">Edit</button>
+              <button type="button" class="btn-row btn-row-save" data-row="${s.student_id}" disabled>Save</button>
+            </div>
+          </td>
         </tr>`;
     });
 
     if(data.students && data.students.length){
       document.getElementById('marksTable').style.display='table';
-      document.getElementById('saveMarks').style.display='inline-block';
+      tableActions.style.display='flex';
     } else {
       document.getElementById('marksTable').style.display='none';
-      document.getElementById('saveMarks').style.display='none';
+      tableActions.style.display='none';
       alert('No students allocated to this subject for the selected class.');
     }
 
-    publishButton.style.display = 'none';
-    if(currentStatus === 'published') {
-      setSaveMode();
-    } else {
-      setPublishMode();
-    }
-
+    marksheetLoaded = !!marksheetId;
+    setDirty(false);
     updateStatusUI();
     bindSuggestionHandlers();
     bindScoreHandlers();
+    bindRowActions();
   })
   .catch(err => {
     console.error('Load students error:', err);
@@ -337,16 +378,13 @@ function publishMarks(){
     if(d.success){
       currentStatus='published';
       updateStatusUI();
+      setDirty(false);
       alert("Marks published successfully");
     } else alert(d.error || "Publish failed");
   });
 }
 
 saveButton.onclick = function(){
-  if(saveButton.dataset.action === 'publish'){
-    publishMarks();
-    return;
-  }
   if(!marksheetId) return alert("Load students first");
 
   const remarks = {};
@@ -379,7 +417,7 @@ saveButton.onclick = function(){
       alert("Marks saved as draft");
       currentStatus = 'draft';
       updateStatusUI();
-      setPublishMode();
+      setDirty(false);
       document.getElementById('loadStudents').click();
     } else alert(d.error || "Error saving");
   })
@@ -429,10 +467,12 @@ async function fetchSuggestedComments(studentId, scoreValue){
 function bindScoreHandlers(){
   document.querySelectorAll('.score').forEach(input => {
     input.addEventListener('input', () => {
+      const currentRow = input.closest('tr');
+      if(currentRow) currentRow.dataset.dirty = 'true';
       if(input.dataset.timer){
         clearTimeout(Number(input.dataset.timer));
       }
-      const row = input.closest('tr');
+      const row = currentRow;
       const sel = row ? row.querySelector('.suggested-comment') : null;
       if(sel){
         sel.innerHTML = '<option value="">Updating suggestions...</option>';
@@ -511,15 +551,90 @@ document.addEventListener('input', function(e){
   }
   if(e.target.classList.contains('remark')){
     e.target.dataset.manual = 'true';
+    const row = e.target.closest('tr');
+    if(row) row.dataset.dirty = 'true';
   }
   if(e.target.classList.contains('score') || e.target.classList.contains('remark')){
-    if(currentStatus === 'published') {
-      setSaveMode();
-    } else if(currentStatus === 'draft') {
-      setPublishMode();
+    if(currentStatus === 'draft'){
+      setDirty(true);
     }
   }
 });
+
+function recomputeDirty(){
+  const dirtyRows = document.querySelectorAll('#marksTable tbody tr[data-dirty="true"]');
+  setDirty(dirtyRows.length > 0);
+}
+
+function toggleRowEditable(row, editable){
+  row.querySelectorAll('.score, .remark, .suggested-comment').forEach(el => {
+    el.disabled = !editable;
+  });
+  const saveBtn = row.querySelector('.btn-row-save');
+  if(saveBtn){
+    saveBtn.disabled = !editable;
+  }
+}
+
+async function saveRow(row){
+  if(!marksheetId) return;
+  const scoreInput = row.querySelector('.score');
+  const remarkInput = row.querySelector('.remark');
+  if(!scoreInput || !remarkInput) return;
+
+  const marks = [{
+    student_id: scoreInput.dataset.id,
+    score: scoreInput.value || null,
+    comment_text: remarkInput.value || '',
+    comment_manual: (remarkInput.dataset.manual === 'true')
+  }];
+
+  const resp = await fetch("{% url 'save_marks' %}", {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'X-CSRFToken':getCookie('csrftoken')
+    },
+    body: JSON.stringify({marksheet_id:marksheetId, marks:marks, out_of:outOf.value})
+  });
+  if(!resp.ok){
+    throw new Error(await resp.text() || `Save failed (${resp.status})`);
+  }
+  const data = await resp.json();
+  if(!data.success){
+    throw new Error(data.error || 'Save failed');
+  }
+  row.dataset.dirty = 'false';
+  recomputeDirty();
+}
+
+function bindRowActions(){
+  document.querySelectorAll('.btn-row-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if(currentStatus !== 'draft') return;
+      const row = btn.closest('tr');
+      toggleRowEditable(row, true);
+    });
+  });
+  document.querySelectorAll('.btn-row-save').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if(currentStatus !== 'draft') return;
+      const row = btn.closest('tr');
+      try{
+        await saveRow(row);
+        toggleRowEditable(row, false);
+      } catch(err){
+        alert(err.message || 'Row save failed');
+      }
+    });
+  });
+
+  document.querySelectorAll('#marksTable tbody tr').forEach(row => {
+    if(currentStatus === 'draft'){
+      toggleRowEditable(row, false);
+    }
+  });
+}
 </script>
 
 {% endblock %}
