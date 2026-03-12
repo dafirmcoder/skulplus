@@ -23,6 +23,14 @@
   .assign-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;background:#0f172a;color:#fff;text-decoration:none;font-size:12px}
   .assign-btn:hover{background:#1e293b}
   .soft-link{color:#2563eb;text-decoration:none;font-weight:600}
+  .table-wrap{overflow:auto}
+  @media (max-width: 768px){
+    .parent-grid{grid-template-columns:1fr;gap:12px}
+    .parent-card{padding:12px}
+    .section-card{padding:12px}
+    .section-title{font-size:16px}
+    .table-wrap table{display:block;white-space:nowrap}
+  }
 </style>
 
   <div class="parent-grid">
@@ -82,6 +90,7 @@
 
       <div id="academics" style="margin-top:14px">
         <div class="section-title"><i class="fas fa-graduation-cap" style="color:#2563eb"></i> Academic History</div>
+        <div class="table-wrap">
         <table class="table" style="width:100%;border-collapse:collapse">
           <thead>
             <tr>
@@ -106,10 +115,12 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div id="fees" style="margin-top:14px">
         <div class="section-title"><i class="fas fa-wallet" style="color:#0ea5e9"></i> Fees Payment History</div>
+        <div class="table-wrap">
         <table class="table" style="width:100%;border-collapse:collapse">
           <thead>
             <tr>
@@ -134,10 +145,12 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div id="assignments" style="margin-top:14px">
         <div class="section-title"><i class="fas fa-file-arrow-down" style="color:#16a34a"></i> Assignments <span class="tag">{{ item.term }} {{ item.year }}</span></div>
+        <div class="table-wrap">
         <table class="table" style="width:100%;border-collapse:collapse">
           <thead>
             <tr>
@@ -162,6 +175,7 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       </div>
 
       {% if item.competency_history %}
@@ -172,6 +186,7 @@
             <div style="font-weight:700">{{ entry.title }} • {{ entry.term }} {{ entry.year }}</div>
             {% for strand, items in entry.strands.items %}
               <div style="margin-top:8px"><strong>{{ strand }}</strong></div>
+              <div class="table-wrap">
               <table class="table" style="width:100%;border-collapse:collapse">
                 <thead><tr><th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Sub Strand</th><th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0">Level</th></tr></thead>
                 <tbody>
@@ -183,6 +198,7 @@
                   {% endfor %}
                 </tbody>
               </table>
+              </div>
             {% endfor %}
           </div>
         {% endfor %}
