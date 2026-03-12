@@ -1512,16 +1512,16 @@ def school_calendar_print(request):
             m += 1
 
     generated_at = timezone.localtime(timezone.now()).strftime('%d %b %Y, %I:%M %p %Z')
-      return render(request, 'schools/school_calendar_print.html', {
-          'school': school,
-          'events': event_list,
-          'range_from': range_from,
-          'range_to': range_to,
-          'audience': audience,
-          'calendar_months': months,
-          'now': generated_at,
-          'preview': preview,
-      })
+    return render(request, 'schools/school_calendar_print.html', {
+        'school': school,
+        'events': event_list,
+        'range_from': range_from,
+        'range_to': range_to,
+        'audience': audience,
+        'calendar_months': months,
+        'now': generated_at,
+        'preview': preview,
+    })
 
 
 @login_required
