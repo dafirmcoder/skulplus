@@ -218,6 +218,12 @@
     .sp-type-error,.sp-type-danger{border-left-color:#dc2626}
     .sp-type-warning{border-left-color:#f59e0b}
     .sp-type-info{border-left-color:#0f3057}
+    @media print{
+        header, nav, footer, .topbar, .sidebar, #sidebar, .menu, .sidebar-logout, .toggle-btn, .sp-notify-wrap, .no-print{display:none !important;}
+        .wrapper{display:block !important;}
+        .main{margin:0 !important; padding:0 !important; width:100% !important;}
+        body{background:#fff !important;}
+    }
     </style>
 
     <div class="wrapper">

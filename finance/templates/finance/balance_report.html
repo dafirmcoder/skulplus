@@ -38,6 +38,7 @@
     .balance-outstanding { color:#dc2626 !important; font-weight:700; }
     .balance-cleared { color:#2563eb !important; font-weight:700; }
     .balance-overpaid { color:#16a34a !important; font-weight:700; }
+    .print-header-text{flex:1;text-align:center;}
   }
 </style>
 
@@ -78,7 +79,7 @@
         {% if school.logo %}
           <img src="{{ school.logo.url }}" alt="{{ school.name }} logo" style="width:62px;height:62px;object-fit:contain;border:1px solid #e5e7eb;border-radius:6px;padding:4px;background:#fff;" />
         {% endif %}
-        <div>
+        <div class="print-header-text">
           <h3 style="margin:0;color:#0f3057;">{{ school.name }} - Balance Report</h3>
           <div class="muted">
             {% if school.address %}{{ school.address }}{% endif %}

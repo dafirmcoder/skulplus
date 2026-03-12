@@ -62,13 +62,17 @@
   .print-only { display: none; }
 
   @media print {
+    @page { size: A4 portrait; margin: 10mm; }
+    html, body { margin: 0 !important; padding: 0 !important; }
     .no-print { display: none !important; }
     .print-only { display: block !important; }
     body { background: #fff !important; }
+    header, nav, footer, .topbar, .sidebar, #sidebar, .menu, .sidebar-logout, .toggle-btn, .sp-notify-wrap { display: none !important; }
     .main { margin-left: 0 !important; padding: 0 !important; }
     .print-wrap { padding: 8mm; color: #111; }
     .print-header { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #0f3057; padding-bottom: 10px; margin-bottom: 12px; }
     .print-logo { width: 68px; height: 68px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 6px; }
+    .print-header-text { flex:1; text-align:center; }
     .print-title { font-size: 20px; margin: 0; color: #0f3057; }
     .print-meta { font-size: 12px; color: #374151; margin-top: 3px; }
     .print-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -246,7 +250,7 @@
     {% if school.logo %}
       <img class="print-logo" src="{{ school.logo.url }}" alt="{{ school.name }} logo" />
     {% endif %}
-    <div>
+    <div class="print-header-text">
       <h1 class="print-title">{{ school.name }}</h1>
       <div class="print-meta">{% if school.address %}{{ school.address }}{% endif %}{% if school.phone %} | {{ school.phone }}{% endif %}{% if school.email %} | {{ school.email }}{% endif %}</div>
       <div class="print-meta"><strong>Fee Structure</strong>{% if selected_year %} - Year {{ selected_year }}{% endif %}{% if print_single_term %} - {{ print_term_label }}{% else %} - All Terms{% endif %}</div>
