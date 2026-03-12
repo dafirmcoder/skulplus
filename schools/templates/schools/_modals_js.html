@@ -38,7 +38,14 @@ function attachDeleteHandler(studentId){
       .then(async res => {
         if (!res.ok){ const txt = await res.text(); alert('Delete failed (status '+res.status+'): '+txt.slice(0,500)); return; }
         const data = await res.json();
-        if (data.success){ const row = document.querySelector(`tr[data-student-id="${studentId}"]`); if (row) row.remove(); closeGenericModal(); }
+        if (data.success){
+          const row = document.querySelector(`tr[data-student-id="${studentId}"]`);
+          if (row) row.remove();
+          if (typeof window.updateStudentCount === 'function') {
+            window.updateStudentCount(-1);
+          }
+          closeGenericModal();
+        }
       }).catch(err => alert('Network error: '+err.message));
   });
 }

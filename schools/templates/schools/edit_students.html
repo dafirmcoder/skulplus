@@ -2,89 +2,6 @@
 {% load static %}
 {% block content %}
 
-<div class="page-wrapper">
-
-  <!-- PAGE HEADER -->
-  <div class="page-header">
-    <h1><i class="fas fa-user-edit"></i> Edit Students</h1>
-    <p>Search, view and update student records</p>
-  </div>
-
-  <!-- SEARCH BAR -->
-  <div class="search-bar">
-    <input type="text" id="studentSearch" placeholder="Search by name, admission number or class...">
-    <i class="fas fa-search"></i>
-  </div>
-
-  <!-- STUDENT TABLE -->
-  <div class="table-card">
-    <table class="student-table">
-      <thead>
-        <tr>
-          <th>Photo</th>
-          <th>Admission No.</th>
-          <th>Name</th>
-          {% if allow_pathways %}
-          <th>Pathway</th>
-          {% endif %}
-          <th>Class</th>
-          <th>Gender</th>
-          <th>Parent Phone</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="studentTable">
-        {% for student in students %}
-        <tr data-student-id="{{ student.id }}">
-          <td>
-            {% if student.photo %}
-              <img src="{{ student.photo.url }}" class="student-pic">
-            {% else %}
-              <img src="https://via.placeholder.com/40" class="student-pic">
-            {% endif %}
-          </td>
-          <td>{{ student.admission_number }}</td>
-          <td>{{ student.first_name }} {{ student.last_name }}</td>
-          {% if allow_pathways %}
-          <td>
-            {% if student.classroom.level and student.classroom.level.name == 'Senior' %}
-              {% if student.studentpathway %}
-                <span class="badge badge-{{ student.studentpathway.pathway.code|lower }}">{{ student.studentpathway.pathway.code }}</span>
-              {% else %}
-                <span class="badge badge-warning">Not Selected</span>
-              {% endif %}
-            {% else %}
-              <span style="color:#9ca3af">—</span>
-            {% endif %}
-          </td>
-          {% endif %}
-          <td>{{ student.classroom }}</td>
-          <td>{{ student.gender }}</td>
-          <td>{{ student.parent_phone }}</td>
-          <td>
-            <a href="#" onclick="openEditModal({{ student.id }});return false;" class="btn-action edit" title="Edit">
-              <i class="fas fa-pen"></i>
-            </a>
-            <a href="#" onclick="openViewModal({{ student.id }});return false;" class="btn-action view" title="View">
-              <i class="fas fa-eye"></i>
-            </a>
-            <a href="#" onclick="openDeleteModal({{ student.id }});return false;" class="btn-action" style="background:#ef4444" title="Delete">
-              <i class="fas fa-trash"></i>
-            </a>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="{% if allow_pathways %}8{% else %}7{% endif %}" style="text-align:center;padding:20px;color:#888;">
-            No students found.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
 <style>
 :root{
   --skul-blue:#1e3a8a;
@@ -92,6 +9,8 @@
   --skul-green:#22c55e;
   --skul-orange:#f59e0b;
   --bg:#f4f7fb;
+  --ink:#0f172a;
+  --border:#e6ecf2;
 }
 
 .page-wrapper{
@@ -101,6 +20,9 @@
   min-height:100vh;
 }
 
+.page-header{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+}
 .page-header h1{
   margin:0;
   color:var(--skul-blue);
@@ -111,18 +33,19 @@
   color:#6b7280;
   font-size:14px;
 }
+.header-sub{color:#64748b;font-size:13px}
 
 /* SEARCH */
 .search-bar{
   position:relative;
-  max-width:400px;
+  max-width:420px;
   margin-bottom:20px;
 }
 .search-bar input{
   width:100%;
   padding:11px 40px 11px 14px;
-  border-radius:8px;
-  border:1px solid #e5e7eb;
+  border-radius:10px;
+  border:1px solid var(--border);
   background:#fff;
 }
 .search-bar i{
@@ -136,32 +59,36 @@
 /* TABLE CARD */
 .table-card{
   background:#fff;
-  border-radius:14px;
-  padding:18px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.05);
-  overflow-x:auto;
+  border-radius:16px;
+  padding:16px;
+  box-shadow:0 12px 28px rgba(15,23,42,.08);
 }
+.table-wrap{overflow:auto}
 
 .student-table{
   width:100%;
   border-collapse:collapse;
+  min-width:900px;
 }
 
 .student-table thead{
-  background:#eef2ff;
+  background:#f8fafc;
 }
 
 .student-table th{
   text-align:left;
   padding:12px;
-  font-size:13px;
-  color:#374151;
+  font-size:12px;
+  color:#64748b;
+  text-transform:uppercase;
+  letter-spacing:.4px;
 }
 
 .student-table td{
   padding:12px;
   border-top:1px solid #f1f5f9;
   font-size:14px;
+  vertical-align:middle;
 }
 
 .student-table tr:hover{
@@ -169,12 +96,14 @@
 }
 
 .student-pic{
-  width:40px;
-  height:40px;
-  border-radius:50%;
+  width:42px;
+  height:42px;
+  border-radius:12px;
   object-fit:cover;
-  border:2px solid #e0e7ff;
+  border:1px solid #e5e7eb;
 }
+
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#e2e8f0;color:#334155}
 
 /* ACTION BUTTONS */
 .btn-action{
@@ -193,6 +122,7 @@
 
 .btn-action.edit{ background:var(--skul-blue-light); }
 .btn-action.view{ background:var(--skul-green); }
+.btn-action.action-del{ background:#ef4444; }
 
 .btn-action:hover{
   transform:translateY(-2px);
@@ -201,6 +131,8 @@
 
 /* RESPONSIVE */
 @media(max-width:768px){
+  .page-wrapper{padding:18px}
+  .table-card{padding:12px}
   .student-table th:nth-child(5),
   .student-table td:nth-child(5),
   .student-table th:nth-child(6),
@@ -226,18 +158,119 @@
 .error{color:#dc2626;font-size:12px}
 </style>
 
+<div class="page-wrapper">
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <div>
+      <h1><i class="fas fa-user-edit"></i> Edit Students</h1>
+      <p>Search, view and update student records</p>
+    </div>
+    <div class="header-sub"><strong id="studentCount">{{ students|length }}</strong> students</div>
+  </div>
+
+  <!-- SEARCH BAR -->
+  <div class="search-bar">
+    <input type="text" id="studentSearch" placeholder="Search by name, admission number or class...">
+    <i class="fas fa-search"></i>
+  </div>
+
+  <!-- STUDENT TABLE -->
+  <div class="table-card">
+    <div class="table-wrap">
+    <table class="student-table">
+      <thead>
+        <tr>
+          <th>Photo</th>
+          <th>Admission No.</th>
+          <th>Name</th>
+          {% if allow_pathways %}
+          <th>Pathway</th>
+          {% endif %}
+          <th>Class</th>
+          <th>Gender</th>
+          <th>Parent Phone</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="studentTable">
+        {% for student in students %}
+        <tr data-student-id="{{ student.id }}">
+          <td class="td-photo">
+            {% if student.photo %}
+              <img src="{{ student.photo.url }}" class="student-pic">
+            {% else %}
+              <img src="https://via.placeholder.com/40" class="student-pic">
+            {% endif %}
+          </td>
+          <td class="td-adm">{{ student.admission_number }}</td>
+          <td class="td-name">{{ student.first_name }} {{ student.last_name }}</td>
+          {% if allow_pathways %}
+          <td class="td-pathway">
+            {% if student.classroom.level and student.classroom.level.name == 'Senior' %}
+              {% if student.studentpathway %}
+                <span class="badge badge-{{ student.studentpathway.pathway.code|lower }}">{{ student.studentpathway.pathway.code }}</span>
+              {% else %}
+                <span class="badge badge-warning">Not Selected</span>
+              {% endif %}
+            {% else %}
+              <span style="color:#9ca3af">???</span>
+            {% endif %}
+          </td>
+          {% endif %}
+          <td class="td-class"><span class="chip">{{ student.classroom }}</span></td>
+          <td class="td-gender">{{ student.gender }}</td>
+          <td class="td-parent">{{ student.parent_phone }}</td>
+          <td class="td-actions">
+            <a href="#" onclick="openEditModal({{ student.id }});return false;" class="btn-action edit action-edit" title="Edit">
+              <i class="fas fa-pen"></i>
+            </a>
+            <a href="#" onclick="openViewModal({{ student.id }});return false;" class="btn-action view action-view" title="View">
+              <i class="fas fa-eye"></i>
+            </a>
+            <a href="#" onclick="openDeleteModal({{ student.id }});return false;" class="btn-action action-del" style="background:#ef4444" title="Delete">
+              <i class="fas fa-trash"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="{% if allow_pathways %}8{% else %}7{% endif %}" style="text-align:center;padding:20px;color:#888;">
+            No students found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
 <script>
+function updateStudentCount(delta){
+  const countEl = document.getElementById("studentCount");
+  if(!countEl) return;
+  const current = parseInt(countEl.textContent || "0", 10);
+  if(Number.isFinite(current)){
+    countEl.textContent = Math.max(0, current + delta);
+  }
+}
+
 document.getElementById("studentSearch").addEventListener("keyup", function() {
   let filter = this.value.toLowerCase();
   let rows = document.querySelectorAll("#studentTable tr");
 
+  let visible = 0;
   rows.forEach(row => {
     let text = row.innerText.toLowerCase();
-    row.style.display = text.includes(filter) ? "" : "none";
+    const show = text.includes(filter);
+    row.style.display = show ? "" : "none";
+    if (show) visible += 1;
   });
+  const countEl = document.getElementById("studentCount");
+  if(countEl) countEl.textContent = visible;
 });
 </script>
-
 <!-- EDIT MODAL (AJAX) -->
 <div class="modal-bg" id="editModal">
   <div class="modal" id="editModalContent"></div>
@@ -267,6 +300,8 @@ function openEditModal(studentId){
       document.getElementById('editModal').style.display = 'flex';
       attachEditFormHandler();
     }).catch(err => { alert('Could not load edit form: '+err.message); });
+  const countEl = document.getElementById("studentCount");
+  if(countEl) countEl.textContent = visible;
 }
 function closeEditModal(){ document.getElementById('editModal').style.display = 'none'; }
 
@@ -284,23 +319,33 @@ function attachEditFormHandler(){
       credentials: 'same-origin',
       headers: {'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': csrftoken || ''}
     }).then(async res => {
-      if (!res.ok){ try{ const data = await res.json(); if (data && data.errors){ showEditErrors(data.errors); return; } }catch(e){} const txt = await res.text(); showEditErrors({'__all__':[txt.slice(0,300)]}); return; }
+      if (!res.ok){ try{ const data = await res.json(); if (data && data.errors){ showEditErrors(data.errors); return; } }catch(e){} const txt = await res.text(); showEditErrors({'__all__':[txt.slice(0,300)]});
+  const countEl = document.getElementById("studentCount");
+  if(countEl) countEl.textContent = visible; return; }
       const data = await res.json();
       if (data.success){
         const s = data.student;
         const row = document.querySelector(`tr[data-student-id="${s.id}"]`);
         if (row){
-          row.children[0].querySelector('img').src = s.photo_url || 'https://via.placeholder.com/40';
-          row.children[1].textContent = s.admission_number || '';
-          row.children[2].textContent = (s.first_name||'') + ' ' + (s.last_name||'');
-          row.children[3].textContent = s.classroom || '';
-          row.children[4].textContent = s.gender || '';
-          row.children[5].textContent = s.parent_phone || '';
+          const img = row.querySelector('.td-photo img');
+          if (img) img.src = s.photo_url || 'https://via.placeholder.com/40';
+          const adm = row.querySelector('.td-adm');
+          if (adm) adm.textContent = s.admission_number || '';
+          const nameCell = row.querySelector('.td-name');
+          if (nameCell) nameCell.textContent = (s.first_name||'') + ' ' + (s.last_name||'');
+          const classCell = row.querySelector('.td-class .chip');
+          if (classCell) classCell.textContent = s.classroom || '';
+          const genderCell = row.querySelector('.td-gender');
+          if (genderCell) genderCell.textContent = s.gender || '';
+          const parentCell = row.querySelector('.td-parent');
+          if (parentCell) parentCell.textContent = s.parent_phone || '';
         }
         closeEditModal();
       } else if (data.errors){ showEditErrors(data.errors); }
     }).catch(err=> showEditErrors({'__all__':['Network error: '+err.message]}));
   });
+  const countEl = document.getElementById("studentCount");
+  if(countEl) countEl.textContent = visible;
 
   function showEditErrors(errors){
     const errDiv = document.getElementById('edit-form-errors'); if (!errDiv) return; errDiv.innerHTML='';
