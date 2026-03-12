@@ -1,6 +1,8 @@
 from collections import OrderedDict
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
+import io
+from urllib.request import urlopen
 import mimetypes
 import os
 
@@ -1902,4 +1904,12 @@ def _image_reader_from_field(field):
         if hasattr(field, 'url'):
             return ImageReader(field.url)
     except Exception:
-        return None
+        try:
+            url = getattr(field, 'url', None)
+            if not url:
+                return None
+            with urlopen(url) as resp:
+                data = resp.read()
+            return ImageReader(io.BytesIO(data))
+        except Exception:
+            return None
