@@ -157,7 +157,7 @@
               {% if rec.is_paid %}
               <span class="icon-btn disabled" title="Paid month is locked"><i class="fas fa-eye"></i></span>
               {% else %}
-              <a href="{% url 'payroll_overview' %}?record={{ rec.id }}" class="icon-btn" title="View/Edit"><i class="fas fa-eye"></i></a>
+              <a href="{% url 'payroll_overview' %}?record={{ rec.id }}{% if filter_month %}&filter_month={{ filter_month }}{% endif %}{% if filter_year %}&filter_year={{ filter_year }}{% endif %}" class="icon-btn" title="View/Edit"><i class="fas fa-eye"></i></a>
               {% endif %}
               <a href="{% url 'generate_payslip' rec.id %}" class="icon-btn" title="Payslip"><i class="fas fa-file-lines"></i></a>
               {% if rec.month|lower == 'december' %}
@@ -187,7 +187,7 @@
   <div class="modal-card">
     <div class="modal-head">
       <h3 style="margin:0;color:#0f3057;">Edit Payroll: {{ selected_record.staff.full_name }}</h3>
-      <a href="{% url 'payroll_overview' %}" class="icon-btn" title="Close"><i class="fas fa-xmark"></i></a>
+      <a href="{% url 'payroll_overview' %}{% if filter_month or filter_year %}?{% if filter_month %}filter_month={{ filter_month }}{% endif %}{% if filter_year %}{% if filter_month %}&{% endif %}filter_year={{ filter_year }}{% endif %}{% endif %}" class="icon-btn" title="Close"><i class="fas fa-xmark"></i></a>
     </div>
     <form method="post" class="fields">
       {% csrf_token %}
@@ -249,7 +249,7 @@
       </div>
       <div class="full">
         <button type="submit" class="btn">Save Payroll Changes</button>
-        <a href="{% url 'payroll_overview' %}" class="btn-secondary" style="margin-left:8px;text-decoration:none;display:inline-block;">Close</a>
+        <a href="{% url 'payroll_overview' %}{% if filter_month or filter_year %}?{% if filter_month %}filter_month={{ filter_month }}{% endif %}{% if filter_year %}{% if filter_month %}&{% endif %}filter_year={{ filter_year }}{% endif %}{% endif %}" class="btn-secondary" style="margin-left:8px;text-decoration:none;display:inline-block;">Close</a>
       </div>
     </form>
   </div>
@@ -344,15 +344,16 @@
     }
 
     const modal = document.getElementById('payroll-modal');
+    const closeUrl = "{% url 'payroll_overview' %}{% if filter_month or filter_year %}?{% if filter_month %}filter_month={{ filter_month }}{% endif %}{% if filter_year %}{% if filter_month %}&{% endif %}filter_year={{ filter_year }}{% endif %}{% endif %}";
     if (modal) {
       modal.addEventListener('click', function (event) {
         if (event.target === modal) {
-          window.location.href = "{% url 'payroll_overview' %}";
+          window.location.href = closeUrl;
         }
       });
       document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
-          window.location.href = "{% url 'payroll_overview' %}";
+          window.location.href = closeUrl;
         }
       });
     }

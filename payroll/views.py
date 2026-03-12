@@ -327,22 +327,33 @@ def payroll_overview(request):
         return HttpResponseForbidden('Only headteachers can view payroll.')
 
     staff = Staff.objects.select_related('school').filter(school=school).order_by('full_name')
-    records = PayrollRecord.objects.select_related('staff').filter(staff__school=school).order_by('-year', '-id')
+    records_base = PayrollRecord.objects.select_related('staff').filter(staff__school=school).order_by('-year', '-id')
     current_month = date.today().strftime('%B')
     current_year_raw = str(date.today().year)
-    filter_month = (request.GET.get('filter_month') or current_month).strip()
-    filter_year_raw = (request.GET.get('filter_year') or current_year_raw).strip()
+    selected_record = None
+    selected_record_id = request.GET.get('record')
+    if selected_record_id:
+        selected_record = records_base.filter(id=selected_record_id).first()
+
+    filter_month = (request.GET.get('filter_month') or '').strip()
+    filter_year_raw = (request.GET.get('filter_year') or '').strip()
+    if not filter_month and not filter_year_raw and selected_record:
+        filter_month = selected_record.month
+        filter_year_raw = str(selected_record.year)
+    if not filter_month:
+        filter_month = current_month
+    if not filter_year_raw:
+        filter_year_raw = current_year_raw
     filter_year = int(filter_year_raw) if filter_year_raw.isdigit() else None
+    records = records_base
     if filter_month:
         records = records.filter(month=filter_month)
     if filter_year is not None:
         records = records.filter(year=filter_year)
     period_paid = records.exists() and not records.filter(is_paid=False).exists()
     payroll_form = PayrollRecordForm(initial={'year': date.today().year})
-    selected_record = None
-    selected_record_id = request.GET.get('record')
     if selected_record_id:
-        selected_record = records.filter(id=selected_record_id).first()
+        selected_record = records.filter(id=selected_record_id).first() or selected_record
 
     if request.method == 'POST':
         action = request.POST.get('action', '').strip().lower()
