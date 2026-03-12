@@ -299,10 +299,17 @@ if(openPrintBtn){
     if(to) params.set('to', to);
     if(audience) params.set('audience', audience);
     const url = '{% url "school_calendar_print" %}' + (params.toString() ? `?${params.toString()}` : '');
-    if (window.SkulPlusPrint && typeof window.SkulPlusPrint.printUrl === 'function') {
-      window.SkulPlusPrint.printUrl(url);
+    try {
+      if (window.SkulPlusPrint && typeof window.SkulPlusPrint.printUrl === 'function') {
+        window.SkulPlusPrint.printUrl(url);
+        return;
+      }
+    } catch (e) {}
+    const win = window.open(url, '_blank');
+    if (!win) {
+      alert('Popup blocked. Please allow popups and try again.');
     } else {
-      window.open(url, '_blank');
+      win.focus();
     }
   });
 }
