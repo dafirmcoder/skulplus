@@ -3174,54 +3174,54 @@ def parent_dashboard(request):
                 })
             competency_history.sort(key=lambda r: (r['year'], term_order.get(r['term'], 0), r['title']), reverse=True)
 
-          student_cards.append({
-              'student': student,
-              'term': term,
-              'year': year,
-              'balance': balance,
-              'payments': payments,
-              'academic_history': academic_history,
-              'competency_history': competency_history,
-              'assignments': list(
-                  Assignment.objects.filter(
-                      classroom=student.classroom,
-                      term=term,
-                      year=year,
-                  ).select_related('subject', 'teacher__user').order_by('subject__name')
-              ) if student.classroom else [],
-          })
-          total_assignments += len(student_cards[-1]['assignments'])
+        student_cards.append({
+            'student': student,
+            'term': term,
+            'year': year,
+            'balance': balance,
+            'payments': payments,
+            'academic_history': academic_history,
+            'competency_history': competency_history,
+            'assignments': list(
+                Assignment.objects.filter(
+                    classroom=student.classroom,
+                    term=term,
+                    year=year,
+                ).select_related('subject', 'teacher__user').order_by('subject__name')
+            ) if student.classroom else [],
+        })
+        total_assignments += len(student_cards[-1]['assignments'])
 
-          try:
-              from .models import AttendanceRegister, AttendanceEntry
-              end_date = timezone.localdate()
-              start_date = end_date - datetime.timedelta(days=30)
-              att_qs = AttendanceEntry.objects.filter(
-                  student=student,
-                  register__status=AttendanceRegister.STATUS_SUBMITTED,
-                  register__date__range=(start_date, end_date),
-              ).select_related('register')
-              total_days = att_qs.count()
-              status_counts = defaultdict(int)
-              for row in att_qs.values('status').annotate(total=Count('id')):
-                  status_counts[row['status']] = row['total']
-              present = status_counts.get(AttendanceEntry.STATUS_PRESENT, 0)
-              absent = status_counts.get(AttendanceEntry.STATUS_ABSENT, 0)
-              late = status_counts.get(AttendanceEntry.STATUS_LATE, 0)
-              excused = status_counts.get(AttendanceEntry.STATUS_EXCUSED, 0)
-              pct = round((present / total_days) * 100, 1) if total_days else 0
-              student_cards[-1]['attendance_summary'] = {
-                  'total_days': total_days,
-                  'present': present,
-                  'absent': absent,
-                  'late': late,
-                  'excused': excused,
-                  'percent': pct,
-                  'range_start': start_date,
-                  'range_end': end_date,
-              }
-          except Exception:
-              student_cards[-1]['attendance_summary'] = None
+        try:
+            from .models import AttendanceRegister, AttendanceEntry
+            end_date = timezone.localdate()
+            start_date = end_date - datetime.timedelta(days=30)
+            att_qs = AttendanceEntry.objects.filter(
+                student=student,
+                register__status=AttendanceRegister.STATUS_SUBMITTED,
+                register__date__range=(start_date, end_date),
+            ).select_related('register')
+            total_days = att_qs.count()
+            status_counts = defaultdict(int)
+            for row in att_qs.values('status').annotate(total=Count('id')):
+                status_counts[row['status']] = row['total']
+            present = status_counts.get(AttendanceEntry.STATUS_PRESENT, 0)
+            absent = status_counts.get(AttendanceEntry.STATUS_ABSENT, 0)
+            late = status_counts.get(AttendanceEntry.STATUS_LATE, 0)
+            excused = status_counts.get(AttendanceEntry.STATUS_EXCUSED, 0)
+            pct = round((present / total_days) * 100, 1) if total_days else 0
+            student_cards[-1]['attendance_summary'] = {
+                'total_days': total_days,
+                'present': present,
+                'absent': absent,
+                'late': late,
+                'excused': excused,
+                'percent': pct,
+                'range_start': start_date,
+                'range_end': end_date,
+            }
+        except Exception:
+            student_cards[-1]['attendance_summary'] = None
 
     announcements = Announcement.objects.filter(
         school_id__in={s.school_id for s in students}
