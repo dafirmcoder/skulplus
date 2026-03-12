@@ -1,0 +1,212 @@
+{% extends "layouts/dashboard_base.html" %}
+{% load static %}
+{% block title %}Lesson Plan Generator{% endblock %}
+
+{% block content %}
+<div class="card-saas">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+      <h2 class="section-title mb-1">Lesson Plan Generator</h2>
+      <div class="soft-muted">Create structured lesson plans with guided steps and resource suggestions.</div>
+    </div>
+    <span class="badge text-bg-primary">Step <span id="wizardStep">1</span> of 5</span>
+  </div>
+</div>
+
+<div class="card-saas mt-3">
+  <div class="progress mb-4" style="height:8px;">
+    <div class="progress-bar bg-primary" role="progressbar" style="width:20%" id="wizardProgress"></div>
+  </div>
+
+  <form id="lessonWizard" data-curriculum="{{ curriculum_type|default:'CBE' }}">
+    <div class="wizard-step active" data-step="1">
+      <h5 class="fw-semibold mb-3">Step 1 – Class & Subject</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Class</label>
+          <select class="form-select" id="lpClass" required>
+            <option value="">Select class</option>
+            {% for item in classes %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Subject</label>
+          <select class="form-select" id="lpSubject" required>
+            <option value="">Select subject</option>
+            {% for item in subjects %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-control" id="lpDate" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Lesson Length (mins)</label>
+          <input type="number" class="form-control" id="lpLength" min="10" value="40" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-step" data-step="2">
+      <h5 class="fw-semibold mb-3">Step 2 – Topic Selection</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Topic</label>
+          <select class="form-select" id="lpTopic" required disabled>
+            <option value="">Select subject first</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Subtopic</label>
+          <select class="form-select" id="lpSubtopic" required disabled>
+            <option value="">Select topic first</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4">
+        <h6 class="fw-semibold">Suggested Resources</h6>
+        <div class="row g-3" id="resourceCards">
+          <div class="col-md-6 col-lg-3">
+            <div class="card h-100">
+              <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-play-circle text-primary"></i>
+                  <strong>Video Resource</strong>
+                </div>
+                <p class="soft-muted small">Curated video for this topic.</p>
+                <button class="btn btn-outline-primary btn-sm">Add to lesson</button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="card h-100">
+              <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-file-earmark-text text-success"></i>
+                  <strong>Worksheet</strong>
+                </div>
+                <p class="soft-muted small">Printable practice sheet.</p>
+                <button class="btn btn-outline-primary btn-sm">Add to lesson</button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="card h-100">
+              <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-lightning-charge text-warning"></i>
+                  <strong>Activity</strong>
+                </div>
+                <p class="soft-muted small">Hands-on group activity.</p>
+                <button class="btn btn-outline-primary btn-sm">Add to lesson</button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="card h-100">
+              <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-beaker text-danger"></i>
+                  <strong>Experiment</strong>
+                </div>
+                <p class="soft-muted small">Quick experiment idea.</p>
+                <button class="btn btn-outline-primary btn-sm">Add to lesson</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-step" data-step="3">
+      <h5 class="fw-semibold mb-3">Step 3 – Lesson Details</h5>
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">Learning Objectives</label>
+          <textarea class="form-control" rows="3" id="lpObjectives" placeholder="List objectives for the lesson"></textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Teaching Activities</label>
+          <textarea class="form-control" rows="4" id="lpActivities" placeholder="Outline key teaching activities"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-step" data-step="4">
+      <h5 class="fw-semibold mb-3">Step 4 – Activities & Assessment</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Assessment Method</label>
+          <select class="form-select" id="lpAssessment">
+            <option value="">Choose method</option>
+            <option>Observation Checklist</option>
+            <option>Quiz</option>
+            <option>Group Presentation</option>
+            <option>Exit Ticket</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Reflection Notes</label>
+          <input type="text" class="form-control" id="lpReflection" placeholder="What will you improve next time?">
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-step" data-step="5">
+      <h5 class="fw-semibold mb-3">Step 5 – Review & Generate</h5>
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold">Lesson Overview</h6>
+              <ul class="list-unstyled soft-muted" id="reviewOverview">
+                <li>Class: —</li>
+                <li>Subject: —</li>
+                <li>Date: —</li>
+                <li>Duration: —</li>
+              </ul>
+              <h6 class="fw-semibold mt-3">Learning Objectives</h6>
+              <p class="soft-muted" id="reviewObjectives">—</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="fw-semibold">Teaching Activities</h6>
+              <p class="soft-muted" id="reviewActivities">—</p>
+              <h6 class="fw-semibold mt-3">Assessment Method</h6>
+              <p class="soft-muted" id="reviewAssessment">—</p>
+              <h6 class="fw-semibold mt-3">Reflection</h6>
+              <p class="soft-muted" id="reviewReflection">—</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-4">
+        <button type="button" class="btn btn-outline-secondary" id="editLessonBtn">Edit</button>
+        <button type="button" class="btn btn-primary" id="generateLessonBtn"><i class="bi bi-file-earmark-pdf me-2"></i>Generate PDF</button>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between mt-4">
+      <button type="button" class="btn btn-outline-secondary" id="prevStepBtn" disabled>Back</button>
+      <button type="button" class="btn btn-primary" id="nextStepBtn">Continue</button>
+    </div>
+  </form>
+</div>
+
+<div class="loading-overlay" id="lessonLoading">
+  <div class="loading-card">
+    <div class="spinner-border text-primary" role="status"></div>
+    <div>
+      <div class="fw-semibold">Generating lesson plan...</div>
+      <div class="soft-muted">Preparing your PDF preview.</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/lessonplan_wizard.js' %}"></script>
+{% endblock %}

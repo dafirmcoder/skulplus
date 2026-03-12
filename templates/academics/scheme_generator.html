@@ -1,0 +1,187 @@
+{% extends "layouts/dashboard_base.html" %}
+{% load static %}
+
+{% block title %}Schemes of Work{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-12">
+    <div class="card-saas">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+          <h2 class="section-title mb-1">Schemes of Work Generator</h2>
+          <div class="soft-muted">Generate a structured scheme of work based on syllabus topics.</div>
+        </div>
+        <div class="badge rounded-pill text-bg-primary px-3 py-2">Curriculum: {{ curriculum_type|default:"CBE" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-7">
+    <div class="card-saas">
+      <h5 class="fw-semibold mb-3">Scheme Setup</h5>
+      <form id="schemeForm" data-curriculum="{{ curriculum_type|default:'CBE' }}">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Select Class</label>
+            <select class="form-select" id="schemeClass" required>
+              <option value="">Choose class</option>
+              {% for item in classes %}
+              <option value="{{ item.id }}">{{ item.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Select Subject</label>
+            <select class="form-select" id="schemeSubject" required>
+              <option value="">Choose subject</option>
+              {% for item in subjects %}
+              <option value="{{ item.id }}">{{ item.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Select Term</label>
+            <select class="form-select" id="schemeTerm" required>
+              <option value="">Choose term</option>
+              {% for term in terms %}
+              <option value="{{ term.id }}">{{ term.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Select Start Topic</label>
+            <select class="form-select" id="schemeTopic" required disabled>
+              <option value="">Select subject first</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Select Start Subtopic</label>
+            <select class="form-select" id="schemeSubtopic" required disabled>
+              <option value="">Select topic first</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="border-top my-4"></div>
+
+        <div id="termDatesPanel">
+          {% if term_dates %}
+          <div class="row g-3">
+            <div class="col-md-3">
+              <div class="stat-card">
+                <div class="soft-muted text-uppercase">Opening</div>
+                <div class="fw-semibold">{{ term_dates.opening_date }}</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="stat-card">
+                <div class="soft-muted text-uppercase">Midterm</div>
+                <div class="fw-semibold">{{ term_dates.midterm_date }}</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="stat-card">
+                <div class="soft-muted text-uppercase">Closing</div>
+                <div class="fw-semibold">{{ term_dates.closing_date }}</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="stat-card">
+                <div class="soft-muted text-uppercase">Total Weeks</div>
+                <div class="fw-semibold">{{ term_dates.total_weeks }}</div>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Number of Weeks</label>
+              <input type="number" class="form-control" id="manualWeeks" min="1" placeholder="e.g. 12">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Midterm Week</label>
+              <input type="number" class="form-control" id="manualMidterm" min="1" placeholder="e.g. 6">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Closing Week</label>
+              <input type="number" class="form-control" id="manualClosing" min="1" placeholder="e.g. 12">
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="mt-4 d-flex justify-content-end">
+          <button type="submit" class="btn btn-primary btn-lg px-4" id="generateSchemeBtn">
+            <i class="bi bi-magic me-2"></i>Generate Scheme
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-xl-5">
+    <div class="card-saas">
+      <h5 class="fw-semibold mb-3">Preview Panel</h5>
+      <p class="soft-muted">Once generated, your scheme preview will appear here for review before download.</p>
+      <div class="d-grid gap-2 mt-3">
+        <button class="btn btn-outline-primary" id="downloadSchemeBtn" disabled><i class="bi bi-download me-2"></i>Download PDF</button>
+        <button class="btn btn-outline-secondary" id="editSchemeBtn" disabled><i class="bi bi-pencil me-2"></i>Edit Scheme</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card-saas">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h5 class="fw-semibold mb-0">Scheme Preview</h5>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-primary btn-sm" id="downloadSchemeBtnTop" disabled>
+            <i class="bi bi-download me-1"></i>Download PDF
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" id="editSchemeBtnTop" disabled>
+            <i class="bi bi-pencil me-1"></i>Edit Scheme
+          </button>
+        </div>
+      </div>
+      <div class="table-responsive table-sticky" style="max-height:420px;">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Week</th>
+              <th>Date</th>
+              <th>Topic</th>
+              <th>Subtopic</th>
+              <th>Activities</th>
+              <th>Resources</th>
+              <th>Assessment</th>
+            </tr>
+          </thead>
+          <tbody id="schemePreviewBody">
+            <tr><td colspan="7" class="text-center soft-muted py-4">No scheme generated yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="schemeLoading">
+  <div class="loading-card">
+    <div class="spinner-border text-primary" role="status"></div>
+    <div>
+      <div class="fw-semibold">Generating scheme...</div>
+      <div class="soft-muted">Please wait a moment.</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="{% static 'js/scheme_generator.js' %}"></script>
+{% endblock %}

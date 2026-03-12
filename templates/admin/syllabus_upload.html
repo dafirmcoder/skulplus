@@ -1,0 +1,62 @@
+{% extends "layouts/dashboard_base.html" %}
+{% block title %}Syllabus Upload{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card-saas">
+      <h2 class="section-title mb-2">Upload Syllabus</h2>
+      <p class="soft-muted">Attach syllabus, sample scheme, and lesson plan files for teacher planning.</p>
+
+      <form class="row g-3" id="syllabusUploadForm">
+        <div class="col-md-6">
+          <label class="form-label">Subject</label>
+          <select class="form-select" required>
+            <option value="">Select subject</option>
+            {% for item in subjects %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Class</label>
+          <select class="form-select" required>
+            <option value="">Select class</option>
+            {% for item in classes %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Curriculum Type</label>
+          <select class="form-select" required>
+            <option value="CBE">CBE</option>
+            <option value="CAMBRIDGE">Cambridge</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Upload Syllabus Document</label>
+          <input type="file" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Upload Sample Scheme</label>
+          <input type="file" class="form-control">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Upload Sample Lesson Plan</label>
+          <input type="file" class="form-control">
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary px-4" type="submit"><i class="bi bi-cloud-arrow-up me-2"></i>Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card-saas">
+      <h5 class="fw-semibold mb-2">Instructions</h5>
+      <ul class="soft-muted small">
+        <li>Upload only syllabus documents aligned with the selected curriculum.</li>
+        <li>Teachers will only see syllabuses for their school curriculum type.</li>
+        <li>Include sample schemes/lesson plans to speed up generation.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

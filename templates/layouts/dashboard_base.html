@@ -1,0 +1,131 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{% block title %}Academic Planning{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{% static 'css/dashboard.css' %}" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body class="sp-dashboard">
+    <div class="dashboard-shell">
+      <aside class="dash-sidebar" id="dashSidebar">
+        <div class="dash-brand">
+          {% if SITE_LOGO_URL %}
+            <img src="{{ SITE_LOGO_URL }}{% if SITE_ASSET_VERSION %}?v={{ SITE_ASSET_VERSION }}{% endif %}" alt="SkulPlus" class="dash-logo">
+          {% else %}
+            <img src="{% static 'images/skulplus_logo.png' %}" alt="SkulPlus" class="dash-logo">
+          {% endif %}
+          <div>
+            <div class="dash-title">SkulPlus</div>
+            <div class="dash-subtitle">Academic Planning</div>
+          </div>
+        </div>
+        <nav class="dash-menu">
+          <a class="dash-link {% if request.path == '/teacher/dashboard/' %}active{% endif %}" href="{% url 'teacher_dashboard' %}">
+            <i class="bi bi-grid"></i><span>Dashboard</span>
+          </a>
+          <a class="dash-link {% if request.path == '/academics/schemes/' %}active{% endif %}" href="/academics/schemes/">
+            <i class="bi bi-layers"></i><span>Schemes of Work</span>
+          </a>
+          <a class="dash-link {% if request.path == '/academics/lesson-plans/' %}active{% endif %}" href="/academics/lesson-plans/">
+            <i class="bi bi-journal-text"></i><span>Lesson Plans</span>
+          </a>
+          <a class="dash-link {% if request.path == '/academics/syllabus-coverage/' %}active{% endif %}" href="/academics/syllabus-coverage/">
+            <i class="bi bi-bar-chart"></i><span>Syllabus Coverage</span>
+          </a>
+          <a class="dash-link {% if request.path == '/academics/resources/' %}active{% endif %}" href="/academics/resources/">
+            <i class="bi bi-archive"></i><span>Resources</span>
+          </a>
+          <a class="dash-link {% if request.path == '/academics/reports/' %}active{% endif %}" href="/academics/reports/">
+            <i class="bi bi-file-earmark-text"></i><span>Reports</span>
+          </a>
+        </nav>
+        <div class="dash-collapse">
+          <button class="btn btn-outline-light btn-sm" type="button" id="sidebarToggle">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+        </div>
+      </aside>
+
+      <main class="dash-main">
+        <header class="dash-topbar">
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-light d-lg-none" type="button" id="mobileToggle">
+              <i class="bi bi-list"></i>
+            </button>
+            <div class="school-pill">
+              {% if school_logo_url %}
+                <img src="{{ school_logo_url }}" alt="{{ school_name }}" class="school-logo">
+              {% endif %}
+              <span class="school-name">{{ school_name|default:"School" }}</span>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-btn" type="button" data-bs-toggle="tooltip" data-bs-title="Notifications">
+              <i class="bi bi-bell"></i>
+            </button>
+            <div class="dropdown">
+              <button class="profile-btn dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <div class="profile-avatar">{{ request.user.first_name|default:"T"|slice:":1" }}</div>
+                <span>{{ request.user.get_full_name|default:request.user.username }}</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end shadow">
+                <li><a class="dropdown-item" href="#"><i class="bi bi-person-circle me-2"></i>Profile</a></li>
+                <li><a class="dropdown-item" href="#"><i class="bi bi-collection me-2"></i>My Classes</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+              </ul>
+            </div>
+          </div>
+        </header>
+
+        <section class="dash-content">
+          {% block content %}{% endblock %}
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      (function () {
+        const sidebar = document.getElementById('dashSidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const mobileToggle = document.getElementById('mobileToggle');
+
+        if (sidebarToggle) {
+          sidebarToggle.addEventListener('click', function () {
+            sidebar.classList.toggle('collapsed');
+          });
+        }
+        if (mobileToggle) {
+          mobileToggle.addEventListener('click', function () {
+            sidebar.classList.toggle('show');
+          });
+        }
+
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function (el) { new bootstrap.Tooltip(el); });
+
+        window.SkulPlusToast = function (message, type) {
+          const wrap = document.getElementById('toastContainer');
+          if (!wrap) return;
+          const toast = document.createElement('div');
+          toast.className = `toast align-items-center text-bg-${type || 'primary'} border-0`;
+          toast.setAttribute('role', 'alert');
+          toast.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+          wrap.appendChild(toast);
+          const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+          bsToast.show();
+          toast.addEventListener('hidden.bs.toast', function () { toast.remove(); });
+        };
+      })();
+    </script>
+    {% block extra_js %}{% endblock %}
+  </body>
+</html>

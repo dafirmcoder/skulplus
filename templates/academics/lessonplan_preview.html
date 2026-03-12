@@ -1,0 +1,46 @@
+{% extends "layouts/dashboard_base.html" %}
+{% block title %}Lesson Plan Preview{% endblock %}
+{% block content %}
+<div class="card-saas">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h2 class="section-title mb-1">Lesson Plan Preview</h2>
+      <div class="soft-muted">Confirm the plan details before export.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</button>
+      <button class="btn btn-primary"><i class="bi bi-file-earmark-pdf me-1"></i>Generate PDF</button>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="fw-semibold">Lesson Overview</h6>
+          <ul class="list-unstyled soft-muted">
+            <li>Class: {{ lesson.class_name }}</li>
+            <li>Subject: {{ lesson.subject_name }}</li>
+            <li>Date: {{ lesson.date }}</li>
+            <li>Duration: {{ lesson.duration }}</li>
+          </ul>
+          <h6 class="fw-semibold mt-3">Learning Objectives</h6>
+          <p class="soft-muted">{{ lesson.objectives }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h6 class="fw-semibold">Teaching Activities</h6>
+          <p class="soft-muted">{{ lesson.activities }}</p>
+          <h6 class="fw-semibold mt-3">Assessment</h6>
+          <p class="soft-muted">{{ lesson.assessment }}</p>
+          <h6 class="fw-semibold mt-3">Reflection</h6>
+          <p class="soft-muted">{{ lesson.reflection }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

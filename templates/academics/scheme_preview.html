@@ -1,0 +1,46 @@
+{% extends "layouts/dashboard_base.html" %}
+{% block title %}Scheme Preview{% endblock %}
+{% block content %}
+<div class="card-saas">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h2 class="section-title mb-1">Scheme Preview</h2>
+      <div class="soft-muted">Review the generated scheme before downloading.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-primary"><i class="bi bi-download me-1"></i>Download PDF</button>
+      <button class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit Scheme</button>
+    </div>
+  </div>
+  <div class="table-responsive table-sticky" style="max-height:520px;">
+    <table class="table table-striped align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Week</th>
+          <th>Date</th>
+          <th>Topic</th>
+          <th>Subtopic</th>
+          <th>Activities</th>
+          <th>Resources</th>
+          <th>Assessment</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in scheme_rows %}
+        <tr>
+          <td>{{ row.week }}</td>
+          <td>{{ row.date }}</td>
+          <td>{{ row.topic }}</td>
+          <td>{{ row.subtopic }}</td>
+          <td>{{ row.activities }}</td>
+          <td>{{ row.resources }}</td>
+          <td>{{ row.assessment }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center soft-muted py-4">No scheme rows available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

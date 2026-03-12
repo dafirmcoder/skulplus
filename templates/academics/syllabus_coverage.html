@@ -1,0 +1,175 @@
+{% extends "layouts/dashboard_base.html" %}
+{% load static %}
+{% block title %}Syllabus Coverage{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-12">
+    <div class="card-saas">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+          <h2 class="section-title mb-1">Syllabus Coverage Dashboard</h2>
+          <div class="soft-muted">Monitor coverage progress across subjects and topics.</div>
+        </div>
+        <div class="badge text-bg-primary">Curriculum: {{ curriculum_type|default:"CBE" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="stat-card d-flex align-items-center gap-3">
+          <div class="stat-icon" style="background:#2563eb;"><i class="bi bi-journal-bookmark"></i></div>
+          <div>
+            <div class="soft-muted">Subjects Teaching</div>
+            <div class="fw-bold fs-5">{{ coverage_summary.subjects|default:"0" }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card d-flex align-items-center gap-3">
+          <div class="stat-icon" style="background:#16a34a;"><i class="bi bi-check2-circle"></i></div>
+          <div>
+            <div class="soft-muted">Completed Topics</div>
+            <div class="fw-bold fs-5">{{ coverage_summary.completed|default:"0" }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card d-flex align-items-center gap-3">
+          <div class="stat-icon" style="background:#f59e0b;"><i class="bi bi-activity"></i></div>
+          <div>
+            <div class="soft-muted">Total Topics</div>
+            <div class="fw-bold fs-5">{{ coverage_summary.total|default:"0" }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card d-flex align-items-center gap-3">
+          <div class="stat-icon" style="background:#0f172a;"><i class="bi bi-pie-chart"></i></div>
+          <div>
+            <div class="soft-muted">Coverage %</div>
+            <div class="fw-bold fs-5">{{ coverage_summary.percent|default:"0" }}%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card-saas">
+      <h5 class="fw-semibold mb-3">Coverage by Subject</h5>
+      {% for subject in coverage_by_subject %}
+      <div class="mb-3">
+        <div class="d-flex justify-content-between">
+          <strong>{{ subject.name }}</strong>
+          <span class="soft-muted">{{ subject.percent }}%</span>
+        </div>
+        <div class="progress" style="height:8px;">
+          <div class="progress-bar {% if subject.percent >= 75 %}bg-success{% elif subject.percent >= 40 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ subject.percent }}%"></div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="soft-muted">No subject coverage data.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card-saas">
+      <h5 class="fw-semibold mb-3">Coverage Heatmap</h5>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr><th>Week</th><th>Topic</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for row in heatmap %}
+            <tr>
+              <td>Week {{ row.week }}</td>
+              <td>{{ row.topic }}</td>
+              <td>
+                <span class="badge {% if row.status == 'covered' %}text-bg-success{% elif row.status == 'progress' %}text-bg-warning{% else %}text-bg-danger{% endif %}">
+                  {% if row.status == 'covered' %}Covered{% elif row.status == 'progress' %}In Progress{% else %}Not Started{% endif %}
+                </span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center soft-muted">No heatmap data available.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="d-flex gap-2 mt-2">
+        <span class="badge text-bg-success">Green – Covered</span>
+        <span class="badge text-bg-warning">Yellow – In Progress</span>
+        <span class="badge text-bg-danger">Red – Not Started</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card-saas">
+      <h5 class="fw-semibold mb-3">Coverage Table</h5>
+      <div class="table-responsive table-sticky" style="max-height:420px;">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th>Topic</th>
+              <th>Subtopic</th>
+              <th>Lessons Required</th>
+              <th>Lessons Completed</th>
+              <th>Status</th>
+              <th>Last Taught</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in coverage_rows %}
+            <tr>
+              <td>{{ row.topic }}</td>
+              <td>{{ row.subtopic }}</td>
+              <td>{{ row.lessons_required }}</td>
+              <td>{{ row.lessons_completed }}</td>
+              <td>
+                <span class="badge {% if row.status == 'Completed' %}text-bg-success{% elif row.status == 'In Progress' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ row.status }}</span>
+              </td>
+              <td>{{ row.last_taught|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center soft-muted py-4">No coverage records yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card-saas">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <h6 class="fw-semibold">Topic Completion</h6>
+          <canvas id="completionPie" height="220"></canvas>
+        </div>
+        <div class="col-md-4">
+          <h6 class="fw-semibold">Weekly Teaching Activity</h6>
+          <canvas id="weeklyActivity" height="220"></canvas>
+        </div>
+        <div class="col-md-4">
+          <h6 class="fw-semibold">Subject Coverage Progress</h6>
+          <canvas id="subjectCoverage" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/coverage_charts.js' %}"></script>
+<script>
+  window.coverageChartData = {{ chart_data|default:"{}"|safe }};
+</script>
+{% endblock %}
