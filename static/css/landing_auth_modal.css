@@ -353,6 +353,10 @@ body.auth-modal-open {
   .auth-modal-container .toggle-box {
     display: none;
   }
+
+  /* Mobile: show only the active form */
+  .auth-modal-container.active .form-box.login { display: none; }
+  .auth-modal-container:not(.active) .form-box.register { display: none; }
 }
 
 @media (max-width: 560px) {

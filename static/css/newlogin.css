@@ -304,7 +304,7 @@
     position: relative;
     width: 100%;
     transform: none;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     opacity: 1 !important;
     visibility: visible !important;
     pointer-events: auto !important;
@@ -335,6 +335,10 @@
   .btn { grid-column: span 1; }
 
   .toggle-box { display: none; }
+
+  /* Mobile: show only the active form */
+  .container.active .form-box.login { display: none; }
+  .container:not(.active) .form-box.register { display: none; }
 }
 
 @media (max-width: 520px) {

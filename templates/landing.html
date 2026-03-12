@@ -44,7 +44,28 @@
     .calc{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
     input, select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;}
     footer{background:#0f3057;color:#fff;text-align:center;padding:24px;}
-    @media(max-width:900px){.hero{grid-template-columns:1fr;}}
+    @media(max-width:900px){
+      .nav{flex-wrap:wrap;gap:10px;padding:14px 18px;}
+      .nav a{margin-left:0;}
+      .nav .cta{width:100%;text-align:center;}
+      .hero{grid-template-columns:1fr;padding:50px 18px;}
+      .hero h1{font-size:34px;}
+      .section{padding:0 18px 50px;}
+      .grid{grid-template-columns:1fr;}
+      .logos{grid-template-columns:repeat(2,minmax(0,1fr));}
+      .logo-card img{max-height:46px;max-width:100px;}
+      .calc{grid-template-columns:1fr;}
+      .btn-primary,.btn-outline{width:100%;justify-content:center;}
+    }
+    @media(max-width:600px){
+      .hero{padding:40px 14px;}
+      .hero h1{font-size:28px;}
+      .hero p{font-size:15px;}
+      .nav{padding:12px 14px;}
+      .section{padding:0 14px 44px;}
+      .logos{grid-template-columns:1fr;}
+      footer{padding:18px;}
+    }
   </style>
 </head>
 <body>
