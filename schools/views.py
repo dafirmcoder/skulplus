@@ -322,7 +322,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.db import transaction, IntegrityError
-from django.db.models import Sum, Avg, Count, Value, IntegerField, Max, Q
+from django.db.models import Sum, Avg, Count, Value, IntegerField, Max, Q, Case, When
 from django.db.models.functions import TruncMonth
 from django.http import HttpResponseForbidden, JsonResponse
 import json
@@ -5269,7 +5269,18 @@ def subjects(request):
     subject_ids = visible_ids.union(in_use_ids)
     subjects_qs = Subject.objects.filter(id__in=subject_ids).select_related('pathway', 'education_level').annotate(
         class_count=Value(0, output_field=IntegerField())
-    ).order_by('name')
+    )
+    subjects_qs = subjects_qs.annotate(
+        level_order=Case(
+            When(education_level__name='Pre School', then=Value(1)),
+            When(education_level__name='Lower Primary', then=Value(2)),
+            When(education_level__name='Upper Primary', then=Value(3)),
+            When(education_level__name='Junior', then=Value(4)),
+            When(education_level__name='Senior', then=Value(5)),
+            default=Value(99),
+            output_field=IntegerField(),
+        )
+    ).order_by('level_order', 'education_level__name', 'name')
 
     return render(request, 'schools/subjects.html', {
         'subjects': subjects_qs,
