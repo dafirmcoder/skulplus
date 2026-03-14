@@ -10,7 +10,7 @@ import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import DecimalField, ExpressionWrapper, F, Sum
+from django.db.models import DecimalField, ExpressionWrapper, F, Sum, Case, When, Value, IntegerField
 from django.db import transaction
 from django.http import FileResponse, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -276,7 +276,34 @@ def fee_structure(request):
     if not isinstance(structures, list):
         structures = list(structures.distinct())
 
-    classes = ClassRoom.objects.filter(school=school).order_by('name')
+    classes = ClassRoom.objects.filter(school=school).select_related('level')
+    if getattr(school, 'school_type', '') == 'CAMBRIDGE':
+        classes = classes.annotate(
+            level_order=Case(
+                When(level__name='Kindergarten', then=Value(1)),
+                When(level__name='Lower Primary', then=Value(2)),
+                When(level__name='Upper Primary', then=Value(3)),
+                When(level__name='Lower Secondary', then=Value(4)),
+                When(level__name='Upper Secondary (IGCSE)', then=Value(5)),
+                When(level__name='A Level', then=Value(6)),
+                default=Value(99),
+                output_field=IntegerField(),
+            )
+        ).order_by('level_order', 'order', 'name', 'section')
+    elif getattr(school, 'system_type', '') == 'CBE':
+        classes = classes.annotate(
+            level_order=Case(
+                When(level__name='Pre School', then=Value(1)),
+                When(level__name='Lower Primary', then=Value(2)),
+                When(level__name='Upper Primary', then=Value(3)),
+                When(level__name='Junior', then=Value(4)),
+                When(level__name='Senior', then=Value(5)),
+                default=Value(99),
+                output_field=IntegerField(),
+            )
+        ).order_by('level_order', 'order', 'name', 'section')
+    else:
+        classes = classes.order_by('order', 'name', 'section')
 
     if request.method == 'POST':
         action = request.POST.get('action', 'save').strip().lower()
@@ -352,6 +379,18 @@ def fee_structure(request):
     term_votehead_groups = OrderedDict((t, []) for t in term_order)
     class_groups_map = OrderedDict()
 
+    class_order_map = {c.name: idx for idx, c in enumerate(classes)}
+    selected_class_ids = set()
+    if class_ids:
+        try:
+            selected_class_ids = {int(cid) for cid in class_ids}
+        except Exception:
+            selected_class_ids = set()
+    class_label = 'All Classes'
+    if selected_class_ids:
+        selected_names = [c.name for c in classes if c.id in selected_class_ids]
+        class_label = ', '.join(selected_names) if selected_names else 'Selected Classes'
+
     for item in structures:
         amount = item.amount or Decimal('0')
 
@@ -366,7 +405,13 @@ def fee_structure(request):
             extras = [t for t in selected_terms if t not in terms_for_item]
             terms_for_item.extend(extras)
 
-        class_names = sorted({c.name for c in item.applicable_classes.all()})
+        class_objs = list(item.applicable_classes.all())
+        if selected_class_ids:
+            class_objs = [c for c in class_objs if c.id in selected_class_ids]
+        class_names = sorted(
+            {c.name for c in class_objs},
+            key=lambda n: class_order_map.get(n, 9999)
+        )
         classes_label = ', '.join(class_names) if class_names else '-'
 
         for row_term in terms_for_item:
@@ -487,6 +532,7 @@ def fee_structure(request):
         'school': school,
         'structures': structures,
         'classes': classes,
+        'class_label': class_label,
         'selected_class_ids': [str(c) for c in class_ids],
         'selected_term': term,
         'selected_year': year,

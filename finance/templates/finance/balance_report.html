@@ -8,32 +8,57 @@
 
 {% block content %}
 <style>
+  :root {
+    --ink:#0f172a;
+    --muted:#64748b;
+    --card:#ffffff;
+    --line:#e5e7eb;
+    --accent:#0f3057;
+    --accent-2:#2563eb;
+    --soft:#f8fafc;
+    --success:#16a34a;
+    --danger:#dc2626;
+    --warning:#f59e0b;
+  }
   .report-grid { display:grid; grid-template-columns: 1fr; gap:14px; }
-  .card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:16px; }
+  .hero { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .hero h2 { margin:0; color:var(--ink); font-size:22px; }
+  .hero-sub { color:var(--muted); font-size:13px; }
+  .chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .chip { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 10px; font-size:12px; font-weight:600; background:#e0f2fe; color:#075985; border:1px solid #bae6fd; }
+  .chip.warn { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:0 10px 24px rgba(15,48,87,.06); }
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:12px; }
+  .kpi { border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--soft); }
+  .kpi-label { color:var(--muted); font-size:12px; }
+  .kpi-value { font-size:20px; font-weight:800; color:var(--ink); }
   .filters { display:grid; grid-template-columns: 1fr 1fr 1fr auto auto auto; gap:10px; align-items:end; }
-  .label { display:block; font-size:13px; color:#374151; margin-bottom:4px; }
-  .input, .select { width:100%; padding:9px; border:1px solid #d1d5db; border-radius:6px; }
-  .btn { border:none; padding:10px 14px; border-radius:6px; cursor:pointer; font-weight:600; }
-  .btn-primary { background:#0f3057; color:#fff; }
-  .btn-soft { background:#fff; color:#1f2937; border:1px solid #d1d5db; }
-  .table-wrap { overflow:auto; }
-  .table { width:100%; border-collapse:collapse; min-width:980px; font-size:13px; }
-  .table th, .table td { border-bottom:1px solid #f3f4f6; padding:10px; text-align:left; }
-  .table th { background:#f9fafb; color:#111827; }
+  .label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .input, .select { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+  .btn { border:none; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700; }
+  .btn-primary { background:linear-gradient(135deg,var(--accent),#1d4ed8); color:#fff; }
+  .btn-soft { background:#fff; color:#1f2937; border:1px solid var(--line); }
+  .btn-soft:hover { border-color:#94a3b8; }
+  .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:12px; }
+  .table { width:100%; border-collapse:collapse; min-width:980px; font-size:13px; background:#fff; }
+  .table th, .table td { border-bottom:1px solid #f1f5f9; padding:10px; text-align:left; }
+  .table th { background:#f8fafc; color:#0f172a; position:sticky; top:0; z-index:1; }
+  .table tbody tr:hover td { background:#f8fafc; }
   .right { text-align:right !important; }
-  .balance-outstanding { color:#dc2626; font-weight:700; }
-  .balance-cleared { color:#2563eb; font-weight:700; }
-  .balance-overpaid { color:#16a34a; font-weight:700; }
-  .muted { color:#6b7280; }
+  .balance-outstanding { color:var(--danger); font-weight:800; }
+  .balance-cleared { color:var(--accent-2); font-weight:800; }
+  .balance-overpaid { color:var(--success); font-weight:800; }
+  .muted { color:var(--muted); }
   .no-print { display: block; }
   .print-only { display: none; }
+  .toolbar { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
   @media (max-width: 1100px) {
     .filters { grid-template-columns: 1fr 1fr; }
   }
   @media print {
     .no-print { display:none !important; }
     .print-only { display:block !important; }
-    .card { border:none; padding:0; }
+    .card { border:none; padding:0; box-shadow:none; }
     .table { min-width:0; }
     .balance-outstanding { color:#dc2626 !important; font-weight:700; }
     .balance-cleared { color:#2563eb !important; font-weight:700; }
@@ -46,6 +71,53 @@
 </style>
 
 <div class="report-grid">
+  <section class="card no-print">
+    <div class="hero">
+      <div>
+        <h2>Balance Report</h2>
+        <div class="hero-sub">Track fees due, paid, and outstanding balances by class.</div>
+        <div class="chip-row">
+          <span class="chip">Period: {{ period_label }}</span>
+          <span class="chip">Term: {{ term }} | Year: {{ year }}</span>
+          {% if request.GET.classroom %}
+            <span class="chip">Class: {% for c in classes %}{% if request.GET.classroom == c.id|stringformat:'s' %}{{ c.name }}{% endif %}{% endfor %}</span>
+          {% else %}
+            <span class="chip">Class: All Classes</span>
+          {% endif %}
+          {% if period_warning %}
+            <span class="chip warn">{{ period_warning }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="toolbar">
+        <button type="button" class="btn btn-soft" id="btn-print-balances">Print</button>
+        <button type="submit" form="balance-filter-form" name="export_excel" value="1" class="btn btn-soft">Export Excel</button>
+        <button type="submit" form="balance-filter-form" name="export_pdf" value="1" class="btn btn-soft">Export PDF</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card no-print">
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Total Income</div>
+        <div class="kpi-value">{{ income_total }}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Total Expenditure</div>
+        <div class="kpi-value">{{ expenditure_total }}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Net Cashflow</div>
+        <div class="kpi-value">{{ net_cashflow }}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Students Listed</div>
+        <div class="kpi-value">{{ report_data|length }}</div>
+      </div>
+    </div>
+  </section>
+
   <section class="card no-print">
     <form method="get" class="filters" id="balance-filter-form">
       <div>
@@ -70,9 +142,6 @@
         </select>
       </div>
       <button type="submit" class="btn btn-primary">Apply Filter</button>
-      <button type="button" class="btn btn-soft" id="btn-print-balances">Print Balances</button>
-      <button type="submit" name="export_excel" value="1" class="btn btn-soft">Export Excel</button>
-      <button type="submit" name="export_pdf" value="1" class="btn btn-soft">Export PDF</button>
     </form>
   </section>
 
@@ -155,16 +224,32 @@
       }
     });
 
-    const printBtn = document.getElementById('btn-print-balances');
-    printBtn?.addEventListener('click', () => {
-      const url = new URL(window.location.href);
+    function buildPrintUrl() {
+      const url = new URL(window.location.pathname, window.location.origin);
+      const data = new FormData(form);
+      data.forEach((value, key) => {
+        if (value !== null && String(value).trim() !== '') {
+          url.searchParams.set(key, value);
+        }
+      });
       url.searchParams.set('print_pdf', '1');
       url.searchParams.delete('export_pdf');
       url.searchParams.delete('export_excel');
+      return url.toString();
+    }
+
+    const printBtn = document.getElementById('btn-print-balances');
+    printBtn?.addEventListener('click', () => {
+      const url = buildPrintUrl();
       if (window.SkulPlusPrint && window.SkulPlusPrint.printUrl) {
-        window.SkulPlusPrint.printUrl(url.toString());
+        window.SkulPlusPrint.printUrl(url);
       } else {
-        window.open(url.toString(), '_blank');
+        const w = window.open(url, '_blank');
+        if (w) {
+          w.addEventListener('load', () => {
+            try { w.print(); } catch (e) {}
+          });
+        }
       }
     });
   })();

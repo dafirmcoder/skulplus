@@ -8,58 +8,49 @@
 
 {% block content %}
 <style>
-  .check-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 8px;
+  :root{
+    --ink:#0f172a;
+    --muted:#64748b;
+    --line:#e5e7eb;
+    --card:#ffffff;
+    --accent:#0f3057;
+    --accent-2:#2563eb;
+    --soft:#f8fafc;
+    --success:#16a34a;
   }
-
-  .check-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    background: #fff;
+  .page-grid{display:grid;grid-template-columns:1.1fr 0.9fr;gap:16px;align-items:start;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 24px rgba(15,48,87,.06);}
+  .hero{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px;}
+  .hero h2{margin:0;color:var(--ink);font-size:22px;}
+  .hero-sub{color:var(--muted);font-size:13px;}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;}
+  .btn{border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700;}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),#1d4ed8);color:#fff;}
+  .btn-soft{background:#fff;color:#1f2937;border:1px solid var(--line);}
+  .btn-soft:hover{border-color:#94a3b8;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .full{grid-column:1 / -1;}
+  .label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .input, .select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;}
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:600;background:#e0f2fe;color:#075985;border:1px solid #bae6fd;}
+  .check-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;}
+  .check-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;}
+  .circle-check{appearance:none;-webkit-appearance:none;width:16px;height:16px;border:2px solid #6b7280;border-radius:50%;display:inline-block;position:relative;cursor:pointer;background:#fff;margin:0;}
+  .circle-check:checked{border-color:var(--accent);background:var(--accent);}
+  .circle-check:checked::after{content:'';position:absolute;width:6px;height:6px;border-radius:50%;background:#fff;top:3px;left:3px;}
+  .small-note{font-size:12px;color:var(--muted);}
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;background:#fff;}
+  table{width:100%;border-collapse:collapse;min-width:980px;}
+  th,td{border-bottom:1px solid #f1f5f9;padding:10px;font-size:13px;text-align:left;}
+  th{background:#f8fafc;color:#0f172a;}
+  tbody tr:hover td{background:#f8fafc;}
+  .right{text-align:right;}
+  .print-only{display:none;}
+  @media (max-width: 1100px){
+    .page-grid{grid-template-columns:1fr;}
+    .form-grid{grid-template-columns:1fr;}
   }
-
-  .circle-check {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
-    border: 2px solid #6b7280;
-    border-radius: 50%;
-    display: inline-block;
-    position: relative;
-    cursor: pointer;
-    background: #fff;
-    margin: 0;
-  }
-
-  .circle-check:checked {
-    border-color: #0f3057;
-    background: #0f3057;
-  }
-
-  .circle-check:checked::after {
-    content: '';
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #fff;
-    top: 3px;
-    left: 3px;
-  }
-
-  .small-note {
-    font-size: 12px;
-    color: #6b7280;
-  }
-
-  .print-only { display: none; }
 
   @media print {
     @page { size: A4 portrait; margin: 10mm; }
@@ -86,16 +77,34 @@
   }
 </style>
 
-<div class="no-print" style="display:grid;grid-template-columns:1.1fr 1fr;gap:14px;align-items:start;">
-  <section style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;">
+<div class="no-print">
+  <section class="card">
+    <div class="hero">
+      <div>
+        <h2>Fee Structure</h2>
+        <div class="hero-sub">Build vote heads, term schedules, and class mappings.</div>
+        <div class="chip-row">
+          <span class="chip">School: {{ school.name }}</span>
+          {% if selected_year %}<span class="chip">Year: {{ selected_year }}</span>{% endif %}
+          {% if selected_term %}<span class="chip">Term: {{ selected_term }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="toolbar">
+        <button type="button" onclick="printFeeStructure()" class="btn btn-soft">Print Fee Structure</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="page-grid" style="margin-top:12px;">
+  <section class="card">
     <h3 id="fee-form-title" style="margin-top:0;color:#0f3057;">Add Or Update Vote Head</h3>
-    <form method="post" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+    <form method="post" class="form-grid">
       {% csrf_token %}
       <input type="hidden" name="structure_id" id="structure_id" />
 
-      <div style="grid-column:1 / -1;">
-        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Vote Head</label>
-        <input id="vote_head" list="votehead-options" name="vote_head" required style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" placeholder="Select existing or type new vote head" autocomplete="off" />
+      <div class="full">
+        <label class="label">Vote Head</label>
+        <input id="vote_head" list="votehead-options" name="vote_head" required class="input" placeholder="Select existing or type new vote head" autocomplete="off" />
         <div class="small-note" style="margin-top:4px;">Selecting an existing vote head prefills this form. Saving creates a new entry unless an explicit record ID is submitted.</div>
         <datalist id="votehead-options">
           {% for head in votehead_options %}
@@ -105,27 +114,27 @@
       </div>
 
       <div>
-        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Amount</label>
-        <input id="amount" type="number" min="0" step="0.01" name="amount" required style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" />
+        <label class="label">Amount</label>
+        <input id="amount" type="number" min="0" step="0.01" name="amount" required class="input" />
       </div>
 
       <div>
-        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Year</label>
-        <input id="year" type="number" name="year" value="{{ default_year }}" required style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" />
+        <label class="label">Year</label>
+        <input id="year" type="number" name="year" value="{{ default_year }}" required class="input" />
       </div>
 
-      <div style="grid-column:1 / -1;">
-        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Billing Mode</label>
-        <select name="billing_mode" id="billing_mode" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" onchange="toggleBillingMode()">
+      <div class="full">
+        <label class="label">Billing Mode</label>
+        <select name="billing_mode" id="billing_mode" class="select" onchange="toggleBillingMode()">
           {% for value, label in billing_mode_choices %}
             <option value="{{ value }}">{{ label }}</option>
           {% endfor %}
         </select>
       </div>
 
-      <div id="due-term-wrap" style="grid-column:1 / -1;display:none;">
-        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Due Term (Once a year)</label>
-        <select name="due_term" id="due_term" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;">
+      <div id="due-term-wrap" class="full" style="display:none;">
+        <label class="label">Due Term (Once a year)</label>
+        <select name="due_term" id="due_term" class="select">
           <option value="">Select term</option>
           {% for value, label in term_choices %}
             <option value="{{ value }}">{{ label }}</option>
@@ -133,8 +142,8 @@
         </select>
       </div>
 
-      <div id="selected-terms-wrap" style="grid-column:1 / -1;">
-        <label style="display:block;font-size:13px;color:#374151;margin-bottom:6px;">Selected Terms</label>
+      <div id="selected-terms-wrap" class="full">
+        <label class="label" style="margin-bottom:6px;">Selected Terms</label>
         <div class="check-list">
           {% for value, label in term_choices %}
             <label class="check-item">
@@ -145,8 +154,8 @@
         </div>
       </div>
 
-      <div style="grid-column:1 / -1;">
-        <label style="display:block;font-size:13px;color:#374151;margin-bottom:6px;">Applicable Classes</label>
+      <div class="full">
+        <label class="label" style="margin-bottom:6px;">Applicable Classes</label>
         <div class="check-list">
           {% for cls in classes %}
             <label class="check-item">
@@ -158,18 +167,19 @@
         <div class="small-note" style="margin-top:4px;">Only classes in {{ school.name }} are listed.</div>
       </div>
 
-      <div style="grid-column:1 / -1;">
-        <button id="save-btn" type="submit" style="background:#0f3057;color:#fff;border:none;padding:10px 14px;border-radius:6px;cursor:pointer;">Save Vote Head</button> <button type="button" id="cancel-edit" onclick="resetFeeForm()" style="margin-left:8px;background:#fff;color:#374151;border:1px solid #d1d5db;padding:10px 14px;border-radius:6px;cursor:pointer;display:none;">Cancel Edit</button>
+      <div class="full">
+        <button id="save-btn" type="submit" class="btn btn-primary">Save Vote Head</button>
+        <button type="button" id="cancel-edit" onclick="resetFeeForm()" class="btn btn-soft" style="margin-left:8px;display:none;">Cancel Edit</button>
       </div>
     </form>
   </section>
 
-  <section style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;">
+  <section class="card">
     <h3 style="margin-top:0;color:#0f3057;">Filter</h3>
     <form id="auto-filter-form" method="get" style="display:grid;grid-template-columns:1fr;gap:10px;">
       <div>
-        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Term</label>
-        <select name="term" data-autofilter style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;">
+        <label class="label">Term</label>
+        <select name="term" data-autofilter class="select">
           <option value="">All Terms</option>
           {% for value, label in term_choices %}
             <option value="{{ value }}" {% if selected_term == value %}selected{% endif %}>{{ label }}</option>
@@ -177,11 +187,11 @@
         </select>
       </div>
       <div>
-        <label style="display:block;font-size:13px;color:#374151;margin-bottom:4px;">Year</label>
-        <input type="number" name="year" value="{{ selected_year }}" data-autofilter style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" />
+        <label class="label">Year</label>
+        <input type="number" name="year" value="{{ selected_year }}" data-autofilter class="input" />
       </div>
       <div>
-        <label style="display:block;font-size:13px;color:#374151;margin-bottom:6px;">Class / Group Of Classes</label>
+        <label class="label" style="margin-bottom:6px;">Class / Group Of Classes</label>
         <div class="check-list">
           {% for cls in classes %}
             <label class="check-item">
@@ -191,14 +201,15 @@
           {% endfor %}
         </div>
       </div>
-      <button type="button" onclick="printFeeStructure()" style="background:#0f3057;color:#fff;border:none;padding:10px 14px;border-radius:6px;cursor:pointer;">Print Fee Structure</button>
     </form>
   </section>
+  </div>
 </div>
 
-<div class="no-print" style="margin-top:14px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:auto;">
-  <table style="width:100%;border-collapse:collapse;min-width:980px;">
-    <thead style="background:#f9fafb;">
+<div class="no-print card" style="margin-top:14px;padding:0;">
+  <div class="table-wrap">
+  <table>
+    <thead>
       <tr>
         <th style="text-align:left;padding:12px;border-bottom:1px solid #e5e7eb;">Vote Head</th>
         <th style="text-align:right;padding:12px;border-bottom:1px solid #e5e7eb;">Amount</th>
@@ -245,6 +256,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 
 <div class="print-only print-wrap" id="fee-print-area">
@@ -260,6 +272,7 @@
       </div>
       {% if school.address %}<div class="print-meta">{{ school.address|upper }}</div>{% endif %}
       <div class="print-meta"><strong>Fee Structure</strong>{% if selected_year %} - Year {{ selected_year }}{% endif %}{% if print_single_term %} - {{ print_term_label }}{% else %} - All Terms{% endif %}</div>
+      <div class="print-meta">Class: {{ class_label }}</div>
     </div>
   </div>
 

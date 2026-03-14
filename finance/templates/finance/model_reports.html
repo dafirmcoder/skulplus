@@ -195,7 +195,16 @@
 <script>
   (function(){
     function buildUrl(paramName){
-      const url = new URL(window.location.href);
+      const url = new URL(window.location.pathname, window.location.origin);
+      const form = document.querySelector('.filters');
+      if (form) {
+        const data = new FormData(form);
+        data.forEach((value, key) => {
+          if (value !== null && String(value).trim() !== '') {
+            url.searchParams.set(key, value);
+          }
+        });
+      }
       url.searchParams.delete('export_pdf');
       url.searchParams.delete('print_pdf');
       url.searchParams.set(paramName, '1');
@@ -210,7 +219,12 @@
       if (window.SkulPlusPrint && window.SkulPlusPrint.printUrl) {
         window.SkulPlusPrint.printUrl(url);
       } else {
-        window.open(url, '_blank');
+        const w = window.open(url, '_blank');
+        if (w) {
+          w.addEventListener('load', () => {
+            try { w.print(); } catch (e) {}
+          });
+        }
       }
     });
 
