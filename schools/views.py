@@ -208,6 +208,7 @@ from django.shortcuts import get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import login, update_session_auth_hash, logout as auth_logout
+from decimal import Decimal
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.db.models import Q
