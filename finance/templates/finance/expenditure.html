@@ -295,14 +295,29 @@
       }
     }
 
-    function openModal(previewUrl, downloadUrl, name, fileName) {
+    async function detectFileType(previewUrl, fileName) {
+      const clean = (fileName || '').toLowerCase();
+      if (clean.endsWith('.pdf')) return 'pdf';
+      if (clean.match(/\.(png|jpg|jpeg|webp|gif)$/)) return 'image';
+      try {
+        const head = await fetch(previewUrl, { method: 'HEAD', credentials: 'same-origin' });
+        const contentType = (head.headers.get('Content-Type') || '').toLowerCase();
+        if (contentType.includes('pdf')) return 'pdf';
+        if (contentType.startsWith('image/')) return 'image';
+      } catch (e) {
+        // ignore and fall through
+      }
+      return 'unknown';
+    }
+
+    async function openModal(previewUrl, downloadUrl, name, fileName) {
       hideAllPreview();
       downloadLink.href = downloadUrl || previewUrl;
       title.textContent = name ? `Evidence: ${name}` : 'Evidence Document';
-      const clean = (fileName || '').toLowerCase();
-      if (clean.endsWith('.pdf')) {
-        openPdf(previewUrl);
-      } else if (clean.endsWith('.png') || clean.endsWith('.jpg') || clean.endsWith('.jpeg') || clean.endsWith('.webp') || clean.endsWith('.gif')) {
+      const detected = await detectFileType(previewUrl, fileName);
+      if (detected === 'pdf') {
+        await openPdf(previewUrl);
+      } else if (detected === 'image') {
         imgView.src = previewUrl;
         imgView.style.display = 'block';
       } else {

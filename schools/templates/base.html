@@ -524,6 +524,33 @@
 
     <script>
     (function () {
+      if (window.SkulPlusPrint) return;
+      window.SkulPlusPrint = {
+        printUrl: function (url) {
+          const w = window.open(url, '_blank');
+          if (!w) return;
+          w.addEventListener('load', function () {
+            try {
+              w.focus();
+              w.print();
+            } catch (e) {}
+          });
+        },
+        printHtml: function (html) {
+          const w = window.open('', '_blank');
+          if (!w) return;
+          w.document.open();
+          w.document.write(html);
+          w.document.close();
+          w.focus();
+          try { w.print(); } catch (e) {}
+        }
+      };
+    })();
+    </script>
+
+    <script>
+    (function () {
       function ensureWrap() {
         let wrap = document.getElementById('sp-notify-wrap');
         if (!wrap) {
