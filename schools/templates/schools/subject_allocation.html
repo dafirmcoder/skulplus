@@ -178,13 +178,13 @@ function filterSubjects(){
     if (level) {
       if (schoolSystemType === 'CBE') {
         if (level === 'Pre School' || level === 'Lower Primary' || level === 'Upper Primary') {
-          if (subjectLevel && !['Primary', 'Lower Primary', 'Upper Primary', 'Pre School'].includes(subjectLevel)) {
+          if (subjectLevel !== level) {
             visible = false;
           }
         } else if (level === 'Junior') {
-          if (subjectLevel && subjectLevel !== 'Junior') visible = false;
+          if (subjectLevel !== 'Junior') visible = false;
         } else if (level === 'Senior') {
-          if (subjectLevel && subjectLevel !== 'Senior') visible = false;
+          if (subjectLevel !== 'Senior') visible = false;
           if (!allowPathways) {
             visible = false;
           } else if (!pathwayId) {
