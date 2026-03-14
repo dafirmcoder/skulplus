@@ -4637,6 +4637,68 @@ def classes_management(request):
                 }
             })
 
+        # Handle class edit
+        elif action == 'edit_class':
+            class_id = data.get('class_id')
+            name = (data.get('name') or '').strip()
+            section = (data.get('section') or '').strip()
+            level_id = data.get('level')
+            class_teacher_id = data.get('class_teacher')
+
+            if not class_id:
+                return JsonResponse({'success': False, 'error': 'Class ID required'}, status=400)
+            if not name:
+                return JsonResponse({'success': False, 'error': 'Name required'}, status=400)
+
+            cls = ClassRoom.objects.filter(id=class_id, school=school).first()
+            if not cls:
+                return JsonResponse({'success': False, 'error': 'Class not found'}, status=404)
+
+            if ClassRoom.objects.filter(
+                school=school, name__iexact=name, section__iexact=section
+            ).exclude(id=cls.id).exists():
+                return JsonResponse({'success': False, 'error': 'Class with this name/stream already exists.'}, status=400)
+
+            cls.name = name
+            cls.section = section
+
+            if level_id:
+                try:
+                    level_obj = EducationLevel.objects.get(id=level_id)
+                    if getattr(school_obj, 'school_type', '') == 'CAMBRIDGE':
+                        allowed_cambridge = ['Kindergarten', 'Lower Primary', 'Upper Primary', 'Lower Secondary', 'Upper Secondary (IGCSE)', 'A Level']
+                        if level_obj.name not in allowed_cambridge:
+                            return JsonResponse({'success': False, 'error': f"{level_obj.name} level is not allowed for Cambridge schools."}, status=400)
+                    elif school_obj.system_type == 'CBE' and hasattr(school_obj, 'allows_level') and not school_obj.allows_level(level_obj.name):
+                        return JsonResponse({'success': False, 'error': f"{level_obj.name} level is not allowed for this school."}, status=400)
+                    cast(Any, cls).level = level_obj
+                except EducationLevel.DoesNotExist:
+                    return JsonResponse({'success': False, 'error': 'Invalid level selected.'}, status=400)
+            else:
+                cls.level = None
+
+            if class_teacher_id:
+                try:
+                    teacher = Teacher.objects.get(id=int(class_teacher_id), school=school)
+                    cls.class_teacher = teacher
+                except (TypeError, ValueError, Teacher.DoesNotExist):
+                    return JsonResponse({'success': False, 'error': 'Invalid class teacher selected.'}, status=400)
+            else:
+                cls.class_teacher = None
+
+            cls.save()
+            cls_any = cast(Any, cls)
+            return JsonResponse({
+                'success': True,
+                'class': {
+                    'id': cls_any.id,
+                    'name': cls_any.name,
+                    'section': cls_any.section,
+                    'students_count': cls_any.student_set.count(),
+                    'streams': list(cls.streams.values('id', 'name', 'code')),
+                }
+            })
+
         # Handle stream creation
         elif action == 'create_stream':
             class_id = data.get('class_id')
