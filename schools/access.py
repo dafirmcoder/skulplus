@@ -63,6 +63,8 @@ def user_has_permission(user, school: Optional[School], permission: str) -> bool
             return True
         if permission == 'students' and hasattr(user, 'teacher') and user.teacher.is_class_teacher:
             return True
+        if permission == 'academics' and hasattr(user, 'teacher') and user.teacher.is_class_teacher:
+            return True
         return False
     return False
 

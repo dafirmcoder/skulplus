@@ -1130,6 +1130,32 @@ def _teacher_class_teacher_class_ids(teacher, school):
     return class_ids
 
 
+def _teacher_student_scope(teacher, school):
+    full_class_ids = set(
+        ClassRoom.objects.filter(class_teacher=teacher, school=school).values_list('id', flat=True)
+    )
+    stream_map = defaultdict(set)
+    stream_rows = StreamClassTeacher.objects.filter(
+        teacher=teacher,
+        classroom__school=school,
+    ).values_list('classroom_id', 'stream_id')
+    for class_id, stream_id in stream_rows:
+        if class_id and stream_id:
+            stream_map[class_id].add(stream_id)
+    class_ids = full_class_ids | set(stream_map.keys())
+    return full_class_ids, stream_map, class_ids
+
+
+def _teacher_can_access_student(teacher, school, student):
+    full_class_ids, stream_map, class_ids = _teacher_student_scope(teacher, school)
+    if student.classroom_id not in class_ids:
+        return False
+    if student.classroom_id in full_class_ids:
+        return True
+    allowed_streams = stream_map.get(student.classroom_id, set())
+    return bool(student.stream_id and student.stream_id in allowed_streams)
+
+
 def _teacher_allowed_subject_ids_for_class(teacher, school, class_id):
     return set(
         TeacherAssignment.objects.filter(
@@ -1622,8 +1648,9 @@ def attendance_overview(request):
     school, denied = _require_school_permission(request, 'academics', 'students')
     if denied:
         return denied
-    if not has_full_headteacher_access(request.user, school) and not request.user.is_superuser:
-        return HttpResponseForbidden('Only headteachers can access attendance reports.')
+    is_teacher = hasattr(request.user, 'teacher')
+    if not (has_full_headteacher_access(request.user, school) or request.user.is_superuser or (is_teacher and request.user.teacher.is_class_teacher)):
+        return HttpResponseForbidden('Only class teachers can access attendance reports.')
 
     from .models import AttendanceRegister, AttendanceEntry, ClassRoom
 
@@ -1633,6 +1660,9 @@ def attendance_overview(request):
     range_to = parse_date(request.GET.get('to') or '')
 
     registers = AttendanceRegister.objects.filter(school=school).select_related('classroom', 'stream', 'created_by')
+    if is_teacher and request.user.teacher.is_class_teacher and not has_full_headteacher_access(request.user, school):
+        allowed_class_ids = _teacher_class_teacher_class_ids(request.user.teacher, school)
+        registers = registers.filter(classroom_id__in=allowed_class_ids)
     if class_id:
         registers = registers.filter(classroom_id=class_id)
     if status in (AttendanceRegister.STATUS_DRAFT, AttendanceRegister.STATUS_SUBMITTED):
@@ -1644,6 +1674,8 @@ def attendance_overview(request):
     registers = registers.order_by('-date', '-id')[:200]
 
     class_list = ClassRoom.objects.filter(school=school).order_by('order', 'name')
+    if is_teacher and request.user.teacher.is_class_teacher and not has_full_headteacher_access(request.user, school):
+        class_list = class_list.filter(id__in=_teacher_class_teacher_class_ids(request.user.teacher, school))
     register_ids = [r.id for r in registers]
     entry_counts = {}
     if register_ids:
@@ -2565,10 +2597,49 @@ def admit_student(request):
         return denied
     # Determine if request is AJAX early (used for both GET and POST handling)
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    is_teacher = hasattr(request.user, 'teacher')
+    teacher = request.user.teacher if is_teacher else None
+    role = resolve_user_role(request.user, school)
+    full_access = has_full_headteacher_access(request.user, school) or role in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY)
+    full_class_ids = set()
+    stream_map = {}
+    allowed_class_ids = set()
+    if is_teacher and not full_access:
+        full_class_ids, stream_map, allowed_class_ids = _teacher_student_scope(teacher, school)
+        if not allowed_class_ids:
+            return HttpResponseForbidden('Only class teachers can admit students.')
 
     if request.method == "POST":
         # include files (photo) when binding form
         form = StudentForm(request.POST, request.FILES, school=school)
+        if is_teacher and not full_access:
+            if 'classroom' in form.fields:
+                form.fields['classroom'].queryset = ClassRoom.objects.filter(
+                    school=school, id__in=allowed_class_ids
+                ).order_by('name')
+            class_id = request.POST.get('classroom')
+            stream_id = request.POST.get('stream')
+            try:
+                class_id_int = int(class_id) if class_id else None
+            except Exception:
+                class_id_int = None
+            try:
+                stream_id_int = int(stream_id) if stream_id else None
+            except Exception:
+                stream_id_int = None
+            if not class_id_int or class_id_int not in allowed_class_ids:
+                messages.error(request, 'You can only admit students to your class.')
+                return redirect('admit_student')
+            if class_id_int not in full_class_ids:
+                allowed_streams = stream_map.get(class_id_int, set())
+                if not stream_id_int or stream_id_int not in allowed_streams:
+                    messages.error(request, 'You can only admit students to your assigned stream.')
+                    return redirect('admit_student')
+            if 'stream' in form.fields:
+                if class_id_int in stream_map and class_id_int not in full_class_ids:
+                    form.fields['stream'].queryset = Stream.objects.filter(
+                        id__in=stream_map.get(class_id_int, set())
+                    ).order_by('name')
         if form.is_valid():
             student = form.save(commit=False)
             student.school = school
@@ -2617,6 +2688,11 @@ def admit_student(request):
 
     else:
         form = StudentForm(school=school)
+        if is_teacher and not full_access:
+            if 'classroom' in form.fields:
+                form.fields['classroom'].queryset = ClassRoom.objects.filter(
+                    school=school, id__in=allowed_class_ids
+                ).order_by('name')
 
     # If this is an AJAX GET request, return just the form partial (for modal)
     if is_ajax and request.method == 'GET':
@@ -2624,7 +2700,14 @@ def admit_student(request):
 
     # Non-AJAX: render full page with students and classes scoped to the headteacher's school
     students = Student.objects.filter(school=school).order_by('last_name', 'first_name')
+    if is_teacher and not full_access:
+        students = students.filter(classroom_id__in=allowed_class_ids)
+        stream_ids = set().union(*stream_map.values()) if stream_map else set()
+        if stream_ids:
+            students = students.filter(Q(classroom_id__in=full_class_ids) | Q(stream_id__in=stream_ids))
     classes = ClassRoom.objects.filter(school=school)
+    if is_teacher and not full_access:
+        classes = classes.filter(id__in=allowed_class_ids)
 
     return render(request, 'schools/admit_student.html', {
         'form': form,
@@ -2640,9 +2723,48 @@ def admit_student_new(request):
     if denied:
         return denied
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+    is_teacher = hasattr(request.user, 'teacher')
+    teacher = request.user.teacher if is_teacher else None
+    role = resolve_user_role(request.user, school)
+    full_access = has_full_headteacher_access(request.user, school) or role in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY)
+    full_class_ids = set()
+    stream_map = {}
+    allowed_class_ids = set()
+    if is_teacher and not full_access:
+        full_class_ids, stream_map, allowed_class_ids = _teacher_student_scope(teacher, school)
+        if not allowed_class_ids:
+            return HttpResponseForbidden('Only class teachers can admit students.')
 
     if request.method == 'POST':
         form = StudentForm(request.POST, request.FILES, school=school)
+        if is_teacher and not full_access:
+            if 'classroom' in form.fields:
+                form.fields['classroom'].queryset = ClassRoom.objects.filter(
+                    school=school, id__in=allowed_class_ids
+                ).order_by('name')
+            class_id = request.POST.get('classroom')
+            stream_id = request.POST.get('stream')
+            try:
+                class_id_int = int(class_id) if class_id else None
+            except Exception:
+                class_id_int = None
+            try:
+                stream_id_int = int(stream_id) if stream_id else None
+            except Exception:
+                stream_id_int = None
+            if not class_id_int or class_id_int not in allowed_class_ids:
+                messages.error(request, 'You can only admit students to your class.')
+                return redirect('admit_student_new')
+            if class_id_int not in full_class_ids:
+                allowed_streams = stream_map.get(class_id_int, set())
+                if not stream_id_int or stream_id_int not in allowed_streams:
+                    messages.error(request, 'You can only admit students to your assigned stream.')
+                    return redirect('admit_student_new')
+            if 'stream' in form.fields:
+                if class_id_int in stream_map and class_id_int not in full_class_ids:
+                    form.fields['stream'].queryset = Stream.objects.filter(
+                        id__in=stream_map.get(class_id_int, set())
+                    ).order_by('name')
 
         if form.is_valid():
             student = form.save(commit=False)
@@ -2684,6 +2806,11 @@ def admit_student_new(request):
                 return JsonResponse({'success': False, 'errors': form.errors}, status=400)
     else:
         form = StudentForm(school=school)
+        if is_teacher and not full_access:
+            if 'classroom' in form.fields:
+                form.fields['classroom'].queryset = ClassRoom.objects.filter(
+                    school=school, id__in=allowed_class_ids
+                ).order_by('name')
 
     return render(request, 'schools/admit_student_form.html', {'form': form})
 
@@ -3061,6 +3188,18 @@ def edit_students(request):
     students = Student.objects.filter(school=school).select_related(
         'classroom__level', 'stream'
     ).select_related('studentpathway__pathway').order_by('last_name', 'first_name')
+    role = resolve_user_role(request.user, school)
+    full_access = has_full_headteacher_access(request.user, school) or role in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY)
+    if hasattr(request.user, 'teacher') and not full_access:
+        teacher = request.user.teacher
+        full_class_ids, stream_map, allowed_class_ids = _teacher_student_scope(teacher, school)
+        if not allowed_class_ids:
+            return HttpResponseForbidden('Only class teachers can edit students.')
+        students = students.filter(classroom_id__in=allowed_class_ids)
+        if stream_map:
+            stream_ids = set().union(*stream_map.values()) if stream_map else set()
+            if stream_ids:
+                students = students.filter(stream_id__in=stream_ids) | students.filter(classroom_id__in=full_class_ids)
 
     # ensure template-safe `photo` attribute exists (some Student records may not have it)
     for s in students:
@@ -3329,15 +3468,50 @@ def edit_student(request, student_id):
         return denied
     if not school:
         return HttpResponseForbidden()
+    role = resolve_user_role(request.user, school)
+    full_access = has_full_headteacher_access(request.user, school) or role in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY)
     try:
         student = Student.objects.get(id=student_id, school=school)
     except Student.DoesNotExist:
         return HttpResponseForbidden()
+    if hasattr(request.user, 'teacher') and not full_access:
+        teacher = request.user.teacher
+        if not _teacher_can_access_student(teacher, school, student):
+            return HttpResponseForbidden('You can only edit students in your class.')
 
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
     if request.method == 'POST':
         form = StudentForm(request.POST, request.FILES, instance=student, school=school)
+        if hasattr(request.user, 'teacher') and not full_access:
+            full_class_ids, stream_map, allowed_class_ids = _teacher_student_scope(request.user.teacher, school)
+            if 'classroom' in form.fields:
+                form.fields['classroom'].queryset = ClassRoom.objects.filter(
+                    school=school, id__in=allowed_class_ids
+                ).order_by('name')
+            class_id = request.POST.get('classroom')
+            stream_id = request.POST.get('stream')
+            try:
+                class_id_int = int(class_id) if class_id else None
+            except Exception:
+                class_id_int = None
+            try:
+                stream_id_int = int(stream_id) if stream_id else None
+            except Exception:
+                stream_id_int = None
+            if not class_id_int or class_id_int not in allowed_class_ids:
+                messages.error(request, 'You can only move students within your class.')
+                return redirect('edit_student', student_id=student.id)
+            if class_id_int not in full_class_ids:
+                allowed_streams = stream_map.get(class_id_int, set())
+                if not stream_id_int or stream_id_int not in allowed_streams:
+                    messages.error(request, 'You can only move students within your assigned stream.')
+                    return redirect('edit_student', student_id=student.id)
+            if 'stream' in form.fields:
+                if class_id_int in stream_map and class_id_int not in full_class_ids:
+                    form.fields['stream'].queryset = Stream.objects.filter(
+                        id__in=stream_map.get(class_id_int, set())
+                    ).order_by('name')
 
         if form.is_valid():
             student = form.save()
@@ -3402,6 +3576,12 @@ def edit_student(request, student_id):
                 return JsonResponse({'success': False, 'errors': form.errors}, status=400)
     else:
         form = StudentForm(instance=student, school=school)
+        if hasattr(request.user, 'teacher') and not full_access:
+            full_class_ids, stream_map, allowed_class_ids = _teacher_student_scope(request.user.teacher, school)
+            if 'classroom' in form.fields:
+                form.fields['classroom'].queryset = ClassRoom.objects.filter(
+                    school=school, id__in=allowed_class_ids
+                ).order_by('name')
 
     try:
         from academics.models import StudentPathway
@@ -3448,6 +3628,12 @@ def view_student(request, student_id):
         student = Student.objects.get(id=student_id, school=school)
     except Student.DoesNotExist:
         return HttpResponseForbidden()
+    role = resolve_user_role(request.user, school)
+    full_access = has_full_headteacher_access(request.user, school) or role in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY)
+    if hasattr(request.user, 'teacher') and not full_access:
+        teacher = request.user.teacher
+        if not _teacher_can_access_student(teacher, school, student):
+            return HttpResponseForbidden('You can only view students in your class.')
 
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
     try:
@@ -3747,21 +3933,27 @@ def enter_marks(request):
     is_headteacher = hasattr(user, 'headteacher')
     is_superuser = user.is_superuser
     has_academics_role = user_has_permission(user, school, 'academics')
-    if is_headteacher or is_superuser or has_academics_role:
+    role = resolve_user_role(user, school)
+    if is_headteacher or is_superuser or role in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY):
         classes_qs = ClassRoom.objects.filter(school=school)
         subjects_qs = Subject.objects.filter(school=school).select_related('pathway', 'education_level')
     elif hasattr(user, 'teacher'):
         teacher = user.teacher
-        assigned_class_ids = TeacherAssignment.objects.filter(
-            teacher=teacher,
-            classroom__school=school,
-        ).values_list('classroom_id', flat=True).distinct()
-        assigned_subject_ids = TeacherAssignment.objects.filter(
-            teacher=teacher,
-            classroom__school=school,
-        ).values_list('subject_id', flat=True).distinct()
-        classes_qs = ClassRoom.objects.filter(school=school, id__in=assigned_class_ids)
-        subjects_qs = Subject.objects.filter(school=school, id__in=assigned_subject_ids).select_related('pathway', 'education_level')
+        if teacher.is_class_teacher:
+            class_ids = _teacher_class_teacher_class_ids(teacher, school)
+            classes_qs = ClassRoom.objects.filter(school=school, id__in=class_ids)
+            subjects_qs = Subject.objects.filter(school=school).select_related('pathway', 'education_level')
+        else:
+            assigned_class_ids = TeacherAssignment.objects.filter(
+                teacher=teacher,
+                classroom__school=school,
+            ).values_list('classroom_id', flat=True).distinct()
+            assigned_subject_ids = TeacherAssignment.objects.filter(
+                teacher=teacher,
+                classroom__school=school,
+            ).values_list('subject_id', flat=True).distinct()
+            classes_qs = ClassRoom.objects.filter(school=school, id__in=assigned_class_ids)
+            subjects_qs = Subject.objects.filter(school=school, id__in=assigned_subject_ids).select_related('pathway', 'education_level')
     else:
         classes_qs = ClassRoom.objects.none()
         subjects_qs = Subject.objects.none()
@@ -5346,6 +5538,8 @@ def merit_lists(request):
     has_academics_role = user_has_permission(request.user, school, 'academics')
     if not (is_headteacher or is_superuser or is_teacher or has_academics_role):
         return HttpResponseForbidden()
+    if is_teacher and not request.user.teacher.is_class_teacher and not has_academics_role:
+        return HttpResponseForbidden('Analysis is available to class teachers only.')
     if is_teacher and not request.user.teacher.is_class_teacher:
         return HttpResponseForbidden('Merit lists are available to class teachers only.')
 
@@ -6811,17 +7005,22 @@ def _analysis_page(request, default_scope='class'):
     is_superuser = request.user.is_superuser
     is_teacher = hasattr(request.user, 'teacher')
     has_academics_role = user_has_permission(request.user, school, 'academics')
+    role = resolve_user_role(request.user, school)
     if not (is_headteacher or is_superuser or is_teacher or has_academics_role):
         return HttpResponseForbidden()
+    if is_teacher and not request.user.teacher.is_class_teacher and role not in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY):
+        return HttpResponseForbidden('Analysis is available to class teachers only.')
 
     analysis_scope = (request.GET.get('scope') or default_scope or 'class').strip().lower()
     if analysis_scope not in {'class', 'subject'}:
         analysis_scope = 'class'
 
     classes_qs = ClassRoom.objects.filter(school=school)
-    if is_teacher and not (is_headteacher or is_superuser):
+    if is_teacher and not (is_headteacher or is_superuser or role in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY)):
         teacher = request.user.teacher
-        if analysis_scope == 'subject':
+        if teacher.is_class_teacher:
+            allowed_class_ids = _teacher_class_teacher_class_ids(teacher, school)
+        elif analysis_scope == 'subject':
             allowed_class_ids = _teacher_assigned_class_ids(teacher, school)
         else:
             allowed_class_ids = _teacher_class_teacher_class_ids(teacher, school)
@@ -7943,12 +8142,18 @@ def report_cards(request):
     school, denied = _require_school_permission(request, 'academics')
     if denied:
         return denied
+    role = resolve_user_role(request.user, school)
+    if hasattr(request.user, 'teacher') and not request.user.teacher.is_class_teacher and role not in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY) and not has_full_headteacher_access(request.user, school):
+        return HttpResponseForbidden('Report cards are available to class teachers only.')
     context = {
         'school': school,
         'classes': ClassRoom.objects.filter(school=school).order_by('order', 'name'),
         'exams': Exam.objects.filter(school=school).order_by('-year', 'term', 'start_date', 'title'),
         'terms': ['Term 1', 'Term 2', 'Term 3'],
     }
+    if hasattr(request.user, 'teacher') and role not in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY) and not has_full_headteacher_access(request.user, school):
+        teacher = request.user.teacher
+        context['classes'] = context['classes'].filter(id__in=_teacher_class_teacher_class_ids(teacher, school))
     return render(request, 'schools/report_cards.html', context)
 
 
@@ -7967,6 +8172,12 @@ def report_cards_data(request):
         return JsonResponse({'success': False, 'error': 'Please select class and exam.'}, status=400)
 
     classroom = get_object_or_404(ClassRoom, id=class_id, school=school)
+    role = resolve_user_role(request.user, school)
+    if hasattr(request.user, 'teacher') and role not in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY) and not has_full_headteacher_access(request.user, school):
+        teacher = request.user.teacher
+        allowed_class_ids = _teacher_class_teacher_class_ids(teacher, school)
+        if classroom.id not in allowed_class_ids:
+            return HttpResponseForbidden('You can only view report cards for your class.')
     exam = get_object_or_404(Exam, id=exam_id, school=school)
     term_filter = term or exam.term
 
@@ -10054,6 +10265,7 @@ def entered_marks(request):
     is_superuser = request.user.is_superuser
     is_teacher = hasattr(request.user, 'teacher')
     has_academics_role = user_has_permission(request.user, school, 'academics')
+    role = resolve_user_role(request.user, school)
     if not (is_headteacher or is_superuser or is_teacher or has_academics_role):
         return HttpResponseForbidden()
 
@@ -10069,12 +10281,27 @@ def entered_marks(request):
         .select_related('exam', 'school_class', 'subject')
     )
     teacher_allowed_class_ids = set()
-    if is_teacher and not (is_headteacher or is_superuser):
+    teacher_allowed_subject_ids = set()
+    if is_teacher and not (is_headteacher or is_superuser or role in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_DEPUTY)):
         teacher = request.user.teacher
         teacher_allowed_class_ids = _teacher_class_teacher_class_ids(teacher, school)
-        if not teacher_allowed_class_ids:
-            return HttpResponseForbidden('Entered marks is available to class teachers only.')
-        base_qs = base_qs.filter(school_class_id__in=teacher_allowed_class_ids)
+        if teacher_allowed_class_ids:
+            base_qs = base_qs.filter(school_class_id__in=teacher_allowed_class_ids)
+        else:
+            assigned_pairs = TeacherAssignment.objects.filter(
+                teacher=teacher,
+                classroom__school=school,
+                classroom__isnull=False,
+                subject__isnull=False,
+            ).values_list('classroom_id', 'subject_id')
+            if not assigned_pairs:
+                return HttpResponseForbidden('No assigned class/subject combinations.')
+            teacher_allowed_class_ids = {cid for cid, _sid in assigned_pairs}
+            teacher_allowed_subject_ids = {sid for _cid, sid in assigned_pairs}
+            base_qs = base_qs.filter(
+                school_class_id__in=teacher_allowed_class_ids,
+                subject_id__in=teacher_allowed_subject_ids,
+            )
 
     selected_exam = None
     if exam_id:
@@ -10261,6 +10488,8 @@ def set_exams(request):
     school, denied = _require_school_permission(request, 'academics')
     if denied:
         return denied
+    if hasattr(request.user, 'teacher') and not has_full_headteacher_access(request.user, school):
+        return HttpResponseForbidden('Only headteachers can set exams.')
 
     exams = Exam.objects.filter(school=school).order_by('-year', 'term', 'start_date', 'title')
     return render(request, 'schools/set_exams.html', {
@@ -10275,6 +10504,8 @@ def toggle_exam_lock(request, exam_id):
     school, denied = _require_school_permission(request, 'academics')
     if denied:
         return denied
+    if hasattr(request.user, 'teacher') and not has_full_headteacher_access(request.user, school):
+        return HttpResponseForbidden('Only headteachers can lock exams.')
 
     exam = get_object_or_404(Exam, id=exam_id, school=school)
     exam_any = cast(Any, exam)
