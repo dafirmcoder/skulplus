@@ -5258,15 +5258,10 @@ def subjects(request):
 
     form = SubjectForm(school=school)
 
-    # Include normal school-visible subjects plus any legacy subjects already used in marksheets.
     base_subjects = Subject.objects.filter(school=school).select_related('pathway', 'education_level')
-    visible_ids = set(
+    subject_ids = set(
         filter_subjects_for_school(school, base_subjects).values_list('id', flat=True)
     )
-    in_use_ids = set(
-        MarkSheet.objects.filter(exam__school=school).values_list('subject_id', flat=True).distinct()
-    )
-    subject_ids = visible_ids.union(in_use_ids)
     subjects_qs = Subject.objects.filter(id__in=subject_ids).select_related('pathway', 'education_level').annotate(
         class_count=Value(0, output_field=IntegerField())
     )
@@ -5324,6 +5319,9 @@ def delete_subject(request, subject_id):
         return HttpResponseForbidden()
     school = get_user_school(request.user)
     subject = get_object_or_404(Subject, id=subject_id, school=school)
+    from schools.models import MarkSheet
+    if MarkSheet.objects.filter(exam__school=school, subject=subject).exists():
+        return JsonResponse({'success': False, 'error': 'Cannot delete subject: marksheets exist for this subject.'}, status=400)
     subject.delete()
     return JsonResponse({'success': True})
 
