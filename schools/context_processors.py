@@ -1,5 +1,5 @@
 from .models import SiteConfig
-from .access import get_user_role, get_user_school, user_has_permission, has_full_headteacher_access
+from .access import get_user_role, get_user_school, user_has_permission, has_full_headteacher_access, user_has_user_management
 
 
 def site_logo(request):
@@ -71,6 +71,7 @@ def user_access_flags(request):
     return {
         'ACCESS_ROLE': role or '',
         'ACCESS_CAN_FULL_DASHBOARD': has_full_headteacher_access(user, school),
+        'ACCESS_CAN_USER_MGMT': user_has_user_management(user, school),
         'ACCESS_CAN_STUDENTS': user_has_permission(user, school, 'students'),
         'ACCESS_CAN_TEACHERS': user_has_permission(user, school, 'teachers'),
         'ACCESS_CAN_ACADEMICS': user_has_permission(user, school, 'academics'),

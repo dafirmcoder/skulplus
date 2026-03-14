@@ -412,7 +412,7 @@
     </li>
     {% endif %}
 
-    {% if ACCESS_CAN_FULL_DASHBOARD %}
+    {% if ACCESS_CAN_USER_MGMT %}
     <li class="has-submenu{% if request.path == new_user_url or request.path == user_updates_url %} active active-section{% endif %}" onclick="toggleMenu(event, this)">
       <i class="fas fa-users-cog"></i><span>User Management</span>
       <ul class="submenu">

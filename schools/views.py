@@ -221,6 +221,7 @@ from .access import (
     has_full_headteacher_access,
     user_has_permission,
     user_has_any_permission,
+    user_has_user_management,
 )
 
 def post_login_redirect(request):
@@ -229,8 +230,6 @@ def post_login_redirect(request):
         return redirect('login')
     if hasattr(request.user, 'headteacher'):
         return redirect('headteacher_dashboard')
-    if hasattr(request.user, 'teacher'):
-        return redirect('teacher_dashboard')
     if Student.objects.filter(parent_user=request.user).exists():
         return redirect('parent_dashboard')
     # Backward-compat fallback for legacy accounts tied to school email.
@@ -252,6 +251,8 @@ def post_login_redirect(request):
         return redirect('bursar_dashboard')
     if role in (SchoolUserAccess.ROLE_DEAN, SchoolUserAccess.ROLE_SECRETARY, SchoolUserAccess.ROLE_DEPUTY):
         return redirect('headteacher_dashboard')
+    if hasattr(request.user, 'teacher'):
+        return redirect('teacher_dashboard')
     if request.user.is_staff:
         return redirect('admin:index')
     return redirect('landing')
@@ -8905,7 +8906,7 @@ def _sync_parent_account_for_student(student: Student):
 def new_user(request):
     school = resolve_user_school(request.user)
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
-    if not school or not has_full_headteacher_access(request.user, school):
+    if not school or not user_has_user_management(request.user, school):
         if is_ajax:
             return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
         return HttpResponseForbidden()
@@ -9097,7 +9098,7 @@ def new_user(request):
 def user_updates(request):
     school = resolve_user_school(request.user)
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
-    if not school or not has_full_headteacher_access(request.user, school):
+    if not school or not user_has_user_management(request.user, school):
         if is_ajax:
             return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
         return HttpResponseForbidden()

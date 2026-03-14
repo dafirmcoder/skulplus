@@ -31,14 +31,16 @@ def get_user_role(user, school: Optional[School] = None) -> Optional[str]:
         return 'SUPERUSER'
     if hasattr(user, 'headteacher'):
         return 'HEADTEACHER'
-    if hasattr(user, 'teacher'):
-        return 'TEACHER'
     if school is None:
         school = get_user_school(user)
     if not school:
         return None
     access = SchoolUserAccess.objects.filter(user=user, school=school, is_active=True).first()
-    return access.role if access else None
+    if access:
+        return access.role
+    if hasattr(user, 'teacher'):
+        return 'TEACHER'
+    return None
 
 
 def has_full_headteacher_access(user, school: Optional[School] = None) -> bool:
@@ -57,8 +59,17 @@ def user_has_permission(user, school: Optional[School], permission: str) -> bool
     if role == ROLE_ACCOUNTS:
         return permission in {'finance'}
     if role == 'TEACHER':
-        return permission in {'academics_teacher'}
+        if permission in {'academics_teacher'}:
+            return True
+        if permission == 'students' and hasattr(user, 'teacher') and user.teacher.is_class_teacher:
+            return True
+        return False
     return False
+
+
+def user_has_user_management(user, school: Optional[School] = None) -> bool:
+    role = get_user_role(user, school)
+    return role in ('SUPERUSER', 'HEADTEACHER', ROLE_DEPUTY, ROLE_DEAN)
 
 
 def user_has_any_permission(user, school: Optional[School], permissions: Iterable[str]) -> bool:
