@@ -1691,6 +1691,9 @@ def add_payment(request):
     if selected_allocation_mode not in ('OLDEST_FIRST', 'MANUAL'):
         selected_allocation_mode = 'OLDEST_FIRST'
     entered_total = (request.POST.get('amount_paid') or '').strip()
+    entered_mpesa_code = (request.POST.get('mpesa_code') or '').strip()
+    entered_bank_slip = (request.POST.get('bank_slip_no') or '').strip()
+    entered_cheque = (request.POST.get('cheque_no') or '').strip()
 
     if request.method == 'POST':
         student = Student.objects.filter(id=selected_student_id, school=school).first()
@@ -1724,6 +1727,69 @@ def add_payment(request):
         method_values = [choice[0] for choice in payment_method_choices]
         if selected_method not in method_values:
             messages.error(request, 'Invalid payment method selected.')
+            return redirect('add_payment')
+
+        if selected_method == 'M-Pesa':
+            if not entered_mpesa_code:
+                messages.error(request, 'M-Pesa confirmation code is required.')
+                return redirect('add_payment')
+            if entered_bank_slip or entered_cheque:
+                messages.error(request, 'Bank slip or cheque numbers are only allowed for bank transfers.')
+                return redirect('add_payment')
+        elif selected_method == 'Bank':
+            if entered_mpesa_code:
+                messages.error(request, 'M-Pesa code is only allowed for M-Pesa payments.')
+                return redirect('add_payment')
+            if entered_bank_slip and entered_cheque:
+                messages.error(request, 'Provide either a bank slip number or a cheque number, not both.')
+                return redirect('add_payment')
+            if not entered_bank_slip and not entered_cheque:
+                messages.error(request, 'Bank slip number or cheque number is required for bank transfers.')
+                return redirect('add_payment')
+        else:
+            if entered_mpesa_code or entered_bank_slip or entered_cheque:
+                messages.error(request, 'Reference codes are only required for M-Pesa or bank transfers.')
+                return redirect('add_payment')
+
+        def _enforce_reference_rules(code_field: str, code_value: str, label: str) -> bool:
+            if not code_value:
+                return True
+            existing_qs = FeePayment.objects.select_related('student__parent_user').filter(
+                student__school=school,
+                **{code_field: code_value},
+            )
+            if not existing_qs.exists():
+                return True
+
+            parent_id = student.parent_user_id
+            if not parent_id:
+                messages.error(request, f'{label} already exists and cannot be reused without a parent account.')
+                return False
+
+            if existing_qs.filter(student_id=student.id).exists():
+                messages.error(request, f'{label} has already been used for this student.')
+                return False
+
+            if existing_qs.exclude(student__parent_user_id=parent_id).exists():
+                messages.error(request, f'{label} has already been used for a different parent.')
+                return False
+
+            original_amount = existing_qs.order_by('date_paid', 'id').values_list('amount_paid', flat=True).first() or Decimal('0')
+            total_used = existing_qs.aggregate(total=Sum('amount_paid'))['total'] or Decimal('0')
+            remaining = original_amount - total_used
+            if remaining <= 0:
+                messages.error(request, f'{label} amount has already been fully redeemed.')
+                return False
+            if amount_paid > remaining:
+                messages.error(request, f'{label} has only {remaining} remaining.')
+                return False
+            return True
+
+        if not _enforce_reference_rules('mpesa_code', entered_mpesa_code, 'M-Pesa confirmation code'):
+            return redirect('add_payment')
+        if not _enforce_reference_rules('bank_slip_no', entered_bank_slip, 'Bank slip number'):
+            return redirect('add_payment')
+        if not _enforce_reference_rules('cheque_no', entered_cheque, 'Cheque number'):
             return redirect('add_payment')
 
         payment_meta = _student_outstanding_meta(student, selected_term, year_int)
@@ -1810,6 +1876,9 @@ def add_payment(request):
                 year=year_int,
                 amount_paid=amount_paid,
                 payment_method=selected_method,
+                mpesa_code=entered_mpesa_code,
+                bank_slip_no=entered_bank_slip,
+                cheque_no=entered_cheque,
             )
             FeePaymentAllocation.objects.bulk_create([
                 FeePaymentAllocation(

@@ -74,6 +74,22 @@
             {% endfor %}
           </select>
         </div>
+        <div id="mpesa-code-wrap" style="display:none">
+          <label class="label">M-Pesa Confirmation Code</label>
+          <input type="text" name="mpesa_code" id="mpesa_code" class="input" value="" />
+        </div>
+        <div id="bank-ref-wrap" class="full" style="display:none">
+          <label class="label">Bank Slip / Cheque Number</label>
+          <div class="field-grid">
+            <div>
+              <input type="text" name="bank_slip_no" id="bank_slip_no" class="input" placeholder="Bank slip number" value="" />
+            </div>
+            <div>
+              <input type="text" name="cheque_no" id="cheque_no" class="input" placeholder="Cheque number" value="" />
+            </div>
+          </div>
+          <div class="muted" style="margin-top:4px;">Provide either a bank slip number or a cheque number.</div>
+        </div>
         <div>
           <label class="label">Total Amount Paid</label>
           <input type="number" min="0" step="0.01" name="amount_paid" id="amount_paid" class="input right" value="{{ entered_total }}" required />
@@ -218,6 +234,12 @@
   const dueBody = document.getElementById('due-body');
   const arrearsBody = document.getElementById('arrears-body');
   const amountPaid = document.getElementById('amount_paid');
+  const paymentMethod = document.getElementById('payment_method');
+  const mpesaWrap = document.getElementById('mpesa-code-wrap');
+  const mpesaInput = document.getElementById('mpesa_code');
+  const bankWrap = document.getElementById('bank-ref-wrap');
+  const bankSlipInput = document.getElementById('bank_slip_no');
+  const chequeInput = document.getElementById('cheque_no');
   const kpiDue = document.getElementById('kpi-due');
   const kpiPaid = document.getElementById('kpi-paid');
   const kpiBalance = document.getElementById('kpi-balance');
@@ -423,5 +445,60 @@
     await loadMeta(true, initialStudentId);
     allocationMode.onchange();
   })();
+
+  function updatePaymentRefs() {
+    const method = paymentMethod.value;
+    if (method === 'M-Pesa') {
+      mpesaWrap.style.display = '';
+      bankWrap.style.display = 'none';
+      mpesaInput.required = true;
+      bankSlipInput.required = false;
+      chequeInput.required = false;
+    } else if (method === 'Bank') {
+      mpesaWrap.style.display = 'none';
+      bankWrap.style.display = '';
+      mpesaInput.required = false;
+      bankSlipInput.required = false;
+      chequeInput.required = false;
+    } else {
+      mpesaWrap.style.display = 'none';
+      bankWrap.style.display = 'none';
+      mpesaInput.required = false;
+      bankSlipInput.required = false;
+      chequeInput.required = false;
+    }
+  }
+
+  paymentMethod.onchange = updatePaymentRefs;
+  updatePaymentRefs();
+
+  const paymentForm = document.getElementById('payment-form');
+  if (paymentForm) {
+    paymentForm.addEventListener('submit', function(e) {
+      const method = paymentMethod.value;
+      if (method === 'M-Pesa' && !mpesaInput.value.trim()) {
+        e.preventDefault();
+        alert('M-Pesa confirmation code is required.');
+        mpesaInput.focus();
+        return;
+      }
+      if (method === 'Bank') {
+        const slip = bankSlipInput.value.trim();
+        const cheque = chequeInput.value.trim();
+        if (!slip && !cheque) {
+          e.preventDefault();
+          alert('Provide a bank slip number or a cheque number.');
+          bankSlipInput.focus();
+          return;
+        }
+        if (slip && cheque) {
+          e.preventDefault();
+          alert('Provide either a bank slip number or a cheque number, not both.');
+          bankSlipInput.focus();
+          return;
+        }
+      }
+    });
+  }
 </script>
 {% endblock %}

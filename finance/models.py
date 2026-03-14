@@ -65,6 +65,9 @@ class FeePayment(models.Model):
         ('Bank', 'Bank Transfer'),
         ('M-Pesa', 'M-Pesa'),
     ))
+    mpesa_code = models.CharField(max_length=120, blank=True, db_index=True)
+    bank_slip_no = models.CharField(max_length=120, blank=True, db_index=True)
+    cheque_no = models.CharField(max_length=120, blank=True, db_index=True)
 
     def __str__(self):
         return f'{self.student} - {self.amount_paid}'
