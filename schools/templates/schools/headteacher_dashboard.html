@@ -93,6 +93,7 @@
         <div class="stat-label">Total Classes</div>
       </div>
     </div>
+    {% if can_finance %}
     <div class="stat-card">
       <div class="stat-icon" style="background:#dc2626"><i class="fas fa-coins"></i></div>
       <div>
@@ -107,6 +108,7 @@
         <div class="stat-label">Expected Fees</div>
       </div>
     </div>
+    {% endif %}
   </div>
 
   <div class="quick-actions">
@@ -136,6 +138,7 @@
       </div>
     </div>
 
+    {% if can_finance %}
     <div class="card">
       <h3>Fees Summary</h3>
       <div class="mini">Paid vs Balance</div>
@@ -143,6 +146,7 @@
         <canvas id="feesChart"></canvas>
       </div>
     </div>
+    {% endif %}
   </div>
 
   <div class="dash-grid" style="margin-top:16px;">

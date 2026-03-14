@@ -1905,24 +1905,29 @@ def headteacher_dashboard(request):
     school, denied = _require_school_permission(request, 'students', 'teachers', 'academics')
     if denied:
         return denied
-    debtors = get_students_with_balances(school)
+    can_finance = user_has_permission(request.user, school, 'finance')
+    debtors = get_students_with_balances(school) if can_finance else []
 
     students_count = Student.objects.filter(school=school).count()
     teachers_count = Teacher.objects.filter(school=school).count()
     classes_count = ClassRoom.objects.filter(school=school).count()
 
-    total_paid = Payment.objects.filter(student__school=school).aggregate(
-        total=Sum('amount_paid')
-    )['total'] or 0
-    total_balance = sum((d.get('balance', 0) or 0) for d in debtors)
-    current_year = timezone.localdate().year
-    terms = ['Term 1', 'Term 2', 'Term 3']
-    total_expected = 0
-    for student in Student.objects.filter(school=school):
-        try:
-            total_expected += sum(student.total_fees_due(term, current_year) for term in terms)
-        except Exception:
-            pass
+    total_paid = Decimal('0')
+    total_balance = Decimal('0')
+    total_expected = Decimal('0')
+    if can_finance:
+        total_paid = Payment.objects.filter(student__school=school).aggregate(
+            total=Sum('amount_paid')
+        )['total'] or 0
+        total_balance = sum((d.get('balance', 0) or 0) for d in debtors)
+        current_year = timezone.localdate().year
+        terms = ['Term 1', 'Term 2', 'Term 3']
+        total_expected = 0
+        for student in Student.objects.filter(school=school):
+            try:
+                total_expected += sum(student.total_fees_due(term, current_year) for term in terms)
+            except Exception:
+                pass
 
     recent_announcements = Announcement.objects.filter(
         school=school
@@ -1979,15 +1984,16 @@ def headteacher_dashboard(request):
             cursor = cursor.replace(month=cursor.month + 1)
 
     alerts = []
-    if total_balance > 0:
-        alerts.append(f'Outstanding balances total {total_balance}.')
-    if total_expected and total_paid:
-        try:
-            rate = float(total_paid) / float(total_expected) if float(total_expected) > 0 else 0
-        except Exception:
-            rate = 0
-        if rate < 0.6:
-            alerts.append('Collections are below 60% of expected fees.')
+    if can_finance:
+        if total_balance > 0:
+            alerts.append(f'Outstanding balances total {total_balance}.')
+        if total_expected and total_paid:
+            try:
+                rate = float(total_paid) / float(total_expected) if float(total_expected) > 0 else 0
+            except Exception:
+                rate = 0
+            if rate < 0.6:
+                alerts.append('Collections are below 60% of expected fees.')
     if not upcoming_event:
         alerts.append('No upcoming events scheduled.')
 
@@ -1999,6 +2005,7 @@ def headteacher_dashboard(request):
         'total_paid': total_paid,
         'total_balance': total_balance,
         'total_expected': total_expected,
+        'can_finance': can_finance,
         'recent_announcements': recent_announcements,
         'debtors': debtors,
         'subject_performance': subject_performance,
